@@ -1,27 +1,27 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  LayoutDashboard,
-  FileCheck,
-  Calendar,
-  ClipboardCheck,
-  Settings,
+  Activity,
+  Cpu,
+  CalendarDays,
+  ClipboardList,
+  Settings2,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Modelos de Control", href: "/modelos", icon: FileCheck },
-  { name: "Planificacion", href: "/planificacion", icon: Calendar },
-  { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardCheck },
-  { name: "Ajustes", href: "/ajustes", icon: Settings },
+  { name: "Dashboard", href: "/", icon: Activity },
+  { name: "Modelos de Control", href: "/modelos", icon: Cpu },
+  { name: "Planificacion", href: "/planificacion", icon: CalendarDays },
+  { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardList },
+  { name: "Ajustes", href: "/ajustes", icon: Settings2 },
 ]
 
 export function Sidebar() {
@@ -31,26 +31,33 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col overflow-hidden border-r border-sidebar-border bg-sidebar shadow-[18px_0_54px_oklch(0.18_0.055_255/0.26)] transition-all duration-300 before:absolute before:inset-0 before:bg-[linear-gradient(150deg,oklch(0.28_0.07_252/0.72),transparent_38%),linear-gradient(90deg,oklch(1_0_0/0.075)_0_1px,transparent_1px_100%)] before:bg-[length:100%_100%,18px_18px] before:opacity-80 before:content-[''] after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-gradient-to-b after:from-transparent after:via-white/32 after:to-transparent",
+        "relative flex flex-col overflow-hidden border-r border-[#0f2246] bg-[#06122d] shadow-[18px_0_54px_rgba(0,0,0,0.24)] transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="relative z-10 flex h-16 items-center justify-between border-b border-white/10 px-4 shadow-[inset_0_-1px_0_oklch(0_0_0/0.18)]">
+      <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.08)]">
         {!collapsed && (
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/16 bg-white/10 shadow-[inset_0_1px_0_oklch(1_0_0/0.18),0_12px_30px_oklch(0_0_0/0.30)]">
-              <div className="absolute inset-0 rounded-lg bg-[linear-gradient(145deg,white_0%,transparent_34%,oklch(0.72_0.105_230/0.20)_100%)] opacity-35" />
-              <Sparkles className="relative h-4 w-4 text-sidebar-primary drop-shadow-[0_0_8px_oklch(0.72_0.105_230/0.5)]" strokeWidth={1.8} />
-            </div>
-            <div className="leading-tight">
-              <span className="block text-sm font-bold tracking-wide text-sidebar-foreground">Qualittyx</span>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-primary">Audit OS</span>
+          <Link href="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="relative flex h-10 w-full max-w-[260px] items-center justify-center">
+              <Image
+                src="/logo1.png"
+                alt="Logo"
+                width={144}
+                height={32}
+                className="h-8 w-auto object-contain"
+              />
             </div>
           </Link>
         )}
         {collapsed && (
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-white/16 bg-white/10 shadow-[inset_0_1px_0_oklch(1_0_0/0.18),0_12px_30px_oklch(0_0_0/0.30)]">
-            <Sparkles className="h-4 w-4 text-sidebar-primary drop-shadow-[0_0_8px_oklch(0.72_0.105_230/0.5)]" strokeWidth={1.8} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center">
+            <Image
+              src="/logo1.png"
+              alt="Logo"
+              width={20}
+              height={20}
+              className="h-4 w-4 object-contain"
+            />
           </div>
         )}
         <Button
@@ -58,8 +65,8 @@ export function Sidebar() {
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "text-sidebar-foreground/72 hover:bg-white/10 hover:text-white",
-            collapsed && "absolute right-0 z-10 translate-x-1/2 border border-white/14 bg-sidebar shadow-[0_10px_24px_oklch(0_0_0/0.24)]"
+            "absolute right-4 text-white/80 hover:bg-white/10 hover:text-white",
+            collapsed && "border border-white/14 bg-[#06122d] shadow-[0_10px_24px_rgba(0,0,0,0.24)]"
           )}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -76,8 +83,8 @@ export function Sidebar() {
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200",
                 isActive
-                  ? "border border-white/16 bg-white/12 text-white shadow-[inset_0_1px_0_oklch(1_0_0/0.12),0_14px_30px_oklch(0_0_0/0.24)] before:absolute before:left-0 before:top-2 before:h-6 before:w-0.5 before:rounded-full before:bg-sidebar-primary"
-                  : "text-sidebar-foreground/72 hover:bg-white/8 hover:text-white"
+                  ? "border border-white/16 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.24)] before:absolute before:left-0 before:top-2 before:h-6 before:w-0.5 before:rounded-full before:bg-cyan-300"
+                  : "text-white/70 hover:bg-white/10 hover:text-white"
               )}
               title={collapsed ? item.name : undefined}
             >
@@ -85,14 +92,14 @@ export function Sidebar() {
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-all duration-200",
                   isActive
-                    ? "border-sidebar-primary/32 bg-sidebar-primary/16 shadow-[inset_0_1px_0_oklch(1_0_0/0.16),0_0_20px_oklch(0.72_0.105_230/0.22)]"
-                    : "border-white/10 bg-white/6 group-hover:border-white/16 group-hover:bg-white/10"
+                    ? "border-cyan-300/40 bg-cyan-300/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_22px_rgba(56,189,248,0.18)]"
+                    : "border-white/10 bg-white/5 group-hover:border-white/16 group-hover:bg-white/10"
                 )}
               >
                 <item.icon
                   className={cn(
-                    "h-[18px] w-[18px] shrink-0 drop-shadow-[0_1px_1px_oklch(0_0_0/0.4)]",
-                    isActive ? "text-sidebar-primary" : "text-sidebar-foreground/82"
+                    "h-[18px] w-[18px] shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.24)]",
+                    isActive ? "text-cyan-300" : "text-white/80"
                   )}
                   strokeWidth={1.75}
                 />
@@ -106,17 +113,17 @@ export function Sidebar() {
       <div className={cn("relative z-10 border-t border-white/10 px-2 py-4", collapsed && "px-1")}>
         <div
           className={cn(
-            "flex items-center gap-3 rounded-lg border border-white/12 bg-white/8 px-3 py-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.10)]",
+            "flex items-center gap-3 rounded-lg border border-white/12 bg-white/5 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]",
             collapsed && "justify-center border-transparent bg-transparent"
           )}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sidebar-primary/24 bg-sidebar-primary/14 shadow-[0_8px_18px_oklch(0_0_0/0.22)]">
-            <span className="text-xs font-bold text-sidebar-primary">EG</span>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 shadow-[0_8px_18px_rgba(56,189,248,0.18)]">
+            <span className="text-xs font-bold text-cyan-200">EG</span>
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-sidebar-foreground">Efrain Gonzalez</p>
-              <p className="truncate text-xs text-sidebar-foreground/52">Admin Command</p>
+              <p className="truncate text-sm font-semibold text-white">Efrain Gonzalez</p>
+              <p className="truncate text-xs text-white/60">Admin Command</p>
             </div>
           )}
         </div>

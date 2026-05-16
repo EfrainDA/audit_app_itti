@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
@@ -45,6 +46,7 @@ import {
 
 interface LoteConDatos extends Lote {
   unidadNombre: string
+  unidadLogo?: string
   modeloNombre: string
   auditoresNombres: string
   loteVerticales: LoteVertical[]
@@ -89,6 +91,7 @@ export function EvaluacionesContent() {
       return {
         ...lote,
         unidadNombre: unidad?.nombre || "N/A",
+        unidadLogo: unidad?.logo,
         modeloNombre: modelo?.nombre || "N/A",
         auditoresNombres: auditores.map((auditor) => auditor?.name).join(", "),
         loteVerticales: getLoteVerticalesCompletas(lote),
@@ -127,8 +130,8 @@ export function EvaluacionesContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card className="border-border/70 bg-card/80">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
               <ClipboardCheck className="h-5 w-5 text-primary" />
@@ -139,7 +142,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/80">
+        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-lg border border-border/70 bg-muted p-2">
               <AlertCircle className="h-5 w-5 text-muted-foreground" />
@@ -150,7 +153,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/80">
+        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
               <Clock className="h-5 w-5 text-primary" />
@@ -161,7 +164,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/80">
+        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-lg border border-success/20 bg-success/10 p-2">
               <CheckCircle2 className="h-5 w-5 text-success" />
@@ -208,17 +211,29 @@ export function EvaluacionesContent() {
           const terminados = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
 
           return (
-            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-lg border border-border/70 bg-card/80">
+            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
               <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-secondary/35">
                 <div className="flex w-full flex-col gap-3 pr-4 text-left lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
-                      <Building2 className="h-5 w-5 text-primary" />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg overflow-hidden">
+                      {lote.unidadLogo ? (
+                        <Image
+                          src={lote.unidadLogo}
+                          alt={lote.unidadNombre}
+                          width={44}
+                          height={44}
+                          className="object-contain"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full rounded-lg border border-primary/20 bg-primary/10">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <p className="font-semibold">{lote.unidadNombre}</p>
                       <p className="text-sm text-muted-foreground">
-                        {lote.modeloNombre} | Ciclo {lote.ciclo} - {lote.año}
+                        Ciclo {lote.ciclo} - {lote.año} | {lote.modeloNombre}
                       </p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <User className="h-3.5 w-3.5" />

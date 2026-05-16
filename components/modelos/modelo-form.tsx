@@ -32,6 +32,7 @@ interface VerticalForm {
 interface ParametroForm {
   id: string
   nombre: string
+  descripcion: string
   puntosBase: number
   permiteIntermedio: boolean
 }
@@ -45,7 +46,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
       nombre: "",
       peso: 100,
       tipoEvaluacion: "distribuida",
-      parametros: [{ id: "1", nombre: "", puntosBase: 100, permiteIntermedio: false }],
+      parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
     },
   ])
 
@@ -59,7 +60,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
         nombre: "",
         peso: 0,
         tipoEvaluacion: "distribuida",
-        parametros: [{ id: Date.now().toString(), nombre: "", puntosBase: 100, permiteIntermedio: false }],
+        parametros: [{ id: Date.now().toString(), nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
       },
     ])
   }
@@ -84,7 +85,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
               ...v,
               parametros: [
                 ...v.parametros,
-                { id: Date.now().toString(), nombre: "", puntosBase: 0, permiteIntermedio: false },
+                { id: Date.now().toString(), nombre: "", descripcion: "", puntosBase: 0, permiteIntermedio: false },
               ],
             }
           : v
@@ -141,7 +142,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
             id="nombre"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Modelo Operativo 2026"
+            placeholder="Ej: Ecosistema Financiero 2026"
             className="bg-secondary border-border"
           />
         </div>
@@ -176,16 +177,16 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
           {verticales.map((vertical, index) => (
             <Card key={vertical.id} className="bg-card border-border">
               <CardContent className="p-4">
-                <div className="flex items-start gap-2 mb-4">
-                  <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-grab" />
-                  <div className="flex-1 space-y-4">
+                <div className="flex items-start gap-3 mb-2">
+                  <GripVertical className="h-5 w-5 text-muted-foreground mt-1 cursor-grab gap-1" />
+                  <div className="flex-1 space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="md:col-span-2 space-y-2">
-                        <Label>Nombre de Vertical</Label>
+                        <Label>Nombre de la Vertical</Label>
                         <Input
                           value={vertical.nombre}
                           onChange={(e) => updateVertical(vertical.id, "nombre", e.target.value)}
-                          placeholder="Ej: Cumplimiento Normativo"
+                          placeholder="Ej: Producto / Servicio"
                           className="bg-secondary border-border"
                         />
                       </div>
@@ -227,12 +228,21 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                       </div>
                       <div className="space-y-2">
                         {vertical.parametros.map((parametro) => (
-                          <div key={parametro.id} className="flex items-center gap-2 bg-secondary p-2 rounded">
+                          <div
+                            key={parametro.id}
+                            className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_auto_auto] items-center gap-2 bg-secondary p-2 rounded"
+                          >
                             <Input
                               value={parametro.nombre}
                               onChange={(e) => updateParametro(vertical.id, parametro.id, "nombre", e.target.value)}
                               placeholder="Nombre del parámetro"
-                              className="flex-1 bg-background border-border h-8"
+                              className="bg-background border-border h-8"
+                            />
+                            <Input
+                              value={parametro.descripcion}
+                              onChange={(e) => updateParametro(vertical.id, parametro.id, "descripcion", e.target.value)}
+                              placeholder="Descripción del parámetro"
+                              className="bg-background border-border h-8"
                             />
                             <Input
                               type="number"
@@ -242,27 +252,29 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                               onChange={(e) =>
                                 updateParametro(vertical.id, parametro.id, "puntosBase", parseInt(e.target.value) || 0)
                               }
-                              className="w-20 bg-background border-border h-8"
-                              placeholder="Pts"
+                              className="w-full md:w-24 bg-background border-border h-8"
+                              placeholder="Puntaje"
                             />
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={parametro.permiteIntermedio}
-                                onCheckedChange={(checked) =>
-                                  updateParametro(vertical.id, parametro.id, "permiteIntermedio", checked)
-                                }
-                              />
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">Intermedio</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={parametro.permiteIntermedio}
+                                  onCheckedChange={(checked) =>
+                                    updateParametro(vertical.id, parametro.id, "permiteIntermedio", checked)
+                                  }
+                                />
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">Intermedio</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => removeParametro(vertical.id, parametro.id)}
+                                disabled={vertical.parametros.length === 1}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => removeParametro(vertical.id, parametro.id)}
-                              disabled={vertical.parametros.length === 1}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                            </Button>
                           </div>
                         ))}
                       </div>

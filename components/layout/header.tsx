@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, HelpCircle, Activity } from "lucide-react"
+import { Bell, Search, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -26,10 +26,6 @@ export function Header({ title, subtitle }: HeaderProps) {
   return (
     <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card/86 px-4 shadow-[0_12px_32px_oklch(0.28_0.025_252/0.07)] backdrop-blur-2xl sm:px-6">
       <div className="min-w-0">
-        <div className="mb-0.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/85">
-          <Activity className="h-3.5 w-3.5" />
-          Live Control Layer
-        </div>
         <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
         {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
       </div>

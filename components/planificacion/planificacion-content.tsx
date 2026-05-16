@@ -20,6 +20,7 @@ import {
   Eye,
   ChevronRight,
 } from "lucide-react"
+import Image from "next/image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,7 +91,7 @@ export function PlanificacionContent() {
     return {
       ...lote,
       unidadNombre: unidad?.nombre || "N/A",
-      unidadZona: unidad?.zona || "N/A",
+      unidadLogo: unidad?.logo,
       totalAuditorias: auditorias.length,
       auditoriasTerminadas: auditorias.filter((a) => a.estado === "terminada").length,
       auditoresNombres: auditores.map((a) => a?.name).join(", "),
@@ -100,8 +101,7 @@ export function PlanificacionContent() {
 
   const filteredLotes = lotesConDatos.filter(
     (lote) =>
-      lote.unidadNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lote.unidadZona.toLowerCase().includes(searchTerm.toLowerCase())
+      lote.unidadNombre.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -209,17 +209,23 @@ export function PlanificacionContent() {
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
+                    <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-6 w-6 text-primary" />
+                      <div className="h-10 w-10 flex items-center justify-center overflow-hidden rounded-md">
+                        {lote.unidadLogo ? (
+                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={40} height={40} className="object-contain" />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full rounded-md border border-primary/20 bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <h3 className="font-semibold">{lote.unidadNombre}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Ciclo {lote.ciclo} - {lote.año}
-                        </p>
+                        <p className="text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
                       </div>
                     </div>
+                  </div>
                     <div className="flex items-center gap-1">
                       <Badge className={getEstadoBadgeColor(lote.estado)}>
                         {lote.estado === "abierto" ? (
@@ -311,7 +317,18 @@ export function PlanificacionContent() {
                   <tbody>
                     {lotesConDatos.map((lote) => (
                       <tr key={lote.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="py-3 px-4">{lote.unidadNombre}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 overflow-hidden rounded">
+                              {lote.unidadLogo ? (
+                                <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={24} height={24} className="object-contain" />
+                              ) : (
+                                <Building2 className="h-4 w-4 text-accent" />
+                              )}
+                            </div>
+                            <span>{lote.unidadNombre}</span>
+                          </div>
+                        </td>
                         <td className="py-3 px-4 text-sm">Ciclo {lote.ciclo} - {lote.año}</td>
                         <td className="py-3 px-4">
                           <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>

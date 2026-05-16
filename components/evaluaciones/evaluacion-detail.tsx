@@ -158,7 +158,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                 </div>
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <p>
-                    <span className="text-foreground">Unidad:</span> {unidad?.nombre}
+                    <span className="text-foreground">Unidad de Negocio:</span> {unidad?.nombre}
                   </p>
                   <p>
                     <span className="text-foreground">Proceso:</span> {control.proceso}
@@ -196,7 +196,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
             <p className={cn("text-4xl font-bold", scoreActual !== null && getScoreColor(scoreActual))}>
               {scoreActual !== null ? scoreActual : "-"}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">Puntuación Control</p>
+            <p className="text-sm text-muted-foreground mt-1">Puntuación Obtenida</p>
             <div className="mt-3 space-y-1">
               <div className="flex justify-between text-xs">
                 <span>Progreso</span>

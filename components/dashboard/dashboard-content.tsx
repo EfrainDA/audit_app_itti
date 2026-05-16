@@ -64,10 +64,10 @@ const statCards = [
 export function DashboardContent() {
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-lg border border-primary/12 bg-card/92 p-5 shadow-[0_24px_60px_oklch(0.28_0.025_252/0.09)] backdrop-blur-xl sm:p-6">
+      <section className="relative overflow-hidden rounded-2xl border border-primary/10 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:p-8">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(120deg,transparent,oklch(0.54_0.08_235/0.045),oklch(0.70_0.08_82/0.035))]" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(120deg,transparent,oklch(0.97_0.01_252/0.4),oklch(0.97_0.01_180/0.3))]" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/22 bg-primary/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary/90">
               <Radar className="h-3.5 w-3.5" />
@@ -85,7 +85,7 @@ export function DashboardContent() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo activo</p>
               <p className="mt-2 text-2xl font-semibold text-primary">03</p>
             </div>
-            <div className="rounded-lg border border-border/70 bg-white/70 p-4 shadow-[0_10px_24px_oklch(0.28_0.025_252/0.05)]">
+            <div className="rounded-lg border border-border/70 bg-white/70 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.02)]">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Estado</p>
               <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-accent">
                 <ShieldCheck className="h-5 w-5" />

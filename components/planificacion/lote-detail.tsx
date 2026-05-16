@@ -196,7 +196,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                 <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/50">
                   <div className="flex items-center justify-between w-full pr-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-lg bg-primary/20 flex items-center justify-center">
                         <span className="text-primary font-bold text-sm">
                           {vertical.peso}%
                         </span>
@@ -216,9 +216,9 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                       </div>
                       {scorePromedio !== null && (
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Score Prom.</p>
+                          <p className="text-sm text-muted-foreground">Puntaje Promedio</p>
                           <p className={`font-bold ${getScoreColor(scorePromedio)}`}>
-                            {scorePromedio}%
+                            {scorePromedio}
                           </p>
                         </div>
                       )}
@@ -239,7 +239,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                         return (
                           <Card key={control.id} className="bg-secondary border-border">
                             <CardContent className="p-3">
-                              <div className="flex items-center justify-between">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-center gap-3">
                                   <div className="flex flex-col">
                                     <span className="font-mono text-sm font-medium">
@@ -251,31 +251,31 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <Badge className={getEstadoBadgeColor(control.estado)}>
-                                    {formatEstado(control.estado)}
-                                  </Badge>
-                                  {control.scoreControl !== undefined && (
-                                    <span className={`font-bold ${getScoreColor(control.scoreControl)}`}>
-                                      {control.scoreControl}%
-                                    </span>
-                                  )}
-                                  {auditor && (
-                                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center" title={auditor.name}>
-                                      <span className="text-primary text-xs">
-                                        {auditor.name.split(" ").map((n) => n[0]).join("")}
-                                      </span>
+                                <div className="grid w-full grid-cols-4 items-center gap-3 text-sm sm:w-auto">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                                      {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
                                     </div>
-                                  )}
-                                  <div className="flex items-center gap-1">
-                                    {control.estado !== "terminado" && lote.estado === "abierto" && (
-                                      <Button variant="ghost" size="sm" asChild>
-                                        <Link href={`/evaluaciones/${control.id}`}>
-                                          <Play className="h-4 w-4" />
-                                        </Link>
-                                      </Button>
+                                    <span className="truncate">
+                                      {auditor ? auditor.name : "Sin auditor"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <Badge className={getEstadoBadgeColor(control.estado)}>
+                                      {formatEstado(control.estado)}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-right font-medium">
+                                    {control.scoreControl !== undefined ? (
+                                      <span className={`font-bold ${getScoreColor(control.scoreControl)}`}>
+                                        {control.scoreControl}
+                                      </span>
+                                    ) : (
+                                      "-"
                                     )}
-                                    {control.estado === "pendiente" && lote.estado === "abierto" && (
+                                  </div>
+                                  <div className="flex justify-end">
+                                    {control.estado === "pendiente" && lote.estado === "abierto" ? (
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -284,8 +284,9 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
+                                    ) : (
+                                      <div className="h-8 w-8" />
                                     )}
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                   </div>
                                 </div>
                               </div>
@@ -318,7 +319,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
         </Accordion>
       </div>
 
-      {/* Dialog para agregar control */}
+      {/* Dialogo para agregar control */}
       <Dialog open={showAddControl !== null} onOpenChange={() => setShowAddControl(null)}>
         <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
           <DialogHeader>

@@ -52,7 +52,7 @@ export function LoteForm({ onClose }: LoteFormProps) {
             <SelectContent>
               {mockUnidades.map((unidad) => (
                 <SelectItem key={unidad.id} value={unidad.id}>
-                  {unidad.nombre} - {unidad.zona}
+                  {unidad.nombre}
                 </SelectItem>
               ))}
             </SelectContent>

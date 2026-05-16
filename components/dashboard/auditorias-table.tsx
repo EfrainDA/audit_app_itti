@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Eye, MoreHorizontal } from "lucide-react"
@@ -54,6 +55,7 @@ export function AuditoriasTable() {
           identificador: control.identificador,
           verticalNombre: vertical?.nombre || "N/A",
           unidadNombre: unidad?.nombre || "N/A",
+          unidadLogo: unidad?.logo,
           auditorNombre: auditor?.name || "Sin asignar",
           estado: control.estado,
           scoreControl: control.scoreControl,
@@ -104,7 +106,18 @@ export function AuditoriasTable() {
                 {control.verticalNombre}
               </td>
               <td className="py-3 px-4 text-sm">
-                {control.unidadNombre}
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 overflow-hidden rounded">
+                    {control.unidadLogo ? (
+                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={24} height={24} className="object-contain" />
+                    ) : (
+                      <div className="h-6 w-6 flex items-center justify-center bg-muted rounded">
+                        <span className="text-xs">U</span>
+                      </div>
+                    )}
+                  </div>
+                  <span>{control.unidadNombre}</span>
+                </div>
               </td>
               <td className="py-3 px-4 text-sm text-muted-foreground">
                 {control.auditorNombre}

@@ -15,6 +15,7 @@ export interface UnidadNegocio {
   codigo: string
   zona: string
   responsable: string
+  logo?: string
 }
 
 export interface Ciclo {
@@ -138,22 +139,22 @@ export interface Notificacion {
 // Mock Users
 export const mockUsers: User[] = [
   { id: '1', name: 'Efraín González', email: 'efrain@qualittyx.com', role: 'admin', status: 'activo' },
-  { id: '2', name: 'María García', email: 'maria@qualittyx.com', role: 'supervisor', status: 'activo' },
-  { id: '3', name: 'Carlos López', email: 'carlos@qualittyx.com', role: 'auditor', status: 'activo' },
-  { id: '4', name: 'Ana Martínez', email: 'ana@qualittyx.com', role: 'auditor', status: 'activo' },
-  { id: '5', name: 'Pedro Sánchez', email: 'pedro@qualittyx.com', role: 'auditado', status: 'activo' },
-  { id: '6', name: 'Laura Fernández', email: 'laura@qualittyx.com', role: 'auditado', status: 'inactivo' },
+  { id: '2', name: 'Federico Figueredo', email: 'federico@qualittyx.com', role: 'supervisor', status: 'activo' },
+  { id: '3', name: 'Jose Benitez', email: 'jose@qualittyx.com', role: 'auditor', status: 'activo' },
+  { id: '4', name: 'Ana Fariña', email: 'ana@qualittyx.com', role: 'auditor', status: 'activo' },
+  { id: '5', name: 'Vanessa Coronel', email: 'vanessa@qualittyx.com', role: 'auditado', status: 'activo' },
+  { id: '6', name: 'Wilfrido Benitez', email: 'wilfrido@qualittyx.com', role: 'auditado', status: 'inactivo' },
 ]
 
 export const currentUser: User = mockUsers[0]
 
 // Mock Unidades de Negocio
 export const mockUnidades: UnidadNegocio[] = [
-  { id: '1', nombre: 'Sede Central', codigo: 'SC-001', zona: 'Norte', responsable: 'Pedro Sánchez' },
-  { id: '2', nombre: 'Sucursal Monterrey', codigo: 'SM-002', zona: 'Norte', responsable: 'Laura Fernández' },
-  { id: '3', nombre: 'Sucursal Guadalajara', codigo: 'SG-003', zona: 'Occidente', responsable: 'Roberto Díaz' },
-  { id: '4', nombre: 'Sucursal CDMX', codigo: 'SC-004', zona: 'Centro', responsable: 'Isabel Torres' },
-  { id: '5', nombre: 'Sucursal Cancún', codigo: 'SC-005', zona: 'Sureste', responsable: 'Miguel Ángel Ruiz' },
+  { id: '1', nombre: 'ueno bank', codigo: 'SC-001', zona: 'Norte', responsable: 'Pedro Sánchez', logo: '/logo1.png' },
+  { id: '2', nombre: 'upay', codigo: 'SM-002', zona: 'Norte', responsable: 'Laura Fernández', logo: '/placeholder-logo.png' },
+  { id: '3', nombre: 'itti', codigo: 'SG-003', zona: 'Occidente', responsable: 'Roberto Díaz', logo: '/placeholder-logo.png' },
+  { id: '4', nombre: 'wepa', codigo: 'SC-004', zona: 'Centro', responsable: 'Isabel Torres', logo: '/placeholder-logo.png' },
+  { id: '5', nombre: 'uenoseguros', codigo: 'SC-005', zona: 'Sureste', responsable: 'Miguel Ángel Ruiz', logo: '/placeholder-logo.png' },
 ]
 
 // Mock Ciclos
@@ -174,7 +175,7 @@ export const mockUmbrales: Umbral[] = [
 export const mockModelos: ModeloControl[] = [
   {
     id: '1',
-    nombre: 'Modelo Operativo 2026',
+    nombre: 'Ecosistema Financiero 2026',
     descripcion: 'Modelo de control para evaluación de procesos operativos',
     estado: 'publicado',
     fechaVigenciaDesde: '2026-01-01',
@@ -184,7 +185,7 @@ export const mockModelos: ModeloControl[] = [
     verticales: [
       {
         id: 'v1',
-        nombre: 'Cumplimiento Normativo',
+        nombre: 'Unidad de Negocio',
         descripcion: 'Evaluación del cumplimiento de normativas internas y externas',
         peso: 30,
         tipoEvaluacion: 'cascada',
@@ -223,7 +224,7 @@ export const mockModelos: ModeloControl[] = [
       },
       {
         id: 'v2',
-        nombre: 'Calidad de Servicio',
+        nombre: 'Producto / Servicio',
         descripcion: 'Evaluación de la calidad del servicio al cliente',
         peso: 35,
         tipoEvaluacion: 'distribuida',
@@ -250,7 +251,7 @@ export const mockModelos: ModeloControl[] = [
       },
       {
         id: 'v3',
-        nombre: 'Eficiencia Operativa',
+        nombre: 'Proceso',
         descripcion: 'Medición de la eficiencia en procesos operativos',
         peso: 35,
         tipoEvaluacion: 'distribuida',
@@ -433,7 +434,7 @@ export const dashboardStats = {
   auditoriasEnCurso: 2,
   auditoriasPendientes: 1,
   auditoriasTerminadas: 2,
-  scorePromedio: 80,
+  scorePromedio: 100,
   controlesTotal: 24,
   controlesCompletados: 15,
   unidadesActivas: 5,
@@ -459,8 +460,11 @@ export function getEstadoBadgeColor(estado: string): string {
     case 'publicado':
     case 'activo':
       return 'bg-success/20 text-success'
-    case 'en_curso':
     case 'abierto':
+      return 'bg-emerald-50 text-emerald-700'
+    case 'cerrado':
+      return 'bg-stone-100 text-stone-600'
+    case 'en_curso':
       return 'bg-primary/20 text-primary'
     case 'pendiente':
     case 'borrador':
