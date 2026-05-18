@@ -6,8 +6,9 @@ import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertCircle,
   Building2,
@@ -50,6 +51,18 @@ interface LoteConDatos extends Lote {
   modeloNombre: string
   auditoresNombres: string
   loteVerticales: LoteVertical[]
+  calificacionFinal: number | null
+  verticalResultados: VerticalResultado[]
+}
+
+interface VerticalResultado {
+  id: string
+  nombre: string
+  peso: number
+  controlesTotal: number
+  controlesConScore: number
+  scorePromedio: number | null
+  aporte: number | null
 }
 
 function getLoteVerticalesCompletas(lote: Lote): LoteVertical[] {
@@ -81,12 +94,34 @@ function controlMatches(control: Control, searchTerm: string, filterEstado: stri
 export function EvaluacionesContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<string>("all")
+  const [activeView, setActiveView] = useState("evaluaciones")
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
     return mockLotes.map((lote) => {
       const unidad = mockUnidades.find((u) => u.id === lote.unidadNegocioId)
       const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
       const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
+      const loteVerticales = getLoteVerticalesCompletas(lote)
+      const verticalResultados = loteVerticales.map((loteVertical) => {
+        const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
+        const controlesConScore = loteVertical.controles.filter((control) => control.scoreControl !== undefined)
+        const scorePromedio = controlesConScore.length
+          ? controlesConScore.reduce((acc, control) => acc + (control.scoreControl ?? 0), 0) / controlesConScore.length
+          : null
+
+        return {
+          id: loteVertical.id,
+          nombre: vertical?.nombre || "Vertical sin configurar",
+          peso: vertical?.peso || 0,
+          controlesTotal: loteVertical.controles.length,
+          controlesConScore: controlesConScore.length,
+          scorePromedio,
+          aporte: scorePromedio !== null && vertical ? Number(((scorePromedio * vertical.peso) / 100).toFixed(1)) : null,
+        }
+      })
+      const aportes = verticalResultados
+        .map((vertical) => vertical.aporte)
+        .filter((aporte): aporte is number => aporte !== null)
 
       return {
         ...lote,
@@ -94,7 +129,9 @@ export function EvaluacionesContent() {
         unidadLogo: unidad?.logo,
         modeloNombre: modelo?.nombre || "N/A",
         auditoresNombres: auditores.map((auditor) => auditor?.name).join(", "),
-        loteVerticales: getLoteVerticalesCompletas(lote),
+        loteVerticales,
+        calificacionFinal: aportes.length ? Number(aportes.reduce((acc, aporte) => acc + aporte, 0).toFixed(1)) : null,
+        verticalResultados,
       }
     })
   }, [])
@@ -131,52 +168,61 @@ export function EvaluacionesContent() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center gap-4 px-5 py-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <ClipboardCheck className="h-6 w-6 text-primary" />
+        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-3xl font-semibold tracking-tight">{stats.total}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
               <p className="text-sm text-muted-foreground">Total Controles</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center gap-4 px-5 py-4">
-            <div className="rounded-lg border border-border/70 bg-muted p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <AlertCircle className="h-6 w-6 text-muted-foreground" />
+        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-3xl font-semibold tracking-tight">{stats.pendientes}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.pendientes}</p>
               <p className="text-sm text-muted-foreground">Pendientes</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center gap-4 px-5 py-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <Clock className="h-6 w-6 text-primary" />
+        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <Clock className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-3xl font-semibold tracking-tight">{stats.enCurso}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.enCurso}</p>
               <p className="text-sm text-muted-foreground">En Curso</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center gap-4 px-5 py-4">
-            <div className="rounded-lg border border-success/20 bg-success/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <CheckCircle2 className="h-6 w-6 text-success" />
+        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <CheckCircle2 className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-3xl font-semibold tracking-tight">{stats.terminados}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.terminados}</p>
               <p className="text-sm text-muted-foreground">Terminados</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
+        <TabsList className="bg-secondary">
+          <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeView === "evaluaciones" && (
+        <>
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -204,7 +250,87 @@ export function EvaluacionesContent() {
           Exportar
         </Button>
       </div>
+        </>
+      )}
 
+      {activeView === "calificaciones" && (
+      <Card className="border-border/70 bg-card/80">
+        <CardHeader>
+          <CardTitle className="text-base">Calificacion por Unidad de Negocio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            La calificacion final se calcula con el aporte de cada vertical segun su peso dentro del modelo de control.
+          </p>
+          <Accordion type="multiple" className="space-y-3">
+            {lotesConDatos.map((lote) => (
+              <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/60 bg-background/35">
+                <AccordionTrigger className="px-4 py-3 hover:bg-secondary/35 hover:no-underline">
+                  <div className="grid w-full grid-cols-1 gap-3 pr-4 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 overflow-hidden rounded">
+                        {lote.unidadLogo ? (
+                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={28} height={28} className="object-contain" />
+                        ) : (
+                          <Building2 className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{lote.unidadNombre}</p>
+                        <p className="text-xs text-muted-foreground">{lote.modeloNombre}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
+                    <p className="truncate text-sm text-muted-foreground">{lote.auditoresNombres || "Sin auditores"}</p>
+                    <div className="text-left md:text-right">
+                      <p className={`text-lg font-semibold ${lote.calificacionFinal !== null ? getScoreColor(lote.calificacionFinal) : "text-muted-foreground"}`}>
+                        {lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Calificacion final</p>
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="overflow-x-auto rounded-lg border border-border/60">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-secondary/45">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Vertical</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Peso</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Promedio logrado</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Controles</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Aporte final</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lote.verticalResultados.map((vertical) => (
+                          <tr key={vertical.id} className="border-b border-border/60 last:border-0">
+                            <td className="px-4 py-3 text-sm font-medium">{vertical.nombre}</td>
+                            <td className="px-4 py-3 text-right text-sm">{vertical.peso}%</td>
+                            <td className="px-4 py-3 text-right text-sm">
+                              {vertical.scorePromedio !== null ? vertical.scorePromedio.toFixed(1) : "-"}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+                              {vertical.controlesConScore}/{vertical.controlesTotal}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-semibold">
+                              {vertical.aporte !== null ? `${vertical.aporte}%` : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </CardContent>
+      </Card>
+      )}
+
+      {activeView === "evaluaciones" && (
+        <>
       <Accordion type="multiple" defaultValue={lotesFiltrados.map((lote) => lote.id)} className="space-y-4">
         {lotesFiltrados.map((lote) => {
           const totalControles = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
@@ -285,6 +411,7 @@ export function EvaluacionesContent() {
                               {scorePromedio !== null && (
                                 <div className="flex flex-col items-end gap-1">
                                   <div className={`min-w-[64px] rounded-md px-2 py-1 text-center ${getScoreBgColor(scorePromedio)}`}>
+                                    <p className="text-[10px] font-medium text-muted-foreground">Logrado</p>
                                     <p className={`font-semibold ${getScoreColor(scorePromedio)}`}>
                                       {((scorePromedio / 100) * vertical.peso).toFixed(1)}%
                                     </p>
@@ -370,6 +497,8 @@ export function EvaluacionesContent() {
             </Button>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   )

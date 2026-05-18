@@ -127,7 +127,6 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
   }
 
   const handleSubmit = () => {
-    // In a real app, this would save to the database
     console.log({ nombre, descripcion, verticales })
     onClose()
   }
@@ -142,7 +141,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
             id="nombre"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Ecosistema Financiero 2026"
+            placeholder="Ej: Ecosistema Financiero V.1"
             className="bg-secondary border-border"
           />
         </div>
@@ -175,10 +174,10 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
 
         <div className="space-y-4">
           {verticales.map((vertical, index) => (
-            <Card key={vertical.id} className="bg-card border-border">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3 mb-2">
-                  <GripVertical className="h-5 w-5 text-muted-foreground mt-1 cursor-grab gap-1" />
+            <Card key={vertical.id} className="bg-card border-border shadow-sm rounded-xl">
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3 mb-1">
+                  <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-grab" />
                   <div className="flex-1 space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="md:col-span-2 space-y-2">
@@ -190,7 +189,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                           className="bg-secondary border-border"
                         />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label>Peso (%)</Label>
                         <Input
                           type="number"
@@ -221,7 +220,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                     {/* Parámetros */}
                     <div className="border-t border-border pt-4">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-medium">Parámetros</p>
+                        <p className="text-sm font-medium text-foreground">Parámetros</p>
                         <Badge variant="outline" className="text-xs">
                           Total: {vertical.parametros.reduce((acc, p) => acc + p.puntosBase, 0)} / 100 pts
                         </Badge>
@@ -230,32 +229,34 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                         {vertical.parametros.map((parametro) => (
                           <div
                             key={parametro.id}
-                            className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_auto_auto] items-center gap-2 bg-secondary p-2 rounded"
+                            className="grid min-h-[42px] grid-cols-1 items-center gap-1.5 rounded-md border border-border/70 bg-secondary px-2 py-1.5 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto]"
                           >
                             <Input
                               value={parametro.nombre}
                               onChange={(e) => updateParametro(vertical.id, parametro.id, "nombre", e.target.value)}
                               placeholder="Nombre del parámetro"
-                              className="bg-background border-border h-8"
+                              className="h-7 bg-background border-border text-sm"
                             />
                             <Input
                               value={parametro.descripcion}
                               onChange={(e) => updateParametro(vertical.id, parametro.id, "descripcion", e.target.value)}
                               placeholder="Descripción del parámetro"
-                              className="bg-background border-border h-8"
+                              className="h-7 bg-background border-border text-sm"
                             />
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={parametro.puntosBase}
-                              onChange={(e) =>
-                                updateParametro(vertical.id, parametro.id, "puntosBase", parseInt(e.target.value) || 0)
-                              }
-                              className="w-full md:w-24 bg-background border-border h-8"
-                              placeholder="Puntaje"
-                            />
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex h-full items-center">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={parametro.puntosBase}
+                                onChange={(e) =>
+                                  updateParametro(vertical.id, parametro.id, "puntosBase", parseInt(e.target.value) || 0)
+                                }
+                                className="h-7 w-full bg-background border-border text-center text-sm"
+                                placeholder="Puntaje"
+                              />
+                            </div>
+                            <div className="flex h-full items-center justify-between gap-1.5">
                               <div className="flex items-center gap-2">
                                 <Switch
                                   checked={parametro.permiteIntermedio}
@@ -268,11 +269,11 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-7 w-7"
                                 onClick={() => removeParametro(vertical.id, parametro.id)}
                                 disabled={vertical.parametros.length === 1}
                               >
-                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                               </Button>
                             </div>
                           </div>
@@ -284,7 +285,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
                         className="mt-2"
                         onClick={() => addParametro(vertical.id)}
                       >
-                        <Plus className="h-3 w-3 mr-1" />
+                        <Plus className="h-3 w-3" />
                         Agregar Parámetro
                       </Button>
                     </div>
@@ -304,7 +305,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
         </div>
 
         <Button variant="outline" onClick={addVertical} className="w-full">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4" />
           Agregar Vertical
         </Button>
       </div>

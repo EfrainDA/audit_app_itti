@@ -100,6 +100,8 @@ export interface Control {
   scoreControl?: number
   proceso?: string
   subproceso?: string
+  subprocesos?: string[]
+  correspondeProceso?: boolean
   producto?: string
   fechaCreacion: string
   auditorId?: string

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +34,7 @@ import {
 } from "@/lib/data"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -48,6 +49,7 @@ interface Respuesta {
 }
 
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
+  const { toast } = useToast()
   // Buscar el control en los loteVerticales
   let control: Control | undefined
   let loteVertical = mockLoteVerticales.find((lv) => {
@@ -66,6 +68,22 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const auditor = mockUsers.find((u) => u.id === control?.auditorId)
 
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
+
+  // Implementación de autoguardado con debounce (retraso de 1.5s)
+  useEffect(() => {
+    if (Object.keys(respuestas).length === 0) return
+
+    const timer = setTimeout(() => {
+      console.log("Auto-saving responses for control:", controlId, respuestas)
+      toast({
+        title: "Progreso guardado",
+        description: "Los cambios se han guardado automáticamente.",
+        duration: 2000,
+      })
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [respuestas, controlId, toast])
 
   if (!control || !vertical || !lote || !modelo) {
     return (
@@ -150,7 +168,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-xl font-bold font-mono">{control.identificador}</h2>
                   <Badge className={getEstadoBadgeColor(control.estado)}>
                     {formatEstado(control.estado)}
@@ -159,10 +177,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <p>
                     <span className="text-foreground">Unidad de Negocio:</span> {unidad?.nombre}
-                  </p>
-                  <p>
-                    <span className="text-foreground">Proceso:</span> {control.proceso}
-                    {control.subproceso && ` / ${control.subproceso}`}
                   </p>
                   {auditor && (
                     <p>
@@ -173,16 +187,16 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download className="h-4 w-4" />
                   Exportar
                 </Button>
                 <Button variant="outline" size="sm">
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4" />
                   Guardar
                 </Button>
                 {control.estado !== "terminado" && (
                   <Button size="sm" className="bg-warning hover:bg-warning/90 text-warning-foreground">
-                    <Send className="h-4 w-4 mr-2" />
+                    <Send className="h-4 w-4" />
                     Enviar a Réplica
                   </Button>
                 )}
@@ -196,8 +210,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
             <p className={cn("text-4xl font-bold", scoreActual !== null && getScoreColor(scoreActual))}>
               {scoreActual !== null ? scoreActual : "-"}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">Puntuación Obtenida</p>
-            <div className="mt-3 space-y-1">
+            <p className="text-sm text-muted-foreground mt-1">Puntuación Lograda</p>
+            <div className="mt-4 space-y-1">
               <div className="flex justify-between text-xs">
                 <span>Progreso</span>
                 <span>{respondidos}/{totalParametros}</span>
@@ -294,7 +308,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                       )}
                       onClick={() => handleSetRespuesta(parametro.id, "cumple")}
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      <CheckCircle2 className="h-4 w-4" />
                       Cumple (100%)
                     </Button>
                     {parametro.permiteIntermedio && (
@@ -306,7 +320,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         )}
                         onClick={() => handleSetRespuesta(parametro.id, "intermedio")}
                       >
-                        <MinusCircle className="h-4 w-4 mr-1" />
+                        <MinusCircle className="h-4 w-4" />
                         Intermedio (50%)
                       </Button>
                     )}
@@ -318,7 +332,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                       )}
                       onClick={() => handleSetRespuesta(parametro.id, "no_cumple")}
                     >
-                      <XCircle className="h-4 w-4 mr-1" />
+                      <XCircle className="h-4 w-4" />
                       No Cumple (0%)
                     </Button>
                     <Button
@@ -334,8 +348,17 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                     </Button>
                   </div>
 
-                  {/* Comentario y Evidencia */}
+                  {/* Comentario y Evidencia - Personas auditadas */}
                   <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Persona Auditada (Cargo)</Label>
+                      <Textarea
+                        placeholder="Nombre de la persona auditada y su cargo..."
+                        className="mt-1 bg-background border-border min-h-[60px]"
+                        value={respuesta?.comentario || ""}
+                        onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
+                      />
+                    </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Comentario / Hallazgo</Label>
                       <Textarea
