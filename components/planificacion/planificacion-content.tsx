@@ -20,7 +20,6 @@ import {
   Eye,
   ChevronRight,
 } from "lucide-react"
-import Image from "next/image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +37,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   mockLotes,
-  mockUnidades,
   mockLoteVerticales,
   mockAuditorias,
   mockUsers,
@@ -49,15 +47,17 @@ import {
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
+import { useUnidades } from "@/hooks/use-unidades"
 
 export function PlanificacionContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
+  const { unidades } = useUnidades()
 
   const lotesConDatos = mockLotes.map((lote) => {
-    const unidad = mockUnidades.find((u) => u.id === lote.unidadNegocioId)
+    const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
     const auditorias = mockAuditorias.filter((a) => a.loteId === lote.id)
     const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
 
@@ -152,7 +152,7 @@ export function PlanificacionContent() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+            <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Calendar className="h-5 w-5 text-primary" />
@@ -163,7 +163,7 @@ export function PlanificacionContent() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+            <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Unlock className="h-5 w-5 text-success" />
@@ -174,7 +174,7 @@ export function PlanificacionContent() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+            <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Lock className="h-5 w-5 text-muted-foreground" />
@@ -185,7 +185,7 @@ export function PlanificacionContent() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+            <Card className="h-24 gap-0 border-chart-2/15 bg-card/88 py-0 backdrop-blur-xl dark:border-chart-2/25 dark:bg-card/86">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <FileCheck className="h-5 w-5 text-chart-2" />
@@ -212,7 +212,7 @@ export function PlanificacionContent() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 flex items-center justify-center overflow-hidden rounded-md">
                         {lote.unidadLogo ? (
-                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={40} height={40} className="object-contain" />
+                          <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                         ) : (
                           <div className="flex items-center justify-center w-full h-full rounded-md border border-primary/20 bg-primary/10">
                             <Building2 className="h-5 w-5 text-primary" />
@@ -320,7 +320,7 @@ export function PlanificacionContent() {
                           <div className="flex items-center gap-2">
                             <div className="h-6 w-6 overflow-hidden rounded">
                               {lote.unidadLogo ? (
-                                <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={24} height={24} className="object-contain" />
+                                <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                               ) : (
                                 <Building2 className="h-4 w-4 text-accent" />
                               )}

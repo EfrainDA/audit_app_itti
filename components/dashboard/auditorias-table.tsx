@@ -31,6 +31,7 @@ export function AuditoriasTable() {
       identificador: string
       verticalNombre: string
       unidadNombre: string
+      unidadLogo?: string
       auditorNombre: string
       estado: string
       scoreControl?: number

@@ -28,10 +28,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { 
   Plus, 
   User, 
   Play, 
+  Pencil,
   Trash2, 
   ChevronRight, 
   FileCheck, 
@@ -61,7 +69,9 @@ interface LoteDetailProps {
 
 export function LoteDetail({ lote }: LoteDetailProps) {
   const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
-  const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
+  const auditores = lote.auditores
+    .map((id) => mockUsers.find((u) => u.id === id))
+    .filter((auditor): auditor is (typeof mockUsers)[number] => Boolean(auditor))
   
   // Estado local para simular agregar controles
   const [loteVerticales, setLoteVerticales] = useState<LoteVertical[]>(() => {
@@ -88,6 +98,8 @@ export function LoteDetail({ lote }: LoteDetailProps) {
 
   const [showAddControl, setShowAddControl] = useState<string | null>(null)
   const [newControl, setNewControl] = useState(initialNewControl)
+  const [editingControl, setEditingControl] = useState<{ loteVerticalId: string; controlId: string } | null>(null)
+  const [editControl, setEditControl] = useState(initialNewControl)
   const [isControlSuggestionsOpen, setIsControlSuggestionsOpen] = useState(false)
   const [isProcessSuggestionsOpen, setIsProcessSuggestionsOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
@@ -205,6 +217,53 @@ export function LoteDetail({ lote }: LoteDetailProps) {
           : lv
       )
     )
+  }
+
+  const openEditControl = (loteVerticalId: string, control: Control) => {
+    const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
+
+    setEditingControl({ loteVerticalId, controlId: control.id })
+    setEditControl({
+      identificador: control.identificador,
+      auditorId: control.auditorId || "",
+      correspondeProceso: Boolean(control.correspondeProceso),
+      proceso: control.correspondeProceso ? control.proceso || control.identificador : control.proceso || "",
+      subprocesos,
+      subprocesoTemp: "",
+    })
+  }
+
+  const handleUpdateControl = () => {
+    if (!editingControl) return
+
+    const identificador = editControl.correspondeProceso ? editControl.proceso.trim() : editControl.identificador.trim()
+    if (!identificador) return
+
+    setLoteVerticales((prev) =>
+      prev.map((lv) =>
+        lv.id === editingControl.loteVerticalId
+          ? {
+              ...lv,
+              controles: lv.controles.map((control) =>
+                control.id === editingControl.controlId
+                  ? {
+                      ...control,
+                      identificador,
+                      auditorId: editControl.auditorId || undefined,
+                      correspondeProceso: editControl.correspondeProceso,
+                      proceso: editControl.correspondeProceso ? editControl.proceso.trim() || undefined : undefined,
+                      subproceso: editControl.correspondeProceso && editControl.subprocesos.length > 0 ? editControl.subprocesos.join(", ") : undefined,
+                      subprocesos: editControl.correspondeProceso ? editControl.subprocesos : undefined,
+                    }
+                  : control
+              ),
+            }
+          : lv
+      )
+    )
+
+    setEditingControl(null)
+    setEditControl(initialNewControl)
   }
 
   const getTotalControles = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
@@ -386,14 +445,31 @@ export function LoteDetail({ lote }: LoteDetailProps) {
 
                               <div className="flex justify-end">
                                 {control.estado === "pendiente" && lote.estado === "abierto" ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteControl(loteVertical.id, control.id)}
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openEditControl(loteVertical.id, control)}>
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        Editar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive"
+                                        onClick={() => handleDeleteControl(loteVertical.id, control.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Borrar
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 ) : (
                                   <div className="h-8 w-8" />
                                 )}
@@ -678,6 +754,178 @@ export function LoteDetail({ lote }: LoteDetailProps) {
               className="bg-primary hover:bg-primary/90"
             >
               Agregar Control
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingControl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingControl(null)
+            setEditControl(initialNewControl)
+          }
+        }}
+      >
+        <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Editar Control</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/60 px-4 py-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-correspondeProceso" className="text-sm font-medium">
+                  Corresponde a Procesos
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Cambia entre control simple o control asociado a proceso/subprocesos.
+                </p>
+              </div>
+              <Switch
+                id="edit-correspondeProceso"
+                checked={editControl.correspondeProceso}
+                onCheckedChange={(checked) =>
+                  setEditControl({
+                    ...editControl,
+                    correspondeProceso: checked,
+                    identificador: checked ? editControl.proceso || editControl.identificador : editControl.identificador,
+                    proceso: checked ? editControl.proceso || editControl.identificador : "",
+                    subprocesos: checked ? editControl.subprocesos : [],
+                    subprocesoTemp: checked ? editControl.subprocesoTemp : "",
+                  })
+                }
+              />
+            </div>
+
+            {!editControl.correspondeProceso && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-identificador">Nombre del Control *</Label>
+                  <Input
+                    id="edit-identificador"
+                    value={editControl.identificador}
+                    onChange={(event) => setEditControl({ ...editControl, identificador: event.target.value })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auditor">Auditor</Label>
+                  <Select
+                    value={editControl.auditorId}
+                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue placeholder="Seleccionar auditor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {auditores.map((auditor) => (
+                        <SelectItem key={auditor.id} value={auditor.id}>
+                          {auditor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {editControl.correspondeProceso && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-proceso">Proceso / Nombre del Control *</Label>
+                  <Input
+                    id="edit-proceso"
+                    value={editControl.proceso}
+                    onChange={(event) =>
+                      setEditControl({ ...editControl, proceso: event.target.value, identificador: event.target.value })
+                    }
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subproceso">Subprocesos</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="edit-subproceso"
+                      placeholder="Agregar subproceso"
+                      value={editControl.subprocesoTemp}
+                      onChange={(event) => setEditControl({ ...editControl, subprocesoTemp: event.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const nextSub = editControl.subprocesoTemp.trim()
+                        if (!nextSub) return
+                        setEditControl({
+                          ...editControl,
+                          subprocesos: [...editControl.subprocesos, nextSub],
+                          subprocesoTemp: "",
+                        })
+                      }}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {editControl.subprocesos.map((sub, index) => (
+                      <span key={`${sub}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-border px-2 py-1 text-xs">
+                        {sub}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditControl({
+                              ...editControl,
+                              subprocesos: editControl.subprocesos.filter((_, idx) => idx !== index),
+                            })
+                          }
+                          className="text-destructive"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auditor-proceso">Auditor</Label>
+                  <Select
+                    value={editControl.auditorId}
+                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue placeholder="Seleccionar auditor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {auditores.map((auditor) => (
+                        <SelectItem key={auditor.id} value={auditor.id}>
+                          {auditor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingControl(null)
+                setEditControl(initialNewControl)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdateControl}
+              disabled={editControl.correspondeProceso ? !editControl.proceso.trim() : !editControl.identificador.trim()}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Guardar Cambios
             </Button>
           </DialogFooter>
         </DialogContent>

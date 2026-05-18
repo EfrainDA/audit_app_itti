@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ChangeEvent } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Users,
   Building2,
@@ -15,6 +14,7 @@ import {
   Gauge,
   History,
   Plus,
+  ImagePlus,
   Search,
   MoreHorizontal,
   Edit,
@@ -54,16 +54,83 @@ import {
 } from "@/components/ui/select"
 import {
   mockUsers,
-  mockUnidades,
   mockCiclos,
   mockUmbrales,
   getEstadoBadgeColor,
   formatEstado,
+  type UnidadNegocio,
 } from "@/lib/data"
+import { useUnidades } from "@/hooks/use-unidades"
 
 export function AjustesContent() {
   const [activeTab, setActiveTab] = useState("usuarios")
   const [searchTerm, setSearchTerm] = useState("")
+  const { unidades, setUnidades } = useUnidades()
+  const [isUnidadOpen, setIsUnidadOpen] = useState(false)
+  const [editingUnidad, setEditingUnidad] = useState<UnidadNegocio | null>(null)
+  const [unidadNombre, setUnidadNombre] = useState("")
+  const [unidadEcosistema, setUnidadEcosistema] = useState("")
+  const [unidadLogo, setUnidadLogo] = useState("")
+
+  const resetUnidadForm = () => {
+    setEditingUnidad(null)
+    setUnidadNombre("")
+    setUnidadEcosistema("")
+    setUnidadLogo("")
+  }
+
+  const handleUnidadLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setUnidadLogo(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const openEditUnidad = (unidad: UnidadNegocio) => {
+    setEditingUnidad(unidad)
+    setUnidadNombre(unidad.nombre)
+    setUnidadEcosistema(unidad.ecosistema)
+    setUnidadLogo(unidad.logo || "")
+    setIsUnidadOpen(true)
+  }
+
+  const handleSubmitUnidad = () => {
+    if (editingUnidad) {
+      setUnidades((current) =>
+        current.map((unidad) =>
+          unidad.id === editingUnidad.id
+            ? {
+                ...unidad,
+                nombre: unidadNombre.trim(),
+                ecosistema: unidadEcosistema.trim(),
+                logo: unidadLogo || unidad.logo,
+              }
+            : unidad
+        )
+      )
+    } else {
+      const nextUnidad: UnidadNegocio = {
+        id: `unidad-${Date.now()}`,
+        nombre: unidadNombre.trim(),
+        ecosistema: unidadEcosistema.trim(),
+        codigo: "",
+        zona: "",
+        responsable: "",
+        logo: unidadLogo || "/placeholder-logo.png",
+      }
+
+      setUnidades((current) => [nextUnidad, ...current])
+    }
+
+    resetUnidadForm()
+    setIsUnidadOpen(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -234,40 +301,154 @@ export function AjustesContent() {
         {/* Unidades Tab */}
         <TabsContent value="unidades" className="space-y-4">
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base">Unidades de Negocio</CardTitle>
-                <CardDescription>Administra las sedes y áreas físicas</CardDescription>
+                <CardDescription>Administra las unidades y el ecosistema al que pertenecen</CardDescription>
               </div>
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Unidad
-              </Button>
+              <Dialog
+                open={isUnidadOpen}
+                onOpenChange={(open) => {
+                  setIsUnidadOpen(open)
+                  if (!open) resetUnidadForm()
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={resetUnidadForm}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nueva Unidad
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>{editingUnidad ? "Editar Unidad de Negocio" : "Nueva Unidad de Negocio"}</DialogTitle>
+                    <DialogDescription>
+                      Carga los datos de la unidad y su imagen para verla luego en planificación y lotes.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-5 pt-2">
+                    <div className="flex items-center gap-4 rounded-lg border border-border/70 bg-secondary/35 p-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-primary/10">
+                        {unidadLogo ? (
+                          <img src={unidadLogo} alt="Logo de la unidad" className="h-full w-full object-contain" />
+                        ) : (
+                          <Building2 className="h-7 w-7 text-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Label htmlFor="unidad-logo" className="text-sm font-medium">
+                          Foto o logo de la unidad
+                        </Label>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Se usará como identificador visual en planificación y lotes.
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <label htmlFor="unidad-logo" className="cursor-pointer">
+                          <ImagePlus className="h-4 w-4 mr-2" />
+                          Cargar
+                        </label>
+                      </Button>
+                      <input
+                        id="unidad-logo"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleUnidadLogoChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nombre de la Unidad de Negocio *</Label>
+                      <Input
+                        value={unidadNombre}
+                        onChange={(event) => setUnidadNombre(event.target.value)}
+                        placeholder="Ej. ueno bank"
+                        className="bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Ecosistema al que pertenece *</Label>
+                      <Input
+                        value={unidadEcosistema}
+                        onChange={(event) => setUnidadEcosistema(event.target.value)}
+                        placeholder="Ej. Financiero, Pagos, Seguros"
+                        className="bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 border-t border-border pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setUnidadNombre("")
+                          setUnidadEcosistema("")
+                          setIsUnidadOpen(false)
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={handleSubmitUnidad}
+                        disabled={!unidadNombre.trim() || !unidadEcosistema.trim()}
+                      >
+                        {editingUnidad ? "Guardar Cambios" : "Crear Unidad"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Zona</TableHead>
-                    <TableHead>Responsable</TableHead>
+                    <TableHead>Ecosistema</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockUnidades.map((unidad) => (
+                  {unidades.map((unidad) => (
                     <TableRow key={unidad.id} className="border-border">
-                      <TableCell className="font-medium">{unidad.nombre}</TableCell>
                       <TableCell>
-                        <code className="text-sm bg-muted px-2 py-1 rounded">{unidad.codigo}</code>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-primary/10">
+                            {unidad.logo ? (
+                              <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
+                            ) : (
+                              <Building2 className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                          <span className="font-medium">{unidad.nombre}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>{unidad.zona}</TableCell>
-                      <TableCell>{unidad.responsable}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-primary/20 bg-primary/8 text-primary">
+                          {unidad.ecosistema}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditUnidad(unidad)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setUnidades((current) => current.filter((item) => item.id !== unidad.id))}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

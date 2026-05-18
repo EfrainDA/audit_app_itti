@@ -168,7 +168,7 @@ export function EvaluacionesContent() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <ClipboardCheck className="h-5 w-5 text-primary" />
@@ -179,7 +179,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+        <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <AlertCircle className="h-5 w-5 text-muted-foreground" />
@@ -190,7 +190,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <Clock className="h-5 w-5 text-primary" />
@@ -201,7 +201,7 @@ export function EvaluacionesContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-border/60 bg-white/70 py-0 backdrop-blur-xl">
+        <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <CheckCircle2 className="h-5 w-5 text-success" />
