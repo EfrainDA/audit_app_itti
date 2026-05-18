@@ -9,7 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { type ModeloControl } from "@/lib/data"
-import { CheckCircle, XCircle, HelpCircle, FileText, Camera } from "lucide-react"
+import { CheckCircle, XCircle, HelpCircle, FileText, Camera, Layers3, ListChecks, CirclePercent } from "lucide-react"
 
 interface ModeloDetailProps {
   modelo: ModeloControl
@@ -29,22 +29,37 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{modelo.verticales.length}</p>
-            <p className="text-sm text-muted-foreground">Verticales</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <Layers3 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">{modelo.verticales.length}</p>
+              <p className="text-sm text-muted-foreground">Verticales</p>
+            </div>
           </CardContent>
         </Card>
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{totalParametros}</p>
-            <p className="text-sm text-muted-foreground">Parámetros</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <ListChecks className="h-6 w-6 text-chart-2" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">{totalParametros}</p>
+              <p className="text-sm text-muted-foreground">Parámetros</p>
+            </div>
           </CardContent>
         </Card>
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">100%</p>
-            <p className="text-sm text-muted-foreground">Peso Total</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <CirclePercent className="h-6 w-6 text-warning" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">100%</p>
+              <p className="text-sm text-muted-foreground">Peso Total</p>
+            </div>
           </CardContent>
         </Card>
       </div>

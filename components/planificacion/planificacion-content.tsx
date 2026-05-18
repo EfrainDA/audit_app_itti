@@ -153,46 +153,46 @@ export function PlanificacionContent() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Calendar className="h-5 w-5 text-primary" />
+            <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+              <CardContent className="px-5 py-4 flex items-center gap-4">
+                <div className="p-3 rounded-lg border border-primary/20 bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <Calendar className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.length}</p>
+                  <p className="text-3xl font-semibold tracking-tight">{mockLotes.length}</p>
                   <p className="text-sm text-muted-foreground">Lotes Totales</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-success/10">
-                  <Unlock className="h-5 w-5 text-success" />
+            <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+              <CardContent className="px-5 py-4 flex items-center gap-4">
+                <div className="p-3 rounded-lg border border-success/20 bg-success/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <Unlock className="h-6 w-6 text-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.filter((l) => l.estado === "abierto").length}</p>
+                  <p className="text-3xl font-semibold tracking-tight">{mockLotes.filter((l) => l.estado === "abierto").length}</p>
                   <p className="text-sm text-muted-foreground">Abiertos</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-muted">
-                  <Lock className="h-5 w-5 text-muted-foreground" />
+            <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+              <CardContent className="px-5 py-4 flex items-center gap-4">
+                <div className="p-3 rounded-lg border border-border/70 bg-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <Lock className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.filter((l) => l.estado === "cerrado").length}</p>
+                  <p className="text-3xl font-semibold tracking-tight">{mockLotes.filter((l) => l.estado === "cerrado").length}</p>
                   <p className="text-sm text-muted-foreground">Cerrados</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-chart-2/10">
-                  <FileCheck className="h-5 w-5 text-chart-2" />
+            <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+              <CardContent className="px-5 py-4 flex items-center gap-4">
+                <div className="p-3 rounded-lg border border-chart-2/20 bg-chart-2/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <FileCheck className="h-6 w-6 text-chart-2" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditorias.length}</p>
+                  <p className="text-3xl font-semibold tracking-tight">{mockAuditorias.length}</p>
                   <p className="text-sm text-muted-foreground">Auditorías</p>
                 </div>
               </CardContent>

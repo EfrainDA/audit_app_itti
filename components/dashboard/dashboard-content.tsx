@@ -81,14 +81,14 @@ export function DashboardContent() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:min-w-[340px]">
-            <div className="rounded-lg border border-border/70 bg-white/70 p-4 shadow-[0_10px_24px_oklch(0.28_0.025_252/0.05)]">
+            <div className="rounded-lg border border-border/60 bg-white/75 px-5 py-4 shadow-[0_10px_26px_oklch(0.28_0.025_252/0.05)] backdrop-blur-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo activo</p>
-              <p className="mt-2 text-2xl font-semibold text-primary">03</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-primary">03</p>
             </div>
-            <div className="rounded-lg border border-border/70 bg-white/70 p-4 shadow-[0_10px_24px_rgba(0,0,0,0.02)]">
+            <div className="rounded-lg border border-border/60 bg-white/75 px-5 py-4 shadow-[0_10px_26px_rgba(0,0,0,0.02)] backdrop-blur-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Estado</p>
-              <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-accent">
-                <ShieldCheck className="h-5 w-5" />
+              <div className="mt-2 flex items-center gap-2 text-xl font-semibold text-accent">
+                <ShieldCheck className="h-6 w-6" />
                 Controlado
               </div>
             </div>
@@ -99,15 +99,15 @@ export function DashboardContent() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title} className="border-border/70 bg-card/80">
-            <CardContent className="p-6">
+            <CardContent className="px-6 py-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
                   <p className="mt-2 text-4xl font-semibold tracking-tight">{stat.value}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{stat.description}</p>
                 </div>
-                <div className={`rounded-lg border border-current/15 p-3 ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                <div className={`rounded-lg border border-current/15 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ${stat.bgColor}`}>
+                  <stat.icon className={`h-7 w-7 ${stat.color}`} />
                 </div>
               </div>
             </CardContent>
@@ -137,13 +137,13 @@ export function DashboardContent() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="border-border/70 bg-card/80">
-          <CardContent className="p-6">
+          <CardContent className="px-6 py-5">
             <div className="flex items-center gap-4">
-              <div className="rounded-lg border border-primary/20 bg-primary/10 p-3">
-                <Building2 className="h-5 w-5 text-primary" />
+              <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                <Building2 className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockUnidades.length}</p>
+                <p className="text-3xl font-semibold tracking-tight">{mockUnidades.length}</p>
                 <p className="text-sm text-muted-foreground">Unidades de Negocio</p>
               </div>
             </div>
@@ -151,13 +151,13 @@ export function DashboardContent() {
         </Card>
 
         <Card className="border-border/70 bg-card/80">
-          <CardContent className="p-6">
+          <CardContent className="px-6 py-5">
             <div className="flex items-center gap-4">
-              <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3">
-                <Users className="h-5 w-5 text-chart-2" />
+              <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                <Users className="h-6 w-6 text-chart-2" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockUsers.filter(u => u.role === "auditor").length}</p>
+                <p className="text-3xl font-semibold tracking-tight">{mockUsers.filter(u => u.role === "auditor").length}</p>
                 <p className="text-sm text-muted-foreground">Auditores Activos</p>
               </div>
             </div>
@@ -165,13 +165,13 @@ export function DashboardContent() {
         </Card>
 
         <Card className="border-border/70 bg-card/80">
-          <CardContent className="p-6">
+          <CardContent className="px-6 py-5">
             <div className="flex items-center gap-4">
-              <div className="rounded-lg border border-chart-3/20 bg-chart-3/10 p-3">
-                <FileCheck className="h-5 w-5 text-chart-3" />
+              <div className="rounded-lg border border-chart-3/20 bg-chart-3/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                <FileCheck className="h-6 w-6 text-chart-3" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockLotes.filter(l => l.estado === "abierto").length}</p>
+                <p className="text-3xl font-semibold tracking-tight">{mockLotes.filter(l => l.estado === "abierto").length}</p>
                 <p className="text-sm text-muted-foreground">Lotes Abiertos</p>
               </div>
             </div>

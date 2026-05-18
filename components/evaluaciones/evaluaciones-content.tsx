@@ -130,48 +130,48 @@ export function EvaluacionesContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center gap-4 px-5 py-4">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <ClipboardCheck className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Controles</p>
+              <p className="text-3xl font-semibold tracking-tight">{stats.total}</p>
+              <p className="text-sm text-muted-foreground">Total Controles</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg border border-border/70 bg-muted p-2">
-              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center gap-4 px-5 py-4">
+            <div className="rounded-lg border border-border/70 bg-muted p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <AlertCircle className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-semibold">{stats.pendientes}</p>
-              <p className="text-xs text-muted-foreground">Pendientes</p>
+              <p className="text-3xl font-semibold tracking-tight">{stats.pendientes}</p>
+              <p className="text-sm text-muted-foreground">Pendientes</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
-              <Clock className="h-5 w-5 text-primary" />
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center gap-4 px-5 py-4">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <Clock className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-semibold">{stats.enCurso}</p>
-              <p className="text-xs text-muted-foreground">En Curso</p>
+              <p className="text-3xl font-semibold tracking-tight">{stats.enCurso}</p>
+              <p className="text-sm text-muted-foreground">En Curso</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg border border-success/20 bg-success/10 p-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center gap-4 px-5 py-4">
+            <div className="rounded-lg border border-success/20 bg-success/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-semibold">{stats.terminados}</p>
-              <p className="text-xs text-muted-foreground">Terminados</p>
+              <p className="text-3xl font-semibold tracking-tight">{stats.terminados}</p>
+              <p className="text-sm text-muted-foreground">Terminados</p>
             </div>
           </CardContent>
         </Card>
@@ -269,8 +269,8 @@ export function EvaluacionesContent() {
                         <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/30">
                           <div className="flex w-full flex-col gap-3 pr-4 text-left md:flex-row md:items-center md:justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-14 items-center justify-center rounded-lg border border-accent/20 bg-accent/10">
-                                <span className="text-sm font-semibold text-accent">{vertical.peso}%</span>
+                              <div className="flex h-10 w-14 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
+                                <span className="text-sm font-semibold text-primary">{vertical.peso}%</span>
                               </div>
                               <div>
                                 <p className="font-medium">{vertical.nombre}</p>
