@@ -49,7 +49,7 @@ export function ModelosContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -71,7 +71,7 @@ export function ModelosContent() {
             <DialogHeader>
               <DialogTitle>Crear Nuevo Modelo de Control</DialogTitle>
               <DialogDescription>
-                Define la metodología de evaluación con verticales, parámetros y ponderaciones.
+                Establece la metodología de evaluación configurando las verticales, los parámetros de calidad y la asignación de puntajes.
               </DialogDescription>
             </DialogHeader>
             <ModeloForm onClose={() => setIsCreateOpen(false)} />
