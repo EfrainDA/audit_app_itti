@@ -12,6 +12,7 @@ export interface User {
 export interface UnidadNegocio {
   id: string
   nombre: string
+  ecosistema: string
   codigo: string
   zona: string
   responsable: string
@@ -100,6 +101,8 @@ export interface Control {
   scoreControl?: number
   proceso?: string
   subproceso?: string
+  subprocesos?: string[]
+  correspondeProceso?: boolean
   producto?: string
   fechaCreacion: string
   auditorId?: string
@@ -150,11 +153,11 @@ export const currentUser: User = mockUsers[0]
 
 // Mock Unidades de Negocio
 export const mockUnidades: UnidadNegocio[] = [
-  { id: '1', nombre: 'ueno bank', codigo: 'SC-001', zona: 'Norte', responsable: 'Pedro Sánchez', logo: '/logo1.png' },
-  { id: '2', nombre: 'upay', codigo: 'SM-002', zona: 'Norte', responsable: 'Laura Fernández', logo: '/placeholder-logo.png' },
-  { id: '3', nombre: 'itti', codigo: 'SG-003', zona: 'Occidente', responsable: 'Roberto Díaz', logo: '/placeholder-logo.png' },
-  { id: '4', nombre: 'wepa', codigo: 'SC-004', zona: 'Centro', responsable: 'Isabel Torres', logo: '/placeholder-logo.png' },
-  { id: '5', nombre: 'uenoseguros', codigo: 'SC-005', zona: 'Sureste', responsable: 'Miguel Ángel Ruiz', logo: '/placeholder-logo.png' },
+  { id: '1', nombre: 'ueno bank', ecosistema: 'Financiero', codigo: 'SC-001', zona: 'Norte', responsable: 'Pedro Sánchez', logo: '/logo1.png' },
+  { id: '2', nombre: 'upay', ecosistema: 'Pagos', codigo: 'SM-002', zona: 'Norte', responsable: 'Laura Fernández', logo: '/placeholder-logo.png' },
+  { id: '3', nombre: 'itti', ecosistema: 'Tecnologia', codigo: 'SG-003', zona: 'Occidente', responsable: 'Roberto Díaz', logo: '/placeholder-logo.png' },
+  { id: '4', nombre: 'wepa', ecosistema: 'Pagos', codigo: 'SC-004', zona: 'Centro', responsable: 'Isabel Torres', logo: '/placeholder-logo.png' },
+  { id: '5', nombre: 'uenoseguros', ecosistema: 'Seguros', codigo: 'SC-005', zona: 'Sureste', responsable: 'Miguel Ángel Ruiz', logo: '/placeholder-logo.png' },
 ]
 
 // Mock Ciclos

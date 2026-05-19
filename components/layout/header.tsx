@@ -1,6 +1,8 @@
 "use client"
 
-import { Bell, Search, HelpCircle } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Bell, Search, HelpCircle, Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { mockNotificaciones } from "@/lib/data"
-import { useState } from "react"
 
 interface HeaderProps {
   title: string
@@ -21,10 +22,17 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const [notifications] = useState(mockNotificaciones)
+  const [mounted, setMounted] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
   const unreadCount = notifications.filter(n => !n.leida).length
+  const isDark = resolvedTheme === "dark"
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
-    <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card/86 px-4 shadow-[0_12px_32px_oklch(0.28_0.025_252/0.07)] backdrop-blur-2xl sm:px-6">
+    <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card/86 px-4 shadow-[0_12px_32px_oklch(0.28_0.025_252/0.07)] backdrop-blur-2xl dark:shadow-[0_18px_42px_oklch(0.04_0.02_255/0.36)] sm:px-6">
       <div className="min-w-0">
         <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
         {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
@@ -35,12 +43,19 @@ export function Header({ title, subtitle }: HeaderProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar..."
-            className="w-72 border-border/80 bg-white/80 pl-9"
+            className="w-72 border-border/80 bg-card/80 pl-9"
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-          <HelpCircle className="h-5 w-5" />
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
+          title={isDark ? "Modo claro" : "Modo oscuro"}
+          className="relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+        >
+          {mounted && isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
 
         <DropdownMenu>
@@ -74,6 +89,10 @@ export function Header({ title, subtitle }: HeaderProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       </div>
     </header>
   )

@@ -63,7 +63,7 @@ export function ModelosContent() {
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Nuevo Modelo
             </Button>
           </DialogTrigger>
@@ -81,35 +81,35 @@ export function ModelosContent() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-success/10">
+        <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <FileCheck className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockModelos.filter(m => m.estado === 'publicado').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'publicado').length}</p>
               <p className="text-sm text-muted-foreground">Activos</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-primary/10">
+        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <FileCheck className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockModelos.filter(m => m.estado === 'borrador').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'borrador').length}</p>
               <p className="text-sm text-muted-foreground">En Borrador</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-muted">
+        <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
+          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+            <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <Archive className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockModelos.filter(m => m.estado === 'deprecado').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'deprecado').length}</p>
               <p className="text-sm text-muted-foreground">Deprecados</p>
             </div>
           </CardContent>
@@ -121,7 +121,7 @@ export function ModelosContent() {
         {filteredModelos.map((modelo) => (
           <Card
             key={modelo.id}
-            className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
+            className="bg-card border-border cursor-pointer"
             onClick={() => setSelectedModelo(modelo)}
           >
             <CardContent className="p-6">
@@ -131,7 +131,7 @@ export function ModelosContent() {
                     <h3 className="font-semibold text-lg">{modelo.nombre}</h3>
                     <Badge className={getEstadoBadgeColor(modelo.estado)}>
                       {formatEstado(modelo.estado)}
-                    </Badge>
+                    </Badge> {/* Ensure consistent badge styling */}
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {modelo.descripcion || "Sin descripción"}
@@ -201,7 +201,7 @@ export function ModelosContent() {
 
               <div className="flex items-center justify-end mt-4 text-primary text-sm">
                 <span>Ver detalle</span>
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight className="h-4 w-4 ml-1" /> {/* Consistent icon sizing */}
               </div>
             </CardContent>
           </Card>

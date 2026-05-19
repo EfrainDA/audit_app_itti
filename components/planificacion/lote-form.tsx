@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { mockUnidades, mockUsers, mockModelos } from "@/lib/data"
+import { Building2 } from "lucide-react"
+import { mockUsers, mockModelos } from "@/lib/data"
+import { useUnidades } from "@/hooks/use-unidades"
 
 interface LoteFormProps {
   onClose: () => void
@@ -23,6 +25,7 @@ export function LoteForm({ onClose }: LoteFormProps) {
   const [ciclo, setCiclo] = useState("")
   const [modeloId, setModeloId] = useState("")
   const [auditores, setAuditores] = useState<string[]>([])
+  const { unidades } = useUnidades()
 
   const auditoresDisponibles = mockUsers.filter((u) => u.role === "auditor" && u.status === "activo")
   const modelosPublicados = mockModelos.filter((m) => m.estado === "publicado")
@@ -50,9 +53,21 @@ export function LoteForm({ onClose }: LoteFormProps) {
               <SelectValue placeholder="Selecciona una unidad" />
             </SelectTrigger>
             <SelectContent>
-              {mockUnidades.map((unidad) => (
+              {unidades.map((unidad) => (
                 <SelectItem key={unidad.id} value={unidad.id}>
-                  {unidad.nombre}
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-primary/20 bg-primary/10">
+                      {unidad.logo ? (
+                        <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
+                      ) : (
+                        <Building2 className="h-3.5 w-3.5 text-primary" />
+                      )}
+                    </span>
+                    <span className="flex flex-col">
+                      <span>{unidad.nombre}</span>
+                      <span className="text-xs text-muted-foreground">{unidad.ecosistema}</span>
+                    </span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

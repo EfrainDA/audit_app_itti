@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -26,11 +28,31 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { Plus, User, Play, Trash2, ChevronRight, FileCheck } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { 
+  Plus, 
+  User, 
+  Play, 
+  Pencil,
+  Trash2, 
+  ChevronRight, 
+  FileCheck, 
+  FileText, 
+  Clock, 
+  CheckCircle2,
+  LayoutList 
+} from "lucide-react"
 import {
   type Lote,
   type Control,
   type LoteVertical,
+  mockLotes,
   mockLoteVerticales,
   mockModelos,
   mockUsers,
@@ -39,6 +61,7 @@ import {
   formatEstado,
 } from "@/lib/data"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 interface LoteDetailProps {
   lote: Lote
@@ -46,7 +69,9 @@ interface LoteDetailProps {
 
 export function LoteDetail({ lote }: LoteDetailProps) {
   const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
-  const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
+  const auditores = lote.auditores
+    .map((id) => mockUsers.find((u) => u.id === id))
+    .filter((auditor): auditor is (typeof mockUsers)[number] => Boolean(auditor))
   
   // Estado local para simular agregar controles
   const [loteVerticales, setLoteVerticales] = useState<LoteVertical[]>(() => {
@@ -65,6 +90,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
   const initialNewControl = {
     identificador: "",
     auditorId: "",
+    correspondeProceso: false,
     proceso: "",
     subprocesos: [] as string[],
     subprocesoTemp: "",
@@ -72,16 +98,91 @@ export function LoteDetail({ lote }: LoteDetailProps) {
 
   const [showAddControl, setShowAddControl] = useState<string | null>(null)
   const [newControl, setNewControl] = useState(initialNewControl)
+  const [editingControl, setEditingControl] = useState<{ loteVerticalId: string; controlId: string } | null>(null)
+  const [editControl, setEditControl] = useState(initialNewControl)
+  const [isControlSuggestionsOpen, setIsControlSuggestionsOpen] = useState(false)
+  const [isProcessSuggestionsOpen, setIsProcessSuggestionsOpen] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // Implementación de autoguardado con debounce (retraso de 1.5s)
+  useEffect(() => {
+    if (loteVerticales.length === 0) return
+
+    setAutoSaveStatus('saving')
+
+    const timer = setTimeout(() => {
+      console.log("Auto-saving plan for lote:", lote.id, loteVerticales)
+      setAutoSaveStatus('saved')
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [loteVerticales, lote.id])
+
+  const existingControlNames = useMemo(() => {
+    const loteIdsForUnidad = mockLotes
+      .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
+      .map((mockLote) => mockLote.id)
+
+    const persistedNames = mockLoteVerticales
+      .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
+      .flatMap((lv) => lv.controles.map((control) => control.identificador))
+
+    const localNames = loteVerticales.flatMap((lv) =>
+      lv.controles.map((control) => control.identificador)
+    )
+
+    const names = [...persistedNames, ...localNames]
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
+  }, [lote.unidadNegocioId, loteVerticales])
+
+  const filteredControlNames = existingControlNames.filter((name) =>
+    name.toLowerCase().includes(newControl.identificador.trim().toLowerCase())
+  )
+  const hasExactControlMatch = existingControlNames.some(
+    (name) => name.toLowerCase() === newControl.identificador.trim().toLowerCase()
+  )
+
+  const existingProcessNames = useMemo(() => {
+    const loteIdsForUnidad = mockLotes
+      .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
+      .map((mockLote) => mockLote.id)
+
+    const persistedNames = mockLoteVerticales
+      .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
+      .flatMap((lv) =>
+        lv.controles
+          .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
+          .filter((process): process is string => Boolean(process?.trim()))
+      )
+
+    const localNames = loteVerticales.flatMap((lv) =>
+      lv.controles
+        .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
+        .filter((process): process is string => Boolean(process?.trim()))
+    )
+
+    return Array.from(new Set([...persistedNames, ...localNames])).sort((a, b) => a.localeCompare(b))
+  }, [lote.unidadNegocioId, loteVerticales])
+
+  const filteredProcessNames = existingProcessNames.filter((name) =>
+    name.toLowerCase().includes(newControl.proceso.trim().toLowerCase())
+  )
+  const hasExactProcessMatch = existingProcessNames.some(
+    (name) => name.toLowerCase() === newControl.proceso.trim().toLowerCase()
+  )
 
   const handleAddControl = (loteVerticalId: string) => {
-    if (!newControl.identificador.trim()) return
+    const identificador = newControl.correspondeProceso ? newControl.proceso.trim() : newControl.identificador.trim()
+    if (!identificador) return
 
     const nuevoControl: Control = {
       id: `c-${Date.now()}`,
       loteVerticalId,
-      identificador: newControl.identificador,
-      proceso: newControl.proceso || undefined,
-      subproceso: newControl.subprocesos.length > 0 ? newControl.subprocesos.join(", ") : undefined,
+      identificador,
+      correspondeProceso: newControl.correspondeProceso,
+      proceso: newControl.correspondeProceso ? newControl.proceso || undefined : undefined,
+      subproceso: newControl.correspondeProceso && newControl.subprocesos.length > 0 ? newControl.subprocesos.join(", ") : undefined,
+      subprocesos: newControl.correspondeProceso ? newControl.subprocesos : undefined,
       estado: "pendiente",
       fechaCreacion: new Date().toISOString().split("T")[0],
       auditorId: newControl.auditorId || undefined,
@@ -98,10 +199,13 @@ export function LoteDetail({ lote }: LoteDetailProps) {
     setNewControl({
       identificador: "",
       auditorId: "",
+      correspondeProceso: false,
       proceso: "",
       subprocesos: [],
       subprocesoTemp: "",
     })
+    setIsControlSuggestionsOpen(false)
+    setIsProcessSuggestionsOpen(false)
     setShowAddControl(null)
   }
 
@@ -115,28 +219,82 @@ export function LoteDetail({ lote }: LoteDetailProps) {
     )
   }
 
-  const selectedVertical = showAddControl
-    ? modelo?.verticales.find((v) => v.id === loteVerticales.find((lv) => lv.id === showAddControl)?.verticalId)
-    : undefined
+  const openEditControl = (loteVerticalId: string, control: Control) => {
+    const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
+
+    setEditingControl({ loteVerticalId, controlId: control.id })
+    setEditControl({
+      identificador: control.identificador,
+      auditorId: control.auditorId || "",
+      correspondeProceso: Boolean(control.correspondeProceso),
+      proceso: control.correspondeProceso ? control.proceso || control.identificador : control.proceso || "",
+      subprocesos,
+      subprocesoTemp: "",
+    })
+  }
+
+  const handleUpdateControl = () => {
+    if (!editingControl) return
+
+    const identificador = editControl.correspondeProceso ? editControl.proceso.trim() : editControl.identificador.trim()
+    if (!identificador) return
+
+    setLoteVerticales((prev) =>
+      prev.map((lv) =>
+        lv.id === editingControl.loteVerticalId
+          ? {
+              ...lv,
+              controles: lv.controles.map((control) =>
+                control.id === editingControl.controlId
+                  ? {
+                      ...control,
+                      identificador,
+                      auditorId: editControl.auditorId || undefined,
+                      correspondeProceso: editControl.correspondeProceso,
+                      proceso: editControl.correspondeProceso ? editControl.proceso.trim() || undefined : undefined,
+                      subproceso: editControl.correspondeProceso && editControl.subprocesos.length > 0 ? editControl.subprocesos.join(", ") : undefined,
+                      subprocesos: editControl.correspondeProceso ? editControl.subprocesos : undefined,
+                    }
+                  : control
+              ),
+            }
+          : lv
+      )
+    )
+
+    setEditingControl(null)
+    setEditControl(initialNewControl)
+  }
 
   const getTotalControles = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
   const getControlesTerminados = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
+  const getSubprocesosCount = (control: Control) => {
+    if (control.subprocesos) return control.subprocesos.length
+    if (!control.subproceso) return 0
+    return control.subproceso.split(",").filter((subproceso) => subproceso.trim().length > 0).length
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header con info del modelo */}
-      <div className="flex items-start justify-between p-4 bg-secondary rounded-lg">
+      {/* Header Info - Resumen de completado profesional */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-secondary/40 border border-border rounded-xl gap-6">
         <div>
-          <p className="text-sm text-muted-foreground">Modelo de Control</p>
-          <p className="font-medium">{modelo?.nombre}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {modelo?.verticales.length} verticales configuradas
-          </p>
+          <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Modelo Aplicado</p>
+          <h2 className="text-lg font-bold text-foreground">{modelo?.nombre}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="secondary" className="h-5 text-[10px] font-bold uppercase">{loteVerticales.length} Verticales</Badge>
+            <Badge variant="outline" className="h-5 text-[10px] font-bold uppercase">Ciclo {lote.ciclo}</Badge>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Controles</p>
-          <p className="text-2xl font-bold">
-            {getControlesTerminados()}/{getTotalControles()}
+        <div className="flex-1 max-w-[240px] sm:text-right space-y-1.5">
+          <div className="flex items-center justify-between sm:justify-end gap-2">
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Progreso General</p>
+            {autoSaveStatus === 'saving' && <span className="text-[9px] text-muted-foreground flex items-center gap-1 animate-pulse"><Clock className="h-2.5 w-2.5" /> Guardando...</span>}
+            {autoSaveStatus === 'saved' && <span className="text-[9px] text-success flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5" /> Guardado</span>}
+          </div>
+          <Progress value={getTotalControles() > 0 ? (getControlesTerminados() / getTotalControles()) * 100 : 0} className="h-2" />
+          <p className="text-sm font-bold">
+            {getControlesTerminados()}/{getTotalControles()} <span className="text-muted-foreground font-normal">controles realizados</span>
           </p>
         </div>
       </div>
@@ -145,20 +303,17 @@ export function LoteDetail({ lote }: LoteDetailProps) {
       <div>
         <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
           <User className="h-4 w-4" />
-          Auditores Asignados ({auditores.length})
+          Equipo de Control de Calidad ({auditores.length})
         </h3>
         <div className="flex flex-wrap gap-2">
           {auditores.map((auditor) => (
-            <div key={auditor?.id} className="flex items-center gap-2 bg-secondary px-3 py-2 rounded-lg">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-primary text-xs font-medium">
+            <div key={auditor?.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-sm hover:border-primary/30 transition-colors">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                <span className="text-primary text-[10px] font-bold uppercase">
                   {auditor?.name.split(" ").map((n) => n[0]).join("")}
                 </span>
               </div>
-              <div>
-                <p className="text-sm font-medium">{auditor?.name}</p>
-                <p className="text-xs text-muted-foreground">{auditor?.email}</p>
-              </div>
+              <span className="text-xs font-medium pr-1">{auditor?.name}</span>
             </div>
           ))}
         </div>
@@ -236,62 +391,91 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                     ) : (
                       loteVertical.controles.map((control) => {
                         const auditor = mockUsers.find((u) => u.id === control.auditorId)
+                        const subprocesosCount = getSubprocesosCount(control)
+                        
                         return (
-                          <Card key={control.id} className="bg-secondary border-border">
-                            <CardContent className="p-3">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex flex-col">
-                                    <span className="font-mono text-sm font-medium">
-                                      {control.identificador}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {control.proceso}
-                                      {control.subproceso && ` / ${control.subproceso}`}
-                                    </span>
-                                  </div>
+                          <div 
+                            key={control.id} 
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border/40 bg-secondary/20 hover:bg-secondary/40 hover:border-primary/20 transition-all duration-200"
+                          >
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-mono text-sm font-semibold text-foreground">
+                                  {control.identificador}
+                                </span>
+                                <Badge className={cn("text-[10px] h-5 px-1.5 uppercase font-bold", getEstadoBadgeColor(control.estado))}>
+                                  {formatEstado(control.estado)}
+                                </Badge>
+                                {subprocesosCount > 0 && (
+                                  <Badge variant="outline" className="h-5 gap-1 border-primary/20 bg-primary/5 text-primary text-[10px] font-bold">
+                                    <LayoutList className="h-2.5 w-2.5" />
+                                    {subprocesosCount} Subprocesos
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                                <FileText className="h-3 w-3 shrink-0" />
+                                <span>{control.proceso || "Sin proceso específico"}</span>
+                                {control.subproceso && <span className="text-border">|</span>}
+                                <span className="truncate">{control.subproceso}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-6 sm:gap-8">
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-bold text-primary uppercase">
+                                    {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
+                                  </span>
                                 </div>
-                                <div className="grid w-full grid-cols-4 items-center gap-3 text-sm sm:w-auto">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                                      {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
-                                    </div>
-                                    <span className="truncate">
-                                      {auditor ? auditor.name : "Sin auditor"}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <Badge className={getEstadoBadgeColor(control.estado)}>
-                                      {formatEstado(control.estado)}
-                                    </Badge>
-                                  </div>
-                                  <div className="text-right font-medium">
-                                    {control.scoreControl !== undefined ? (
-                                      <span className={`font-bold ${getScoreColor(control.scoreControl)}`}>
-                                        {control.scoreControl}
-                                      </span>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </div>
-                                  <div className="flex justify-end">
-                                    {control.estado === "pendiente" && lote.estado === "abierto" ? (
+                                <span className="text-xs text-muted-foreground truncate max-w-[100px] hidden md:inline">
+                                  {auditor ? auditor.name : "Sin auditor"}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col items-end min-w-[50px]">
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold">Logrado</span>
+                                <span className={cn(
+                                  "text-sm font-bold",
+                                  control.scoreControl !== undefined ? getScoreColor(control.scoreControl) : "text-muted-foreground"
+                                )}>
+                                  {control.scoreControl ?? "--"}
+                                </span>
+                              </div>
+
+                              <div className="flex justify-end">
+                                {control.estado === "pendiente" && lote.estado === "abierto" ? (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
                                       <Button
                                         variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteControl(loteVertical.id, control.id)}
-                                        className="text-destructive hover:text-destructive"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
                                       >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Pencil className="h-4 w-4" />
                                       </Button>
-                                    ) : (
-                                      <div className="h-8 w-8" />
-                                    )}
-                                  </div>
-                                </div>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openEditControl(loteVertical.id, control)}>
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        Editar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive"
+                                        onClick={() => handleDeleteControl(loteVertical.id, control.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Borrar
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                ) : (
+                                  <div className="h-8 w-8" />
+                                )}
                               </div>
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </div>
                         )
                       })
                     )}
@@ -305,6 +489,8 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                       className="w-full border-dashed"
                       onClick={() => {
                         setNewControl(initialNewControl)
+                        setIsControlSuggestionsOpen(false)
+                        setIsProcessSuggestionsOpen(false)
                         setShowAddControl(loteVertical.id)
                       }}
                     >
@@ -320,22 +506,100 @@ export function LoteDetail({ lote }: LoteDetailProps) {
       </div>
 
       {/* Dialogo para agregar control */}
-      <Dialog open={showAddControl !== null} onOpenChange={() => setShowAddControl(null)}>
+      <Dialog
+        open={showAddControl !== null}
+        onOpenChange={() => {
+          setIsControlSuggestionsOpen(false)
+          setIsProcessSuggestionsOpen(false)
+          setShowAddControl(null)
+        }}
+      >
         <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Control</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/60 px-4 py-3">
+              <div className="space-y-1">
+                <Label htmlFor="correspondeProceso" className="text-sm font-medium">
+                  Corresponde a Procesos
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Habilita la selección de proceso y la carga de subprocesos.
+                </p>
+              </div>
+              <Switch
+                id="correspondeProceso"
+                checked={newControl.correspondeProceso}
+                onCheckedChange={(checked) =>
+                  setNewControl({
+                    ...newControl,
+                    correspondeProceso: checked,
+                    identificador: checked ? newControl.proceso : newControl.identificador,
+                    proceso: checked ? newControl.proceso : "",
+                    subprocesos: checked ? newControl.subprocesos : [],
+                    subprocesoTemp: checked ? newControl.subprocesoTemp : "",
+                  })
+                }
+              />
+            </div>
+            {!newControl.correspondeProceso && (
+            <div className="relative space-y-2">
               <Label htmlFor="identificador">Nombre del Control *</Label>
               <Input
                 id="identificador"
                 placeholder="Ej: Control de Inventario, Revisión de Facturas"
                 value={newControl.identificador}
-                onChange={(e) => setNewControl({ ...newControl, identificador: e.target.value })}
+                onFocus={() => setIsControlSuggestionsOpen(true)}
+                onBlur={() => window.setTimeout(() => setIsControlSuggestionsOpen(false), 120)}
+                onChange={(e) => {
+                  setNewControl({ ...newControl, identificador: e.target.value })
+                  setIsControlSuggestionsOpen(true)
+                }}
                 className="bg-secondary border-border"
               />
+              {isControlSuggestionsOpen && !newControl.correspondeProceso && (
+                <div
+                  className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  {filteredControlNames.length > 0 ? (
+                    filteredControlNames.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                        onClick={() => {
+                          setNewControl({ ...newControl, identificador: name })
+                          setIsControlSuggestionsOpen(false)
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
+                      onClick={() => setIsControlSuggestionsOpen(false)}
+                    >
+                      Crear nuevo control{newControl.identificador.trim() ? `: ${newControl.identificador.trim()}` : ""}
+                    </button>
+                  )}
+                  {newControl.identificador.trim() && filteredControlNames.length > 0 && !hasExactControlMatch && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
+                      onClick={() => setIsControlSuggestionsOpen(false)}
+                    >
+                      Crear nuevo control: {newControl.identificador.trim()}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
+            )}
+            {!newControl.correspondeProceso && (
             <div className="space-y-2">
               <Label htmlFor="auditor">Auditor</Label>
               <Select
@@ -354,26 +618,64 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                 </SelectContent>
               </Select>
             </div>
-            {selectedVertical?.contieneProceso && (
+            )}
+            {newControl.correspondeProceso && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="proceso">Proceso</Label>
-                  <Select
-                    value={newControl.proceso}
-                    onValueChange={(value) => setNewControl({ ...newControl, proceso: value })}
-                  >
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar proceso" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      <SelectItem value="Ventas">Ventas</SelectItem>
-                      <SelectItem value="Soporte">Soporte</SelectItem>
-                      <SelectItem value="Operaciones">Operaciones</SelectItem>
-                      <SelectItem value="Compras">Compras</SelectItem>
-                      <SelectItem value="Logística">Logística</SelectItem>
-                      <SelectItem value="RRHH">RRHH</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="proceso">Proceso / Nombre del Control *</Label>
+                  <div className="relative">
+                    <Input
+                      id="proceso"
+                      placeholder="Ej: Ventas, Operaciones"
+                      value={newControl.proceso}
+                      onFocus={() => setIsProcessSuggestionsOpen(true)}
+                      onBlur={() => window.setTimeout(() => setIsProcessSuggestionsOpen(false), 120)}
+                      onChange={(e) => {
+                        setNewControl({ ...newControl, proceso: e.target.value, identificador: e.target.value })
+                        setIsProcessSuggestionsOpen(true)
+                      }}
+                      className="bg-secondary border-border"
+                    />
+                    {isProcessSuggestionsOpen && (
+                      <div
+                        className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
+                        onMouseDown={(event) => event.preventDefault()}
+                      >
+                        {filteredProcessNames.length > 0 ? (
+                          filteredProcessNames.map((process) => (
+                            <button
+                              key={process}
+                              type="button"
+                              className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                              onClick={() => {
+                                setNewControl({ ...newControl, proceso: process, identificador: process })
+                                setIsProcessSuggestionsOpen(false)
+                              }}
+                            >
+                              {process}
+                            </button>
+                          ))
+                        ) : (
+                          <button
+                            type="button"
+                            className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
+                            onClick={() => setIsProcessSuggestionsOpen(false)}
+                          >
+                            Crear nuevo proceso{newControl.proceso.trim() ? `: ${newControl.proceso.trim()}` : ""}
+                          </button>
+                        )}
+                        {newControl.proceso.trim() && filteredProcessNames.length > 0 && !hasExactProcessMatch && (
+                          <button
+                            type="button"
+                            className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
+                            onClick={() => setIsProcessSuggestionsOpen(false)}
+                          >
+                            Crear nuevo proceso: {newControl.proceso.trim()}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="subproceso">Subprocesos</Label>
@@ -421,6 +723,24 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                     ))}
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="auditor-proceso">Auditor</Label>
+                  <Select
+                    value={newControl.auditorId}
+                    onValueChange={(value) => setNewControl({ ...newControl, auditorId: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue placeholder="Seleccionar auditor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {auditores.map((auditor) => (
+                        <SelectItem key={auditor.id} value={auditor.id}>
+                          {auditor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </>
             )}
           </div>
@@ -430,10 +750,182 @@ export function LoteDetail({ lote }: LoteDetailProps) {
             </Button>
             <Button
               onClick={() => showAddControl && handleAddControl(showAddControl)}
-              disabled={!newControl.identificador.trim() || (selectedVertical?.contieneProceso && !newControl.proceso.trim())}
+              disabled={newControl.correspondeProceso ? !newControl.proceso.trim() : !newControl.identificador.trim()}
               className="bg-primary hover:bg-primary/90"
             >
               Agregar Control
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingControl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingControl(null)
+            setEditControl(initialNewControl)
+          }
+        }}
+      >
+        <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Editar Control</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/60 px-4 py-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-correspondeProceso" className="text-sm font-medium">
+                  Corresponde a Procesos
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Cambia entre control simple o control asociado a proceso/subprocesos.
+                </p>
+              </div>
+              <Switch
+                id="edit-correspondeProceso"
+                checked={editControl.correspondeProceso}
+                onCheckedChange={(checked) =>
+                  setEditControl({
+                    ...editControl,
+                    correspondeProceso: checked,
+                    identificador: checked ? editControl.proceso || editControl.identificador : editControl.identificador,
+                    proceso: checked ? editControl.proceso || editControl.identificador : "",
+                    subprocesos: checked ? editControl.subprocesos : [],
+                    subprocesoTemp: checked ? editControl.subprocesoTemp : "",
+                  })
+                }
+              />
+            </div>
+
+            {!editControl.correspondeProceso && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-identificador">Nombre del Control *</Label>
+                  <Input
+                    id="edit-identificador"
+                    value={editControl.identificador}
+                    onChange={(event) => setEditControl({ ...editControl, identificador: event.target.value })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auditor">Auditor</Label>
+                  <Select
+                    value={editControl.auditorId}
+                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue placeholder="Seleccionar auditor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {auditores.map((auditor) => (
+                        <SelectItem key={auditor.id} value={auditor.id}>
+                          {auditor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {editControl.correspondeProceso && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-proceso">Proceso / Nombre del Control *</Label>
+                  <Input
+                    id="edit-proceso"
+                    value={editControl.proceso}
+                    onChange={(event) =>
+                      setEditControl({ ...editControl, proceso: event.target.value, identificador: event.target.value })
+                    }
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subproceso">Subprocesos</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="edit-subproceso"
+                      placeholder="Agregar subproceso"
+                      value={editControl.subprocesoTemp}
+                      onChange={(event) => setEditControl({ ...editControl, subprocesoTemp: event.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const nextSub = editControl.subprocesoTemp.trim()
+                        if (!nextSub) return
+                        setEditControl({
+                          ...editControl,
+                          subprocesos: [...editControl.subprocesos, nextSub],
+                          subprocesoTemp: "",
+                        })
+                      }}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {editControl.subprocesos.map((sub, index) => (
+                      <span key={`${sub}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-border px-2 py-1 text-xs">
+                        {sub}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditControl({
+                              ...editControl,
+                              subprocesos: editControl.subprocesos.filter((_, idx) => idx !== index),
+                            })
+                          }
+                          className="text-destructive"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auditor-proceso">Auditor</Label>
+                  <Select
+                    value={editControl.auditorId}
+                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue placeholder="Seleccionar auditor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {auditores.map((auditor) => (
+                        <SelectItem key={auditor.id} value={auditor.id}>
+                          {auditor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingControl(null)
+                setEditControl(initialNewControl)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdateControl}
+              disabled={editControl.correspondeProceso ? !editControl.proceso.trim() : !editControl.identificador.trim()}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Guardar Cambios
             </Button>
           </DialogFooter>
         </DialogContent>

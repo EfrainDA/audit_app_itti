@@ -9,7 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { type ModeloControl } from "@/lib/data"
-import { CheckCircle, XCircle, HelpCircle, FileText, Camera } from "lucide-react"
+import { CheckCircle, XCircle, HelpCircle, FileText, Camera, Layers3, ListChecks, CirclePercent } from "lucide-react"
 
 interface ModeloDetailProps {
   modelo: ModeloControl
@@ -29,48 +29,63 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{modelo.verticales.length}</p>
-            <p className="text-sm text-muted-foreground">Verticales</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <Layers3 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">{modelo.verticales.length}</p>
+              <p className="text-sm text-muted-foreground">Verticales</p>
+            </div>
           </CardContent>
         </Card>
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{totalParametros}</p>
-            <p className="text-sm text-muted-foreground">Parámetros</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <ListChecks className="h-6 w-6 text-chart-2" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">{totalParametros}</p>
+              <p className="text-sm text-muted-foreground">Parámetros</p>
+            </div>
           </CardContent>
         </Card>
-        <Card className="bg-secondary border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">100%</p>
-            <p className="text-sm text-muted-foreground">Peso Total</p>
+        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+            <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <CirclePercent className="h-6 w-6 text-warning" />
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight">100%</p>
+              <p className="text-sm text-muted-foreground">Peso Total</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Metadata */}
       <Card className="bg-card border-border">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Creado por</p>
-              <p className="font-medium">{modelo.creadoPor}</p>
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/70">
+            <div className="p-4 text-center">
+              <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Creado por</p>
+              <p className="font-medium text-foreground mt-1">{modelo.creadoPor}</p>
             </div>
-            <div>
-              <p className="text-muted-foreground">Fecha de creación</p>
-              <p className="font-medium">{new Date(modelo.fechaCreacion).toLocaleDateString('es-ES')}</p>
+            <div className="p-4 text-center">
+              <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Fecha de creación</p>
+              <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaCreacion).toLocaleDateString('es-ES')}</p>
             </div>
             {modelo.fechaVigenciaDesde && (
-              <div>
-                <p className="text-muted-foreground">Vigencia desde</p>
-                <p className="font-medium">{new Date(modelo.fechaVigenciaDesde).toLocaleDateString('es-ES')}</p>
+              <div className="p-4 text-center">
+                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Vigencia desde</p>
+                <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaVigenciaDesde).toLocaleDateString('es-ES')}</p>
               </div>
             )}
             {modelo.fechaVigenciaHasta && (
-              <div>
-                <p className="text-muted-foreground">Vigencia hasta</p>
-                <p className="font-medium">{new Date(modelo.fechaVigenciaHasta).toLocaleDateString('es-ES')}</p>
+              <div className="p-4 text-center">
+                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Vigencia hasta</p>
+                <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaVigenciaHasta).toLocaleDateString('es-ES')}</p>
               </div>
             )}
           </div>
@@ -85,16 +100,16 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
             <AccordionItem
               key={vertical.id}
               value={vertical.id}
-              className="border border-border rounded-lg bg-card overflow-hidden"
+              className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-sm"
             >
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
                 <div className="flex items-center gap-3 text-left">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                     <span className="text-primary font-bold">{vertical.peso}%</span>
                   </div>
                   <div>
-                    <h4 className="font-medium">{vertical.nombre}</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <h4 className="font-semibold text-foreground">{vertical.nombre}</h4>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <Badge variant="outline" className="text-xs">
                         {vertical.tipoEvaluacion === 'cascada' ? 'Cascada' : 'Distribuida'}
                       </Badge>
@@ -104,26 +119,22 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <div className="space-y-3 pt-2">
+                <div className="space-y-2 pt-1">
                   {vertical.parametros.map((parametro) => (
-                    <Card key={parametro.id} className="bg-secondary border-border">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-3">
+                    <Card key={parametro.id} className="bg-secondary border-border shadow-sm rounded-lg">
+                      <CardContent className="flex min-h-[76px] items-center justify-between gap-4 p-3">
+                        <div className="min-w-0 space-y-2">
                           <div>
-                            <h5 className="font-medium">{parametro.nombre}</h5>
+                            <h5 className="text-sm font-semibold leading-tight">{parametro.nombre}</h5>
                             {parametro.descripcion && (
-                              <p className="text-sm text-muted-foreground mt-1">
+                              <p className="mt-1 text-sm leading-snug text-muted-foreground">
                                 {parametro.descripcion}
                               </p>
                             )}
                           </div>
-                          <Badge className="bg-primary/20 text-primary">
-                            {parametro.puntosBase} pts
-                          </Badge>
-                        </div>
 
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-                          <span className="flex items-center gap-1">
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1 leading-none">
                             {parametro.permiteIntermedio ? (
                               <>
                                 <CheckCircle className="h-3 w-3 text-success" />
@@ -132,48 +143,15 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
                             ) : (
                               <>
                                 <XCircle className="h-3 w-3 text-muted-foreground" />
-                                Solo Cumple/No Cumple
+                                Solo Cumple / No Cumple
                               </>
                             )}
-                          </span>
-                        </div>
-
-                        {parametro.preguntas.length > 0 && (
-                          <div className="border-t border-border pt-3">
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Preguntas ({parametro.preguntas.length})
-                            </p>
-                            <div className="space-y-2">
-                              {parametro.preguntas.map((pregunta, index) => (
-                                <div
-                                  key={pregunta.id}
-                                  className="flex items-start gap-2 text-sm bg-background p-2 rounded"
-                                >
-                                  <span className="text-muted-foreground shrink-0">
-                                    {index + 1}.
-                                  </span>
-                                  <div className="flex-1">
-                                    <p>{pregunta.texto}</p>
-                                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                                      {pregunta.evidenciaObligatoria && (
-                                        <span className="flex items-center gap-1">
-                                          <Camera className="h-3 w-3" />
-                                          Evidencia requerida
-                                        </span>
-                                      )}
-                                      {pregunta.comentarioObligatorio && (
-                                        <span className="flex items-center gap-1">
-                                          <FileText className="h-3 w-3" />
-                                          Comentario requerido
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                            </span>
                           </div>
-                        )}
+                        </div>
+                        <Badge className="shrink-0 self-center bg-primary/20 text-primary">
+                          {parametro.puntosBase} pts.
+                        </Badge>
                       </CardContent>
                     </Card>
                   ))}

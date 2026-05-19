@@ -20,7 +20,6 @@ import {
   Eye,
   ChevronRight,
 } from "lucide-react"
-import Image from "next/image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +37,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   mockLotes,
-  mockUnidades,
   mockLoteVerticales,
   mockAuditorias,
   mockUsers,
@@ -49,15 +47,17 @@ import {
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
+import { useUnidades } from "@/hooks/use-unidades"
 
 export function PlanificacionContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
+  const { unidades } = useUnidades()
 
   const lotesConDatos = mockLotes.map((lote) => {
-    const unidad = mockUnidades.find((u) => u.id === lote.unidadNegocioId)
+    const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
     const auditorias = mockAuditorias.filter((a) => a.loteId === lote.id)
     const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
 
@@ -111,7 +111,6 @@ export function PlanificacionContent() {
         <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
           <TabsList className="bg-secondary">
             <TabsTrigger value="lotes">Lotes</TabsTrigger>
-            <TabsTrigger value="auditorias">Calificaciones</TabsTrigger>
             <TabsTrigger value="calendario">Calendario</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
@@ -153,46 +152,46 @@ export function PlanificacionContent() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
+            <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
+              <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+                <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Calendar className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.length}</p>
                   <p className="text-sm text-muted-foreground">Lotes Totales</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-success/10">
+            <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
+              <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+                <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Unlock className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.filter((l) => l.estado === "abierto").length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.filter((l) => l.estado === "abierto").length}</p>
                   <p className="text-sm text-muted-foreground">Abiertos</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-muted">
+            <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
+              <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+                <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <Lock className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockLotes.filter((l) => l.estado === "cerrado").length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.filter((l) => l.estado === "cerrado").length}</p>
                   <p className="text-sm text-muted-foreground">Cerrados</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-chart-2/10">
+            <Card className="h-24 gap-0 border-chart-2/15 bg-card/88 py-0 backdrop-blur-xl dark:border-chart-2/25 dark:bg-card/86">
+              <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+                <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <FileCheck className="h-5 w-5 text-chart-2" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditorias.length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockAuditorias.length}</p>
                   <p className="text-sm text-muted-foreground">Auditorías</p>
                 </div>
               </CardContent>
@@ -200,20 +199,20 @@ export function PlanificacionContent() {
           </div>
 
           {/* Lotes Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-1">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             {filteredLotes.map((lote) => (
               <Card
                 key={lote.id}
-                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
+                className="bg-card border-border shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
                 onClick={() => setSelectedLote(lote)}
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 flex items-center justify-center overflow-hidden rounded-md">
                         {lote.unidadLogo ? (
-                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={40} height={40} className="object-contain" />
+                          <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                         ) : (
                           <div className="flex items-center justify-center w-full h-full rounded-md border border-primary/20 bg-primary/10">
                             <Building2 className="h-5 w-5 text-primary" />
@@ -222,11 +221,11 @@ export function PlanificacionContent() {
                       </div>
                       <div>
                         <h3 className="font-semibold">{lote.unidadNombre}</h3>
-                        <p className="text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
+                        <p className="text-xs text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
                       </div>
                     </div>
                   </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <Badge className={getEstadoBadgeColor(lote.estado)}>
                         {lote.estado === "abierto" ? (
                           <><Unlock className="h-3 w-3 mr-1" /> Abierto</>
@@ -264,15 +263,15 @@ export function PlanificacionContent() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center p-2 bg-secondary rounded-lg">
-                      <p className="text-lg font-bold">{lote.totalAuditorias}</p>
+                    <div className="text-center p-2 bg-secondary/60 rounded-lg border border-border/70">
+                      <p className="text-lg font-bold text-foreground">{lote.totalAuditorias}</p>
                       <p className="text-xs text-muted-foreground">Auditorías</p>
                     </div>
-                    <div className="text-center p-2 bg-secondary rounded-lg">
-                      <p className="text-lg font-bold">{lote.auditoriasTerminadas}</p>
+                    <div className="text-center p-2 bg-secondary/60 rounded-lg border border-border/70">
+                      <p className="text-lg font-bold text-foreground">{lote.auditoriasTerminadas}</p>
                       <p className="text-xs text-muted-foreground">Terminadas</p>
                     </div>
-                    <div className="text-center p-2 bg-secondary rounded-lg">
+                    <div className="text-center p-2 bg-secondary/60 rounded-lg border border-border/70">
                       <p className="text-lg font-bold">{lote.auditores.length}</p>
                       <p className="text-xs text-muted-foreground">Auditores</p>
                     </div>
@@ -284,7 +283,7 @@ export function PlanificacionContent() {
                   </div>
 
                   <div className="flex items-center justify-end mt-4 text-primary text-sm">
-                    <span>Ver evaluaciones
+                    <span className="font-medium">Ver evaluaciones
                     </span>
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </div>
@@ -321,7 +320,7 @@ export function PlanificacionContent() {
                           <div className="flex items-center gap-2">
                             <div className="h-6 w-6 overflow-hidden rounded">
                               {lote.unidadLogo ? (
-                                <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={24} height={24} className="object-contain" />
+                                <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                               ) : (
                                 <Building2 className="h-4 w-4 text-accent" />
                               )}

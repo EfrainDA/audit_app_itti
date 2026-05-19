@@ -19,7 +19,7 @@ import { useState } from "react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: Activity },
   { name: "Modelos de Control", href: "/modelos", icon: Cpu },
-  { name: "Planificacion", href: "/planificacion", icon: CalendarDays },
+  { name: "Planificación", href: "/planificacion", icon: CalendarDays },
   { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardList },
   { name: "Ajustes", href: "/ajustes", icon: Settings2 },
 ]
@@ -83,7 +83,7 @@ export function Sidebar() {
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200",
                 isActive
-                  ? "border border-white/16 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.24)] before:absolute before:left-0 before:top-2 before:h-6 before:w-0.5 before:rounded-full before:bg-cyan-300"
+                  ? "border border-white/16 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.24)] before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-cyan-300"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               )}
               title={collapsed ? item.name : undefined}
