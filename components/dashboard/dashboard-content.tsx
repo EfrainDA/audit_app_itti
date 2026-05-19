@@ -63,33 +63,32 @@ const statCards = [
 
 export function DashboardContent() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <section className="relative overflow-hidden rounded-2xl border border-primary/10 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:p-8">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(120deg,transparent,oklch(0.97_0.01_252/0.4),oklch(0.97_0.01_180/0.3))]" />
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-white/50" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/22 bg-primary/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary/90">
-              <Radar className="h-3.5 w-3.5" />
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-1 rounded-md border border-primary/22 bg-primary/8 px-2 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary/90">
+              <Radar className="h-5 w-5" />
               Quality Intelligence
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Centro de mando de auditorias con precision operativa.
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-2xl">
+              Control de auditorías con precisión operativa.
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Supervisa ciclos, riesgo de cierre, desempeno por vertical y controles recientes en una vista de alta senal.
+              Supervisa en tiempo real el ciclo de vida de cada auditoría, mitiga riesgos de cierre, mide el desempeño por vertical y analiza los controles con una vista estratégica.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:min-w-[340px]">
-            <div className="rounded-lg border border-border/60 bg-white/75 px-5 py-4 shadow-[0_10px_26px_oklch(0.28_0.025_252/0.05)] backdrop-blur-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo activo</p>
+          <div className="grid grid-cols-2 gap-3 sm:min-w-[400px]">
+            <div className= "text-center rounded-lg border border-border/60 bg-white/75 px-4 py-10 shadow-[0_10px_26px_oklch(0.28_0.025_252/0.05)] backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo Activo</p>
               <p className="mt-2 text-3xl font-semibold tracking-tight text-primary">03</p>
             </div>
-            <div className="rounded-lg border border-border/60 bg-white/75 px-5 py-4 shadow-[0_10px_26px_rgba(0,0,0,0.02)] backdrop-blur-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Estado</p>
-              <div className="mt-2 flex items-center gap-2 text-xl font-semibold text-accent">
-                <ShieldCheck className="h-6 w-6" />
-                Controlado
+            <div className= "text-center rounded-lg border border-border/60 bg-white/75 px-4 py-10 shadow-[0_10px_26px_oklch(0.28_0.025_252/0.05)] backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Progreso General</p>
+              <div className="mt-2 text-3xl font-semibold tracking-tight text-primary">
+                80%
               </div>
             </div>
           </div>
