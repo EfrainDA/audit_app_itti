@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import {
   Activity,
@@ -139,7 +146,16 @@ type AnalystVerticalSummary = {
 type SupervisorVerticalScore = {
   id: string
   name: string
+  performancePct: number | null
   achieved: number | null
+  controls: {
+    id: string
+    identificador?: string
+    estado: string
+    scoreControl?: number
+    proceso?: string
+    subproceso?: string
+  }[]
 }
 
 type SupervisorLoteSummary = {
@@ -158,6 +174,14 @@ type SupervisorLoteSummary = {
     parametro: string
     count: number
   }[]
+}
+
+type SupervisorAnalystSummary = {
+  id: string
+  name: string
+  assigned: number
+  completed: number
+  pending: number
 }
 
 const roleCopy: Record<DashboardView, {
@@ -546,7 +570,7 @@ function AnalystProgressPanel({ counts, className }: { counts: CountMetrics; cla
       <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso de Controles</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso del lote asignado</p>
             <div className="mt-2 flex items-end gap-3">
               <p className={cn("text-5xl font-semibold leading-none tracking-tight", semaphore.text)}>{counts.progressPct}%</p>
             </div>
@@ -600,7 +624,10 @@ function AnalystUnitScore({
       <CardContent className="space-y-3 p-3 pt-0">
         {verticals.map((vertical) => {
           const verticalSemaphore = getSemaphore(vertical.averageScore ?? 0)
-          const progress = vertical.total ? Math.round((vertical.completed / vertical.total) * 100) : 0
+          const contributionProgress =
+            vertical.achieved !== null && vertical.weight > 0
+              ? Math.min(100, Math.round((vertical.achieved / vertical.weight) * 100))
+              : 0
 
           return (
             <div key={vertical.id} className="rounded-lg border border-border/60 bg-background p-3">
@@ -619,7 +646,7 @@ function AnalystUnitScore({
                 </div>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                <div className={cn("h-full rounded-full", verticalSemaphore.bg)} style={{ width: `${vertical.achieved ?? 0}%` }} />
+                <div className={cn("h-full rounded-full", verticalSemaphore.bg)} style={{ width: `${contributionProgress}%` }} />
               </div>
             </div>
           )
@@ -774,7 +801,41 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
   )
 }
 
+function SupervisorAnalystAssignments({ analysts }: { analysts: SupervisorAnalystSummary[] }) {
+  return (
+    <Card className="h-full border-border/70 bg-card">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold">Analistas por asignacion</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">Asignaciones totales, cierres realizados y pendientes por cerrar.</p>
+      </CardHeader>
+      <CardContent className="divide-y divide-border/60">
+        {analysts.map((analyst) => (
+          <div key={analyst.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <p className="whitespace-nowrap text-sm font-semibold leading-tight">{analyst.name}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge variant="outline" className="border-border bg-muted/40 text-muted-foreground shadow-none">
+                {analyst.assigned} asign.
+              </Badge>
+              <Badge variant="outline" className="border-success/25 bg-success/10 text-success shadow-none">
+                {analyst.completed} term.
+              </Badge>
+              <Badge variant="outline" className="border-destructive/25 bg-destructive/10 text-destructive shadow-none">
+                {analyst.pending} pend.
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null)
+  const selectedLote = lotes.find((lote) => lote.id === selectedLoteId)
+
   return (
     <Card className="border-border/70 bg-card">
       <CardHeader className="pb-2">
@@ -796,7 +857,7 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-3">
                 {lote.verticalScores.map((vertical) => {
-                  const verticalSemaphore = getSemaphore(vertical.achieved !== null ? Math.round(vertical.achieved) : 0)
+                  const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
 
                   return (
                     <div key={vertical.id} className={cn("rounded-md border px-3 py-2 text-center", verticalSemaphore.border)}>
@@ -808,10 +869,89 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                   )
                 })}
               </div>
+              <div className="mt-2 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-primary shadow-none hover:bg-primary/8 hover:text-primary"
+                  onClick={() => setSelectedLoteId(lote.id)}
+                >
+                  Ver detalle
+                </Button>
+              </div>
             </div>
           )
         })}
       </CardContent>
+      <Dialog open={Boolean(selectedLote)} onOpenChange={(open) => !open && setSelectedLoteId(null)}>
+        <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          {selectedLote && (
+            <>
+              <DialogHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0 pr-10 text-left">
+                <div className="space-y-1">
+                  <DialogTitle>Detalle de {selectedLote.unidadNombre}</DialogTitle>
+                  <DialogDescription className="mt-0">
+                    Verticales, controles, puntajes y acceso directo al detalle de parametros.
+                  </DialogDescription>
+                </div>
+                <span className={cn("rounded-lg border border-success/25 bg-success/10 px-4 py-2 text-5xl font-semibold leading-none tracking-tight", getSemaphore(selectedLote.unitScore).text)}>
+                  {selectedLote.unitScore}%
+                </span>
+              </DialogHeader>
+              <div className="space-y-3">
+                {selectedLote.verticalScores.map((vertical) => {
+                  const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
+
+                  return (
+                    <div key={`${selectedLote.id}-${vertical.id}-dialog`} className="rounded-lg border border-border/60 bg-card p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold">{vertical.name}</p>
+                        <span className={cn("text-sm font-semibold", verticalSemaphore.text)}>
+                          {vertical.achieved !== null ? `${vertical.achieved}% logrado` : "Sin puntaje"}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {vertical.controls.map((control) => (
+                          <div
+                            key={control.id}
+                            className="grid gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm lg:grid-cols-[minmax(0,1fr)_112px_96px_auto] lg:items-center"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{control.identificador || control.id}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {[control.proceso, control.subproceso].filter(Boolean).join(" / ") || "Control del lote"}
+                              </p>
+                            </div>
+                            <div className="flex justify-start lg:justify-center">
+                              <Badge className={cn(getEstadoBadgeColor(control.estado), "min-w-24 justify-center shadow-none")}>
+                                {formatEstado(control.estado)}
+                              </Badge>
+                            </div>
+                            <span className="text-left font-semibold lg:text-right">
+                              {control.scoreControl !== undefined ? `${control.scoreControl} pts` : "Sin puntaje"}
+                            </span>
+                            <Button asChild variant="outline" size="sm" className="h-8 w-fit bg-background shadow-none">
+                              <Link href={`/evaluaciones/${control.id}`}>
+                                Ver control
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        ))}
+                        {vertical.controls.length === 0 && (
+                          <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                            Sin controles registrados en esta vertical.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -974,6 +1114,20 @@ export function DashboardContent() {
         .toFixed(1),
     )
     const analystOpenControls = analystControls.filter((control) => control.estado !== "terminado" && control.estado !== "terminada")
+    const supervisorAnalystSummaries: SupervisorAnalystSummary[] = mockUsers
+      .filter((user) => user.role === "auditor")
+      .map((auditor) => {
+        const assignedControls = allControls.filter((control) => control.auditorId === auditor.id)
+        const counts = getCounts(assignedControls)
+
+        return {
+          id: auditor.id,
+          name: auditor.name,
+          assigned: counts.total,
+          completed: counts.completed,
+          pending: Math.max(counts.total - counts.completed, 0),
+        }
+      })
     const supervisorLoteSummaries: SupervisorLoteSummary[] = activeLotes.map((lote) => {
       const unidad = mockUnidades.find((unit) => unit.id === lote.unidadNegocioId)
       const modelo = mockModelos.find((model) => model.id === lote.modeloControlId)
@@ -989,7 +1143,16 @@ export function DashboardContent() {
         return {
           id: vertical.id,
           name: vertical.nombre,
+          performancePct: averageScore,
           achieved: averageScore !== null ? Number(((averageScore * vertical.peso) / 100).toFixed(1)) : null,
+          controls: verticalControls.map((control) => ({
+            id: control.id,
+            identificador: control.identificador,
+            estado: control.estado,
+            scoreControl: control.scoreControl,
+            proceso: control.proceso,
+            subproceso: control.subproceso,
+          })),
         }
       }) ?? []
       const unitScore = Number(
@@ -1046,6 +1209,7 @@ export function DashboardContent() {
       analystVerticalSummaries,
       analystUnitScore,
       supervisorLoteSummaries,
+      supervisorAnalystSummaries,
       daysToCycleClose: getDaysUntil(activeCycle.fechaFin),
       coveragePct,
       verticals,
@@ -1344,6 +1508,18 @@ export function DashboardContent() {
   }
 
   if (activeView === "supervisor") {
+    const finishedAuditors = mockUsers
+      .filter((user) => user.role === "auditor")
+      .filter((auditor) => {
+        const assignedControls = metrics.allControls.filter((control) => control.auditorId === auditor.id)
+
+        return (
+          assignedControls.length > 0 &&
+          assignedControls.every((control) => control.estado === "terminado" || control.estado === "terminada")
+        )
+      })
+    const finishedAuditorNames = finishedAuditors.map((auditor) => auditor.name).join(", ")
+
     const supervisorInsights: Insight[] = [
       {
         title: "Ciclo activo",
@@ -1353,9 +1529,11 @@ export function DashboardContent() {
         tone: "primary",
       },
       {
-        title: "Equipo activo",
-        value: `${mockUsers.filter((user) => user.role === "auditor").length} auditores`,
-        description: "Capacidad disponible para mover los lotes abiertos.",
+        title: "Auditores finalizados",
+        value: `${finishedAuditors.length} ${finishedAuditors.length === 1 ? "auditor" : "auditores"}`,
+        description: finishedAuditors.length
+          ? `${finishedAuditorNames} ${finishedAuditors.length === 1 ? "ya cerro" : "ya cerraron"} sus asignaciones.`
+          : "Aun no hay auditores con todas sus asignaciones cerradas.",
         icon: Users,
         tone: "success",
       },
@@ -1413,12 +1591,10 @@ export function DashboardContent() {
           </div>
         </section>
 
-        <SupervisorLoteProgress lotes={metrics.supervisorLoteSummaries} />
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-          <SupervisorUnitScores lotes={metrics.supervisorLoteSummaries} />
-          <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
-        </div>
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+          <SupervisorLoteProgress lotes={metrics.supervisorLoteSummaries} />
+          <SupervisorAnalystAssignments analysts={metrics.supervisorAnalystSummaries} />
+        </section>
 
         <Card className="overflow-hidden border-border/70 bg-card">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -1436,6 +1612,11 @@ export function DashboardContent() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.08fr_0.92fr]">
+          <SupervisorUnitScores lotes={metrics.supervisorLoteSummaries} />
+          <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
+        </div>
 
         <SupervisorRiskMonitor lotes={metrics.supervisorLoteSummaries} daysToClose={metrics.daysToCycleClose} />
       </div>

@@ -82,15 +82,17 @@ export function Sidebar() {
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "absolute right-4 text-white/80 hover:bg-white/10 hover:text-white",
-            collapsed && "border border-white/14 bg-[#06122d] shadow-[0_10px_24px_rgba(0,0,0,0.24)]"
+            "absolute text-white/80 hover:bg-white/10 hover:text-white",
+            collapsed
+              ? "right-1/2 h-9 w-9 translate-x-1/2 rounded-xl border border-white/14 bg-[#06122d]"
+              : "right-4"
           )}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
 
-      <nav className="relative z-10 flex-1 space-y-1 px-2 py-4">
+      <nav className={cn("relative z-10 flex-1 py-4", collapsed ? "space-y-2 px-2" : "space-y-1 px-2")}>
         {navigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
           return (
@@ -98,16 +100,18 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+                "group relative flex items-center rounded-lg text-sm font-semibold transition-all duration-200",
+                collapsed ? "justify-center px-0 py-1.5" : "gap-3 px-3 py-2.5",
                 isActive
-                  ? "border border-white/16 bg-white/12 text-white shadow-[0_12px_26px_rgba(0,0,0,0.20)]"
-                  : "text-white/68 hover:border-white/12 hover:bg-white/9 hover:text-white"
+                  ? cn("text-white", !collapsed && "border border-white/16 bg-white/12 shadow-[0_12px_26px_rgba(0,0,0,0.20)]")
+                  : cn("text-white/68 hover:text-white", !collapsed && "hover:border-white/12 hover:bg-white/9")
               )}
               title={collapsed ? item.name : undefined}
             >
               <span
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all duration-200",
+                  "flex shrink-0 items-center justify-center rounded-xl border transition-all duration-200",
+                  collapsed ? "h-10 w-10" : "h-9 w-9",
                   isActive
                     ? getIconTone(item.href)
                     : cn("opacity-80 grayscale-[0.25] group-hover:opacity-100 group-hover:grayscale-0", getIconTone(item.href))
