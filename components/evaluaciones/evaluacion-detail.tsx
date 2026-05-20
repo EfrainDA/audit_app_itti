@@ -22,11 +22,6 @@ import {
   Trash2,
 } from "lucide-react"
 import {
-  mockLotes,
-  mockUnidades,
-  mockUsers,
-  mockModelos,
-  mockLoteVerticales,
   type Control,
   type Vertical,
   getScoreColor,
@@ -36,6 +31,7 @@ import {
 } from "@/lib/data"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useAppData } from "@/hooks/use-app-data"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -62,9 +58,10 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
 })
 
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
+  const { data } = useAppData()
   // Buscar el control en los loteVerticales
   let control: Control | undefined
-  let loteVertical = mockLoteVerticales.find((lv) => {
+  let loteVertical = data.loteVerticales.find((lv) => {
     const found = lv.controles.find((c) => c.id === controlId)
     if (found) {
       control = found
@@ -73,11 +70,11 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     return false
   })
 
-  const lote = mockLotes.find((l) => l.id === loteVertical?.loteId)
-  const unidad = mockUnidades.find((u) => u.id === lote?.unidadNegocioId)
-  const modelo = mockModelos.find((m) => m.id === lote?.modeloControlId)
+  const lote = data.lotes.find((l) => l.id === loteVertical?.loteId)
+  const unidad = data.unidades.find((u) => u.id === lote?.unidadNegocioId)
+  const modelo = data.modelos.find((m) => m.id === lote?.modeloControlId)
   const vertical = modelo?.verticales.find((v) => v.id === loteVertical?.verticalId)
-  const auditor = mockUsers.find((u) => u.id === control?.auditorId)
+  const auditor = data.users.find((u) => u.id === control?.auditorId)
 
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
@@ -583,4 +580,3 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     </div>
   )
 }
-

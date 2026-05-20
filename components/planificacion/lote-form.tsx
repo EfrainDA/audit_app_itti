@@ -12,14 +12,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Building2 } from "lucide-react"
-import { mockUsers, mockModelos } from "@/lib/data"
 import { useUnidades } from "@/hooks/use-unidades"
+import { useAppData } from "@/hooks/use-app-data"
 
 interface LoteFormProps {
   onClose: () => void
 }
 
 export function LoteForm({ onClose }: LoteFormProps) {
+  const { data } = useAppData()
   const [unidadId, setUnidadId] = useState("")
   const [año, setAño] = useState("2026")
   const [ciclo, setCiclo] = useState("")
@@ -27,8 +28,8 @@ export function LoteForm({ onClose }: LoteFormProps) {
   const [auditores, setAuditores] = useState<string[]>([])
   const { unidades } = useUnidades()
 
-  const auditoresDisponibles = mockUsers.filter((u) => u.role === "auditor" && u.status === "activo")
-  const modelosPublicados = mockModelos.filter((m) => m.estado === "publicado")
+  const auditoresDisponibles = data.users.filter((u) => u.role === "auditor" && u.status === "activo")
+  const modelosPublicados = data.modelos.filter((m) => m.estado === "publicado")
 
   const toggleAuditor = (auditorId: string) => {
     setAuditores(

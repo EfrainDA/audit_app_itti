@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Search, HelpCircle, Moon, Sun } from "lucide-react"
+import { Bell, Search, HelpCircle, LogOut, Moon, Sun } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { mockNotificaciones } from "@/lib/data"
+import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 
 interface HeaderProps {
   title: string
@@ -21,11 +23,19 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
-  const [notifications] = useState(mockNotificaciones)
+  const router = useRouter()
+  const { appUser, signOut } = useAuth()
+  const { data } = useAppData()
+  const notifications = data.notificaciones
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme, setTheme } = useTheme()
   const unreadCount = notifications.filter(n => !n.leida).length
   const isDark = resolvedTheme === "dark"
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace("/login")
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -92,6 +102,22 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
           <HelpCircle className="h-5 w-5" />
+        </Button>
+
+        <div className="hidden min-w-0 text-right lg:block">
+          <p className="truncate text-sm font-semibold">{appUser?.name ?? "Usuario"}</p>
+          <p className="truncate text-xs capitalize text-muted-foreground">{appUser?.role ?? "sesion activa"}</p>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Cerrar sesion"
+          title="Cerrar sesion"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={handleSignOut}
+        >
+          <LogOut className="h-5 w-5" />
         </Button>
       </div>
     </header>

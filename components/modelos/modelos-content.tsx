@@ -33,16 +33,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { mockModelos, getEstadoBadgeColor, formatEstado, type ModeloControl } from "@/lib/data"
+import { getEstadoBadgeColor, formatEstado, type ModeloControl } from "@/lib/data"
+import { useAppData } from "@/hooks/use-app-data"
 import { ModeloDetail } from "./modelo-detail"
 import { ModeloForm } from "./modelo-form"
 
 export function ModelosContent() {
+  const { data } = useAppData()
+  const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedModelo, setSelectedModelo] = useState<ModeloControl | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
-  const filteredModelos = mockModelos.filter(
+  const filteredModelos = modelos.filter(
     (modelo) =>
       modelo.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       modelo.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -86,7 +89,7 @@ export function ModelosContent() {
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="success" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'publicado').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'publicado').length}</p>
               <p className="text-sm text-muted-foreground">Activos</p>
             </div>
           </CardContent>
@@ -95,7 +98,7 @@ export function ModelosContent() {
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="primary" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'borrador').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'borrador').length}</p>
               <p className="text-sm text-muted-foreground">En Borrador</p>
             </div>
           </CardContent>
@@ -104,7 +107,7 @@ export function ModelosContent() {
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={Archive} tone="neutral" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{mockModelos.filter(m => m.estado === 'deprecado').length}</p>
+              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'deprecado').length}</p>
               <p className="text-sm text-muted-foreground">Deprecados</p>
             </div>
           </CardContent>

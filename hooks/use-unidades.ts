@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { mockUnidades, type UnidadNegocio } from "@/lib/data"
+import { useAppData } from "@/hooks/use-app-data"
 
 const STORAGE_KEY = "qualittyx-unidades"
 const EVENT_NAME = "qualittyx-unidades-updated"
@@ -25,7 +26,8 @@ function persistUnidades(unidades: UnidadNegocio[]) {
 }
 
 export function useUnidades() {
-  const [unidades, setUnidadesState] = useState<UnidadNegocio[]>(mockUnidades)
+  const { data } = useAppData()
+  const [unidades, setUnidadesState] = useState<UnidadNegocio[]>(data.unidades.length ? data.unidades : mockUnidades)
 
   useEffect(() => {
     const sync = () => setUnidadesState(readUnidades())
@@ -40,6 +42,12 @@ export function useUnidades() {
     }
   }, [])
 
+  useEffect(() => {
+    if (data.unidades.length) {
+      setUnidadesState(data.unidades)
+    }
+  }, [data.unidades])
+
   const setUnidades = (updater: UnidadNegocio[] | ((current: UnidadNegocio[]) => UnidadNegocio[])) => {
     const next = typeof updater === "function" ? updater(readUnidades()) : updater
     setUnidadesState(next)
@@ -48,4 +56,3 @@ export function useUnidades() {
 
   return { unidades, setUnidades }
 }
-

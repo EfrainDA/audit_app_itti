@@ -37,11 +37,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
-  mockLotes,
-  mockLoteVerticales,
-  mockAuditorias,
-  mockUsers,
-  mockModelos,
   getEstadoBadgeColor,
   formatEstado,
   type Lote,
@@ -49,21 +44,28 @@ import {
 import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
 import { useUnidades } from "@/hooks/use-unidades"
+import { useAppData } from "@/hooks/use-app-data"
 
 export function PlanificacionContent() {
+  const { data } = useAppData()
+  const lotes = data.lotes
+  const loteVerticalesData = data.loteVerticales
+  const auditorias = data.auditorias
+  const users = data.users
+  const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
   const { unidades } = useUnidades()
 
-  const lotesConDatos = mockLotes.map((lote) => {
+  const lotesConDatos = lotes.map((lote) => {
     const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
-    const auditorias = mockAuditorias.filter((a) => a.loteId === lote.id)
-    const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
+    const loteAuditorias = auditorias.filter((a) => a.loteId === lote.id)
+    const auditores = lote.auditores.map((id) => users.find((u) => u.id === id)).filter(Boolean)
 
-    const loteVerticales = mockLoteVerticales.filter((lv) => lv.loteId === lote.id)
-    const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
+    const loteVerticales = loteVerticalesData.filter((lv) => lv.loteId === lote.id)
+    const modelo = modelos.find((m) => m.id === lote.modeloControlId)
 
     const calificacionFinal = (() => {
       if (!modelo) return null
@@ -93,8 +95,8 @@ export function PlanificacionContent() {
       ...lote,
       unidadNombre: unidad?.nombre || "N/A",
       unidadLogo: unidad?.logo,
-      totalAuditorias: auditorias.length,
-      auditoriasTerminadas: auditorias.filter((a) => a.estado === "terminada").length,
+      totalAuditorias: loteAuditorias.length,
+      auditoriasTerminadas: loteAuditorias.filter((a) => a.estado === "terminada").length,
       auditoresNombres: auditores.map((a) => a?.name).join(", "),
       calificacionFinal,
     }
@@ -157,7 +159,7 @@ export function PlanificacionContent() {
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.length}</p>
                   <p className="text-sm text-muted-foreground">Lotes Totales</p>
                 </div>
               </CardContent>
@@ -166,7 +168,7 @@ export function PlanificacionContent() {
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Unlock} tone="success" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.filter((l) => l.estado === "abierto").length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "abierto").length}</p>
                   <p className="text-sm text-muted-foreground">Abiertos</p>
                 </div>
               </CardContent>
@@ -175,7 +177,7 @@ export function PlanificacionContent() {
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Lock} tone="neutral" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockLotes.filter((l) => l.estado === "cerrado").length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "cerrado").length}</p>
                   <p className="text-sm text-muted-foreground">Cerrados</p>
                 </div>
               </CardContent>
@@ -184,7 +186,7 @@ export function PlanificacionContent() {
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={FileCheck} tone="success" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{mockAuditorias.length}</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{auditorias.length}</p>
                   <p className="text-sm text-muted-foreground">Auditorías</p>
                 </div>
               </CardContent>
@@ -346,7 +348,7 @@ export function PlanificacionContent() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {[1, 2, 3, 4, 5, 6].map((bimestre) => {
-                  const lotesBimestre = mockLotes.filter((l) => l.ciclo === bimestre && l.año === 2026)
+                  const lotesBimestre = lotes.filter((l) => l.ciclo === bimestre && l.año === 2026)
                   const isActive = bimestre === 3
                   const isPast = bimestre < 3
 

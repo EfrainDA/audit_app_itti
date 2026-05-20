@@ -12,18 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  mockLotes,
-  mockUnidades,
-  mockUsers,
-  mockModelos,
-  mockLoteVerticales,
   getScoreColor,
   getEstadoBadgeColor,
   formatEstado,
 } from "@/lib/data"
 import Link from "next/link"
+import { useAppData } from "@/hooks/use-app-data"
 
 export function AuditoriasTable() {
+  const { data } = useAppData()
   // Construir lista de controles recientes con datos
   const controlesRecientes = useMemo(() => {
     const controles: Array<{
@@ -38,17 +35,17 @@ export function AuditoriasTable() {
       ciclo: string
     }> = []
 
-    mockLoteVerticales.forEach((loteVertical) => {
-      const lote = mockLotes.find((l) => l.id === loteVertical.loteId)
+    data.loteVerticales.forEach((loteVertical) => {
+      const lote = data.lotes.find((l) => l.id === loteVertical.loteId)
       if (!lote) return
 
-      const unidad = mockUnidades.find((u) => u.id === lote.unidadNegocioId)
-      const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
+      const unidad = data.unidades.find((u) => u.id === lote.unidadNegocioId)
+      const modelo = data.modelos.find((m) => m.id === lote.modeloControlId)
       const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
 
       loteVertical.controles.forEach((control) => {
         const auditor = control.auditorId
-          ? mockUsers.find((u) => u.id === control.auditorId)
+          ? data.users.find((u) => u.id === control.auditorId)
           : null
 
         controles.push({
@@ -67,7 +64,7 @@ export function AuditoriasTable() {
 
     // Ordenar por fecha de creación (más recientes primero) y tomar los primeros 5
     return controles.slice(0, 5)
-  }, [])
+  }, [data])
 
   return (
     <div className="overflow-x-auto">

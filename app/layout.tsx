@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Roboto } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/components/auth/auth-provider'
 import './globals.css'
 
 const roboto = Roboto({
@@ -40,7 +41,7 @@ export default function RootLayout({
     <html lang="es" className={roboto.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </body>
     </html>

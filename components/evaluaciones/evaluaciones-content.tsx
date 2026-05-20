@@ -32,11 +32,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  mockLotes,
-  mockUnidades,
-  mockUsers,
-  mockModelos,
-  mockLoteVerticales,
   type Control,
   type Lote,
   type LoteVertical,
@@ -45,6 +40,7 @@ import {
   getEstadoBadgeColor,
   formatEstado,
 } from "@/lib/data"
+import { useAppData } from "@/hooks/use-app-data"
 
 interface LoteConDatos extends Lote {
   unidadNombre: string
@@ -66,9 +62,9 @@ interface VerticalResultado {
   aporte: number | null
 }
 
-function getLoteVerticalesCompletas(lote: Lote): LoteVertical[] {
-  const existentes = mockLoteVerticales.filter((lv) => lv.loteId === lote.id)
-  const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
+function getLoteVerticalesCompletas(lote: Lote, loteVerticalesData: LoteVertical[], modelos: ReturnType<typeof useAppData>["data"]["modelos"]): LoteVertical[] {
+  const existentes = loteVerticalesData.filter((lv) => lv.loteId === lote.id)
+  const modelo = modelos.find((m) => m.id === lote.modeloControlId)
 
   return modelo?.verticales.map((vertical, index) => {
     const existente = existentes.find((lv) => lv.verticalId === vertical.id)
@@ -93,16 +89,22 @@ function controlMatches(control: Control, searchTerm: string, filterEstado: stri
 }
 
 export function EvaluacionesContent() {
+  const { data } = useAppData()
+  const lotes = data.lotes
+  const unidades = data.unidades
+  const users = data.users
+  const modelos = data.modelos
+  const loteVerticalesData = data.loteVerticales
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<string>("all")
   const [activeView, setActiveView] = useState("evaluaciones")
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
-    return mockLotes.map((lote) => {
-      const unidad = mockUnidades.find((u) => u.id === lote.unidadNegocioId)
-      const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
-      const auditores = lote.auditores.map((id) => mockUsers.find((u) => u.id === id)).filter(Boolean)
-      const loteVerticales = getLoteVerticalesCompletas(lote)
+    return lotes.map((lote) => {
+      const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
+      const modelo = modelos.find((m) => m.id === lote.modeloControlId)
+      const auditores = lote.auditores.map((id) => users.find((u) => u.id === id)).filter(Boolean)
+      const loteVerticales = getLoteVerticalesCompletas(lote, loteVerticalesData, modelos)
       const verticalResultados = loteVerticales.map((loteVertical) => {
         const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
         const controlesConScore = loteVertical.controles.filter((control) => control.scoreControl !== undefined)
@@ -135,7 +137,7 @@ export function EvaluacionesContent() {
         verticalResultados,
       }
     })
-  }, [])
+  }, [loteVerticalesData, lotes, modelos, unidades, users])
 
   const controles = lotesConDatos.flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
 
@@ -372,7 +374,7 @@ export function EvaluacionesContent() {
               <AccordionContent className="px-5 pb-5">
                 <Accordion type="multiple" defaultValue={lote.loteVerticales.map((lv) => lv.id)} className="space-y-3">
                   {lote.loteVerticales.map((loteVertical) => {
-                    const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
+                    const modelo = modelos.find((m) => m.id === lote.modeloControlId)
                     const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
                     if (!vertical) return null
 
@@ -422,7 +424,7 @@ export function EvaluacionesContent() {
                           ) : (
                             <div className="space-y-2">
                               {loteVertical.controles.map((control) => {
-                                const auditor = control.auditorId ? mockUsers.find((u) => u.id === control.auditorId) : null
+                                const auditor = control.auditorId ? users.find((u) => u.id === control.auditorId) : null
                                 return (
                                   <Card key={control.id} className="border-border/60 bg-card">
                                     <CardContent className="p-3">

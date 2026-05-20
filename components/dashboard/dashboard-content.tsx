@@ -58,16 +58,17 @@ import {
   YAxis,
 } from "recharts"
 import {
-  mockAuditorias,
-  mockCiclos,
-  mockLoteVerticales,
-  mockLotes,
-  mockModelos,
-  mockUnidades,
-  mockUsers,
   getEstadoBadgeColor,
   formatEstado,
+  type Auditoria,
+  type Ciclo,
+  type Lote,
+  type LoteVertical,
+  type ModeloControl,
+  type UnidadNegocio,
+  type User,
 } from "@/lib/data"
+import { useAppData } from "@/hooks/use-app-data"
 import { ProgressChart, type ProgressChartDatum } from "./progress-chart"
 import { ScoreByVerticalChart, type ScoreByVerticalDatum } from "./score-by-vertical-chart"
 import { AuditoriasTable } from "./auditorias-table"
@@ -271,14 +272,14 @@ const toneBadgeStyles: Record<StatCard["tone"], string> = {
   neutral: "border-border/70 bg-muted text-muted-foreground",
 }
 
-function getActiveCycle() {
+function getActiveCycle(ciclos: Ciclo[]) {
   const today = new Date()
 
-  return mockCiclos.find((ciclo) => {
+  return ciclos.find((ciclo) => {
     const start = new Date(`${ciclo.fechaInicio}T00:00:00`)
     const end = new Date(`${ciclo.fechaFin}T23:59:59`)
     return today >= start && today <= end
-  }) ?? mockCiclos[mockCiclos.length - 1]
+  }) ?? ciclos[ciclos.length - 1]
 }
 
 function getCounts(controls: ControlContext[]): CountMetrics {
@@ -1034,25 +1035,33 @@ function SupervisorRiskMonitor({
 
 export function DashboardContent() {
   const [activeView, setActiveView] = useState<DashboardView>("analista")
+  const { data: appData, source: dataSource, error: dataError } = useAppData()
+  const users = appData.users
+  const unidades = appData.unidades
+  const ciclos = appData.ciclos
+  const modelos = appData.modelos
+  const lotes = appData.lotes
+  const loteVerticales = appData.loteVerticales
+  const auditorias = appData.auditorias
 
   const metrics = useMemo(() => {
-    const activeCycle = getActiveCycle()
-    const activeLotes = mockLotes.filter((lote) => lote.ciclo === activeCycle.bimestre)
+    const activeCycle = getActiveCycle(ciclos)
+    const activeLotes = lotes.filter((lote) => lote.ciclo === activeCycle.bimestre)
     const activeLoteIds = new Set(activeLotes.map((lote) => lote.id))
     const verticalMap = new Map<string, { id: string; name: string; weight: number }>()
 
     activeLotes.forEach((lote) => {
-      const modelo = mockModelos.find((model) => model.id === lote.modeloControlId)
+      const modelo = modelos.find((model) => model.id === lote.modeloControlId)
       modelo?.verticales.forEach((vertical) => {
         verticalMap.set(vertical.id, { id: vertical.id, name: vertical.nombre, weight: vertical.peso })
       })
     })
 
-    const activeControls: ControlContext[] = mockLoteVerticales
+    const activeControls: ControlContext[] = loteVerticales
       .filter((loteVertical) => activeLoteIds.has(loteVertical.loteId))
       .flatMap((loteVertical) => {
         const lote = activeLotes.find((item) => item.id === loteVertical.loteId)
-        const unidad = mockUnidades.find((item) => item.id === lote?.unidadNegocioId)
+        const unidad = unidades.find((item) => item.id === lote?.unidadNegocioId)
         const vertical = verticalMap.get(loteVertical.verticalId)
 
         return loteVertical.controles.map((control) => ({
@@ -1073,7 +1082,7 @@ export function DashboardContent() {
         }))
       })
 
-    const activeAuditoriasFallback: ControlContext[] = mockAuditorias
+    const activeAuditoriasFallback: ControlContext[] = auditorias
       .filter((auditoria) => activeLoteIds.has(auditoria.loteId))
       .map((auditoria) => ({
         id: auditoria.controlId,
@@ -1089,7 +1098,7 @@ export function DashboardContent() {
       }))
 
     const allControls = activeControls.length ? activeControls : activeAuditoriasFallback
-    const analystAuditorId = mockUsers.find((user) => user.role === "auditor")?.id
+    const analystAuditorId = users.find((user) => user.role === "auditor")?.id
     const analystControls = allControls.filter((control) => control.auditorId === analystAuditorId)
     const analystAssignedLotes = activeLotes.filter((lote) => analystAuditorId ? lote.auditores.includes(analystAuditorId) : false)
     const analystAssignedLote =
@@ -1098,10 +1107,10 @@ export function DashboardContent() {
       ? allControls.filter((control) => control.loteId === analystAssignedLote.id)
       : analystControls
     const analystAssignedUnit = analystAssignedLote
-      ? mockUnidades.find((unit) => unit.id === analystAssignedLote.unidadNegocioId)
+      ? unidades.find((unit) => unit.id === analystAssignedLote.unidadNegocioId)
       : undefined
-    const coveragePct = mockUnidades.length
-      ? Math.round((new Set(activeLotes.map((lote) => lote.unidadNegocioId)).size / mockUnidades.length) * 100)
+    const coveragePct = unidades.length
+      ? Math.round((new Set(activeLotes.map((lote) => lote.unidadNegocioId)).size / unidades.length) * 100)
       : 0
     const verticals = Array.from(verticalMap.values())
     const globalCounts = getCounts(allControls)
@@ -1114,7 +1123,7 @@ export function DashboardContent() {
         .toFixed(1),
     )
     const analystOpenControls = analystControls.filter((control) => control.estado !== "terminado" && control.estado !== "terminada")
-    const supervisorAnalystSummaries: SupervisorAnalystSummary[] = mockUsers
+    const supervisorAnalystSummaries: SupervisorAnalystSummary[] = users
       .filter((user) => user.role === "auditor")
       .map((auditor) => {
         const assignedControls = allControls.filter((control) => control.auditorId === auditor.id)
@@ -1129,8 +1138,8 @@ export function DashboardContent() {
         }
       })
     const supervisorLoteSummaries: SupervisorLoteSummary[] = activeLotes.map((lote) => {
-      const unidad = mockUnidades.find((unit) => unit.id === lote.unidadNegocioId)
-      const modelo = mockModelos.find((model) => model.id === lote.modeloControlId)
+      const unidad = unidades.find((unit) => unit.id === lote.unidadNegocioId)
+      const modelo = modelos.find((model) => model.id === lote.modeloControlId)
       const loteControls = allControls.filter((control) => control.loteId === lote.id)
       const counts = getCounts(loteControls)
       const verticalScores = modelo?.verticales.map((vertical) => {
@@ -1216,7 +1225,7 @@ export function DashboardContent() {
       activeCycleYear: activeCycle.fechaInicio.slice(0, 4),
       progressLabel: `${globalCounts.started}/${globalCounts.total || 0}`,
     }
-  }, [])
+  }, [auditorias, ciclos, loteVerticales, lotes, modelos, unidades, users])
 
   const roleDashboards = useMemo<Record<DashboardView, RoleDashboard>>(() => {
     const supervisorCounts = metrics.globalCounts
@@ -1336,7 +1345,7 @@ export function DashboardContent() {
           },
           {
             title: "Equipo activo",
-            value: `${mockUsers.filter((user) => user.role === "auditor").length} auditores`,
+            value: `${users.filter((user) => user.role === "auditor").length} auditores`,
             description: "Capacidad disponible para cerrar el ciclo activo.",
             icon: Users,
             tone: "primary",
@@ -1421,7 +1430,7 @@ export function DashboardContent() {
         radarTitle: "Indice estrategico de auditoria",
       },
     }
-  }, [metrics])
+  }, [metrics, users])
 
   const activeDashboard = roleDashboards[activeView]
   const activeCopy = roleCopy[activeView]
@@ -1508,7 +1517,7 @@ export function DashboardContent() {
   }
 
   if (activeView === "supervisor") {
-    const finishedAuditors = mockUsers
+    const finishedAuditors = users
       .filter((user) => user.role === "auditor")
       .filter((auditor) => {
         const assignedControls = metrics.allControls.filter((control) => control.auditorId === auditor.id)

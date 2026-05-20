@@ -52,31 +52,29 @@ import {
   type Lote,
   type Control,
   type LoteVertical,
-  mockLotes,
-  mockLoteVerticales,
-  mockModelos,
-  mockUsers,
   getEstadoBadgeColor,
   getScoreColor,
   formatEstado,
 } from "@/lib/data"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useAppData } from "@/hooks/use-app-data"
 
 interface LoteDetailProps {
   lote: Lote
 }
 
 export function LoteDetail({ lote }: LoteDetailProps) {
-  const modelo = mockModelos.find((m) => m.id === lote.modeloControlId)
+  const { data } = useAppData()
+  const modelo = data.modelos.find((m) => m.id === lote.modeloControlId)
   const auditores = lote.auditores
-    .map((id) => mockUsers.find((u) => u.id === id))
-    .filter((auditor): auditor is (typeof mockUsers)[number] => Boolean(auditor))
+    .map((id) => data.users.find((u) => u.id === id))
+    .filter((auditor): auditor is (typeof data.users)[number] => Boolean(auditor))
   
   // Estado local para simular agregar controles
   const [loteVerticales, setLoteVerticales] = useState<LoteVertical[]>(() => {
     // Obtener verticales existentes del lote o crear nuevas basadas en el modelo
-    const existentes = mockLoteVerticales.filter((lv) => lv.loteId === lote.id)
+    const existentes = data.loteVerticales.filter((lv) => lv.loteId === lote.id)
     
     // Crear verticales vacías basadas en el modelo
     return modelo?.verticales.map((v, idx) => ({
@@ -86,6 +84,18 @@ export function LoteDetail({ lote }: LoteDetailProps) {
       controles: existentes.find((lv) => lv.verticalId === v.id)?.controles ?? []
     })) || []
   })
+
+  useEffect(() => {
+    const existentes = data.loteVerticales.filter((lv) => lv.loteId === lote.id)
+    setLoteVerticales(
+      modelo?.verticales.map((v, idx) => ({
+        id: existentes.find((lv) => lv.verticalId === v.id)?.id ?? `lv-new-${idx}`,
+        loteId: lote.id,
+        verticalId: v.id,
+        controles: existentes.find((lv) => lv.verticalId === v.id)?.controles ?? [],
+      })) || [],
+    )
+  }, [data.loteVerticales, lote.id, modelo])
 
   const initialNewControl = {
     identificador: "",
@@ -119,11 +129,11 @@ export function LoteDetail({ lote }: LoteDetailProps) {
   }, [loteVerticales, lote.id])
 
   const existingControlNames = useMemo(() => {
-    const loteIdsForUnidad = mockLotes
+    const loteIdsForUnidad = data.lotes
       .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
       .map((mockLote) => mockLote.id)
 
-    const persistedNames = mockLoteVerticales
+    const persistedNames = data.loteVerticales
       .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
       .flatMap((lv) => lv.controles.map((control) => control.identificador))
 
@@ -143,11 +153,11 @@ export function LoteDetail({ lote }: LoteDetailProps) {
   )
 
   const existingProcessNames = useMemo(() => {
-    const loteIdsForUnidad = mockLotes
+    const loteIdsForUnidad = data.lotes
       .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
       .map((mockLote) => mockLote.id)
 
-    const persistedNames = mockLoteVerticales
+    const persistedNames = data.loteVerticales
       .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
       .flatMap((lv) =>
         lv.controles
@@ -390,7 +400,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
                       </div>
                     ) : (
                       loteVertical.controles.map((control) => {
-                        const auditor = mockUsers.find((u) => u.id === control.auditorId)
+                        const auditor = data.users.find((u) => u.id === control.auditorId)
                         const subprocesosCount = getSubprocesosCount(control)
                         
                         return (

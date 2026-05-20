@@ -52,17 +52,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  mockUsers,
-  mockCiclos,
-  mockUmbrales,
-  getEstadoBadgeColor,
-  formatEstado,
-  type UnidadNegocio,
-} from "@/lib/data"
+import { getEstadoBadgeColor, formatEstado, type UnidadNegocio } from "@/lib/data"
 import { useUnidades } from "@/hooks/use-unidades"
+import { useAppData } from "@/hooks/use-app-data"
 
 export function AjustesContent() {
+  const { data } = useAppData()
+  const users = data.users
+  const ciclos = data.ciclos
+  const umbrales = data.umbrales
   const [activeTab, setActiveTab] = useState("usuarios")
   const [searchTerm, setSearchTerm] = useState("")
   const { unidades, setUnidades } = useUnidades()
@@ -238,7 +236,7 @@ export function AjustesContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockUsers
+                  {users
                     .filter((u) =>
                       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -484,7 +482,7 @@ export function AjustesContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockCiclos.map((ciclo) => {
+                  {ciclos.map((ciclo) => {
                     const isActive = ciclo.bimestre === 3 && ciclo.año === 2026
                     return (
                       <TableRow key={ciclo.id} className="border-border">
@@ -522,7 +520,7 @@ export function AjustesContent() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {mockUmbrales.map((umbral) => (
+                {umbrales.map((umbral) => (
                   <Card
                     key={umbral.id}
                     className={`border-2 ${
