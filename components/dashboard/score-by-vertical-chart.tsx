@@ -1,8 +1,14 @@
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
-const data = [
+export type ScoreByVerticalDatum = {
+  name: string
+  score: number
+  weight: number
+}
+
+const defaultData: ScoreByVerticalDatum[] = [
   { name: "Cumplimiento", score: 85, weight: 30 },
   { name: "Calidad", score: 78, weight: 35 },
   { name: "Eficiencia", score: 72, weight: 35 },
@@ -14,28 +20,34 @@ function getBarColor(score: number): string {
   return "var(--destructive)"
 }
 
-export function ScoreByVerticalChart() {
+type ScoreByVerticalChartProps = {
+  data?: ScoreByVerticalDatum[]
+  height?: number
+}
+
+export function ScoreByVerticalChart({ data = defaultData, height = 280 }: ScoreByVerticalChartProps) {
   return (
-    <div className="h-[280px] w-full">
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
-          <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" opacity={0.35} horizontal={false} />
+        <BarChart data={data} layout="vertical" margin={{ left: 14, right: 24, top: 8, bottom: 8 }}>
+          <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" opacity={0.38} horizontal={false} />
           <XAxis
             type="number"
             domain={[0, 100]}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontWeight: 600 }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={{ stroke: "var(--border)" }}
           />
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fill: "var(--foreground)", fontSize: 12 }}
+            tick={{ fill: "var(--foreground)", fontSize: 12, fontWeight: 650 }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
-            width={100}
+            width={124}
           />
           <Tooltip
+            cursor={{ fill: "var(--muted)", opacity: 0.26 }}
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",
@@ -45,12 +57,12 @@ export function ScoreByVerticalChart() {
             }}
             formatter={(value: number, name, props) => [
               `${value}% (Peso: ${props.payload?.weight ?? 0}%)`,
-              "Puntuación",
+              "Puntuacion",
             ]}
           />
-          <Bar dataKey="score" radius={[0, 6, 6, 0]} barSize={24} background={{ fill: "var(--muted)", radius: 6 }}>
+          <Bar dataKey="score" radius={[0, 8, 8, 0]} barSize={26} background={{ fill: "var(--muted)", radius: 8 }}>
             {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry.score)} />
+              <Cell key={`cell-${entry.name}-${index}`} fill={getBarColor(entry.score)} />
             ))}
           </Bar>
         </BarChart>

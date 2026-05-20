@@ -215,7 +215,9 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   // Calcular progreso basado en parámetros de la vertical
   const totalParametros = vertical.parametros.length
-  const respondidos = Object.values(respuestas).filter((r) => r.valor !== null).length
+  const parametroIds = new Set(vertical.parametros.map((parametro) => parametro.id))
+  const respuestasDeLaVertical = Object.values(respuestas).filter((respuesta) => parametroIds.has(respuesta.parametroId))
+  const respondidos = respuestasDeLaVertical.filter((r) => r.valor !== null).length
   const progreso = totalParametros > 0 ? (respondidos / totalParametros) * 100 : 0
 
   // Calcular score provisional
@@ -240,7 +242,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     return Math.round((puntosObtenidos / puntosTotal) * 100)
   }
 
-  const scoreActual = control.scoreControl ?? calcularScore()
+  const scoreCalculado = calcularScore()
+  const scoreActual = respondidos > 0 ? scoreCalculado : control.scoreControl ?? scoreCalculado
 
   return (
     <div className="space-y-5">
@@ -580,5 +583,4 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     </div>
   )
 }
-
 

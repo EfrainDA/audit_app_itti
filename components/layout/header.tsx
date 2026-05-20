@@ -32,7 +32,7 @@ export function Header({ title, subtitle }: HeaderProps) {
   }, [])
 
   return (
-    <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card/86 px-4 shadow-[0_12px_32px_oklch(0.28_0.025_252/0.07)] backdrop-blur-2xl dark:shadow-[0_18px_42px_oklch(0.04_0.02_255/0.36)] sm:px-6">
+    <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card px-4 shadow-[var(--material-shadow-soft)] sm:px-6">
       <div className="min-w-0">
         <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
         {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
@@ -40,10 +40,10 @@ export function Header({ title, subtitle }: HeaderProps) {
 
       <div className="flex items-center gap-4">
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <Input
             placeholder="Buscar..."
-            className="w-72 border-border/80 bg-card/80 pl-9"
+            className="w-72 border-border/80 bg-card pl-9"
           />
         </div>
 
@@ -52,7 +52,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           size="icon"
           aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
           title={isDark ? "Modo claro" : "Modo oscuro"}
-          className="relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
+          className="icon-orb relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           {mounted && isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -63,7 +63,7 @@ export function Header({ title, subtitle }: HeaderProps) {
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-destructive/30 bg-destructive text-xs font-bold text-destructive-foreground shadow-[0_8px_18px_oklch(0.64_0.22_25/0.18)]">
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/60 bg-destructive text-xs font-bold text-destructive-foreground shadow-[0_8px_18px_oklch(0.64_0.22_25/0.14)]">
                   {unreadCount}
                 </span>
               )}

@@ -38,7 +38,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60 backdrop-blur-md',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/45',
         className,
       )}
       {...props}
@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'bg-card/96 text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-6 rounded-2xl border border-border/70 p-8 shadow-2xl backdrop-blur-2xl duration-200 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl',
+          'bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-6 rounded-2xl border border-border/70 p-8 shadow-[var(--material-shadow)] duration-200 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl',
           className,
         )}
         {...props}
@@ -69,7 +69,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-4 right-4 inline-flex items-center justify-center rounded-full p-2 bg-muted/60 hover:bg-muted/70 text-muted-foreground shadow-sm transition focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:pointer-events-none"
+            className="icon-orb absolute top-4 right-4 size-9 rounded-full text-muted-foreground transition hover:text-foreground focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:pointer-events-none"
           >
             <XIcon />
             <span className="sr-only">Close</span>

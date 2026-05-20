@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { Roboto } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
-const geist = Geist({
+const roboto = Roboto({
   subsets: ['latin'],
-  variable: '--font-geist',
+  weight: ['400', '500', '700'],
+  variable: '--font-google',
 })
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={geist.variable} suppressHydrationWarning>
+    <html lang="es" className={roboto.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}

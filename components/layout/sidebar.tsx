@@ -24,6 +24,23 @@ const navigation = [
   { name: "Ajustes", href: "/ajustes", icon: Settings2 },
 ]
 
+function getIconTone(href: string) {
+  switch (href) {
+    case "/":
+      return "border-cyan-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.35),transparent_28%),linear-gradient(145deg,rgba(34,211,238,0.34),rgba(14,116,144,0.22))] text-cyan-100 shadow-[0_8px_18px_rgba(34,211,238,0.20)]"
+    case "/modelos":
+      return "border-sky-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(96,165,250,0.34),rgba(37,99,235,0.20))] text-sky-100 shadow-[0_8px_18px_rgba(96,165,250,0.18)]"
+    case "/planificacion":
+      return "border-indigo-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(129,140,248,0.34),rgba(79,70,229,0.20))] text-indigo-100 shadow-[0_8px_18px_rgba(129,140,248,0.18)]"
+    case "/evaluaciones":
+      return "border-emerald-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(52,211,153,0.34),rgba(5,150,105,0.20))] text-emerald-100 shadow-[0_8px_18px_rgba(52,211,153,0.18)]"
+    case "/ajustes":
+      return "border-violet-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(167,139,250,0.34),rgba(124,58,237,0.20))] text-violet-100 shadow-[0_8px_18px_rgba(167,139,250,0.18)]"
+    default:
+      return "border-white/16 bg-white/8 text-white/85"
+  }
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
@@ -31,7 +48,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col overflow-hidden border-r border-[#0f2246] bg-[#06122d] shadow-[18px_0_54px_rgba(0,0,0,0.24)] transition-all duration-300",
+        "relative flex flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -83,25 +100,24 @@ export function Sidebar() {
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200",
                 isActive
-                  ? "border border-white/16 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_30px_rgba(0,0,0,0.24)] before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-cyan-300"
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
+                  ? "border border-white/16 bg-white/12 text-white shadow-[0_12px_26px_rgba(0,0,0,0.20)]"
+                  : "text-white/68 hover:border-white/12 hover:bg-white/9 hover:text-white"
               )}
               title={collapsed ? item.name : undefined}
             >
               <span
                 className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-all duration-200",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all duration-200",
                   isActive
-                    ? "border-cyan-300/40 bg-cyan-300/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_22px_rgba(56,189,248,0.18)]"
-                    : "border-white/10 bg-white/5 group-hover:border-white/16 group-hover:bg-white/10"
+                    ? getIconTone(item.href)
+                    : cn("opacity-80 grayscale-[0.25] group-hover:opacity-100 group-hover:grayscale-0", getIconTone(item.href))
                 )}
               >
                 <item.icon
                   className={cn(
-                    "h-[18px] w-[18px] shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.24)]",
-                    isActive ? "text-cyan-300" : "text-white/80"
+                    "h-[18px] w-[18px] shrink-0 text-current drop-shadow-[0_2px_3px_rgba(0,0,0,0.30)]"
                   )}
-                  strokeWidth={1.75}
+                  strokeWidth={1.8}
                 />
               </span>
               {!collapsed && <span>{item.name}</span>}

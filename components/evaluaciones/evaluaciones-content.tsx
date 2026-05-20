@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RealisticIcon } from "@/components/ui/realistic-icon"
 import {
   AlertCircle,
   Building2,
@@ -168,44 +169,36 @@ export function EvaluacionesContent() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
-            </div>
+            <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
             <div>
               <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
               <p className="text-sm text-muted-foreground">Total Controles</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <div className="rounded-lg border border-border/70 bg-muted p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <AlertCircle className="h-5 w-5 text-muted-foreground" />
-            </div>
+            <RealisticIcon icon={AlertCircle} tone="neutral" size="md" />
             <div>
               <p className="text-2xl font-semibold leading-none tracking-tight">{stats.pendientes}</p>
               <p className="text-sm text-muted-foreground">Pendientes</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <Clock className="h-5 w-5 text-primary" />
-            </div>
+            <RealisticIcon icon={Clock} tone="primary" size="md" />
             <div>
               <p className="text-2xl font-semibold leading-none tracking-tight">{stats.enCurso}</p>
               <p className="text-sm text-muted-foreground">En Curso</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <div className="rounded-lg border border-success/20 bg-success/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-            </div>
+            <RealisticIcon icon={CheckCircle2} tone="success" size="md" />
             <div>
               <p className="text-2xl font-semibold leading-none tracking-tight">{stats.terminados}</p>
               <p className="text-sm text-muted-foreground">Terminados</p>
@@ -254,7 +247,7 @@ export function EvaluacionesContent() {
       )}
 
       {activeView === "calificaciones" && (
-      <Card className="border-border/70 bg-card/80">
+      <Card className="border-border/70 bg-card">
         <CardHeader>
           <CardTitle className="text-base">Calificacion por Unidad de Negocio</CardTitle>
         </CardHeader>
@@ -264,7 +257,7 @@ export function EvaluacionesContent() {
           </p>
           <Accordion type="multiple" className="space-y-3">
             {lotesConDatos.map((lote) => (
-              <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/60 bg-background/35">
+              <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/60 bg-background">
                 <AccordionTrigger className="px-4 py-3 hover:bg-secondary/35 hover:no-underline">
                   <div className="grid w-full grid-cols-1 gap-3 pr-4 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center">
                     <div className="flex items-center gap-2">
@@ -337,7 +330,7 @@ export function EvaluacionesContent() {
           const terminados = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
 
           return (
-            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-white/60 shadow-sm backdrop-blur-md">
+            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
               <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-secondary/35">
                 <div className="flex w-full flex-col gap-3 pr-4 text-left lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-start gap-3">
@@ -369,7 +362,7 @@ export function EvaluacionesContent() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>
-                    <div className="rounded-md border border-border/70 bg-background/25 px-3 py-2 text-right">
+                    <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-right">
                       <p className="text-xs text-muted-foreground">Controles</p>
                       <p className="font-semibold">{terminados}/{totalControles}</p>
                     </div>
@@ -391,7 +384,7 @@ export function EvaluacionesContent() {
                       : null
 
                     return (
-                      <AccordionItem key={loteVertical.id} value={loteVertical.id} className="overflow-hidden rounded-lg border border-border/60 bg-background/25">
+                      <AccordionItem key={loteVertical.id} value={loteVertical.id} className="overflow-hidden rounded-lg border border-border/60 bg-background">
                         <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/30">
                           <div className="flex w-full flex-col gap-3 pr-4 text-left md:flex-row md:items-center md:justify-between">
                             <div className="flex items-center gap-3">
@@ -431,7 +424,7 @@ export function EvaluacionesContent() {
                               {loteVertical.controles.map((control) => {
                                 const auditor = control.auditorId ? mockUsers.find((u) => u.id === control.auditorId) : null
                                 return (
-                                  <Card key={control.id} className="border-border/60 bg-card/70">
+                                  <Card key={control.id} className="border-border/60 bg-card">
                                     <CardContent className="p-3">
                                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                         <div>
@@ -485,7 +478,7 @@ export function EvaluacionesContent() {
       </Accordion>
 
       {lotesFiltrados.length === 0 && (
-        <Card className="border-border/70 bg-card/80">
+        <Card className="border-border/70 bg-card">
           <CardContent className="p-12 text-center">
             <ClipboardCheck className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 font-medium">No se encontraron lotes o controles</h3>

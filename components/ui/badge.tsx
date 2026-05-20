@@ -5,18 +5,18 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow,border-color,background] overflow-hidden backdrop-blur-md',
+  'inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow,border-color,background,transform] overflow-hidden shadow-[inset_0_1px_0_oklch(1_0_0_/_0.56),0_8px_18px_oklch(0.30_0.032_252_/_0.06)]',
   {
     variants: {
       variant: {
         default:
-          'border-primary/18 bg-primary/10 text-primary shadow-[0_8px_18px_oklch(0.32_0.04_252/0.06)] [a&]:hover:bg-primary/14',
+          'border-primary/20 bg-primary/10 text-primary [a&]:hover:bg-primary/14',
         secondary:
-          'border-border bg-secondary/70 text-secondary-foreground [a&]:hover:bg-secondary/90',
+          'border-border/75 bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
         destructive:
-          'border-destructive/35 bg-destructive/18 text-destructive [a&]:hover:bg-destructive/24 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/18',
+          'border-destructive/35 bg-destructive/16 text-destructive [a&]:hover:bg-destructive/24 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
         outline:
-          'border-border/80 bg-background/25 text-foreground [a&]:hover:bg-accent/15 [a&]:hover:text-foreground',
+          'border-border/80 bg-background text-foreground [a&]:hover:bg-accent/15 [a&]:hover:text-foreground',
       },
     },
     defaultVariants: {
