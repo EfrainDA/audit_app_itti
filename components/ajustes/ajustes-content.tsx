@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select"
 import { getEstadoBadgeColor, formatEstado, type UnidadNegocio } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import {
   createBusinessUnit,
   createCycle,
@@ -69,6 +70,9 @@ import { supabase } from "@/lib/supabase"
 
 export function AjustesContent() {
   const { data, error: dataError, refresh } = useAppData()
+  const { appUser } = useAuth()
+  const isSupervisor = appUser?.role === "supervisor"
+  const isAdmin = appUser?.role === "admin"
   const users = data.users
   const unidades = data.unidades
   const ciclos = data.ciclos
@@ -95,6 +99,16 @@ export function AjustesContent() {
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
   const [thresholdError, setThresholdError] = useState<string | null>(null)
   const [isSavingThresholds, setIsSavingThresholds] = useState(false)
+  const visibleTabs = isSupervisor
+    ? ["unidades", "ciclos", "umbrales"]
+    : ["usuarios", "unidades", "ciclos", "umbrales", "auditlog"]
+  const currentTab = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0]
+
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0])
+    }
+  }, [activeTab, visibleTabs])
 
   useEffect(() => {
     const channel = supabase
@@ -259,12 +273,14 @@ export function AjustesContent() {
   return (
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-secondary">
-          <TabsTrigger value="usuarios" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Usuarios</span>
-          </TabsTrigger>
+      <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className={`grid w-full bg-secondary ${isSupervisor ? "grid-cols-3" : "grid-cols-5"}`}>
+          {isAdmin && (
+            <TabsTrigger value="usuarios" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Usuarios</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="unidades" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Unidades</span>
@@ -277,10 +293,12 @@ export function AjustesContent() {
             <Gauge className="h-4 w-4" />
             <span className="hidden sm:inline">Umbrales</span>
           </TabsTrigger>
-          <TabsTrigger value="auditlog" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Audit Log</span>
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="auditlog" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">Audit Log</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Usuarios Tab */}
@@ -563,27 +581,31 @@ export function AjustesContent() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditUnidad(unidad)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteUnidad(unidad.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {isAdmin ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditUnidad(unidad)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteUnidad(unidad.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Solo lectura</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

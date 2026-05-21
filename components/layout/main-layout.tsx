@@ -13,9 +13,10 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
-  const { session, isLoading } = useAuth()
+  const { session, appUser, isLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const isAuditorDashboard = appUser?.role === "auditor" && pathname === "/"
 
   useEffect(() => {
     if (!isLoading && !session) {
@@ -23,11 +24,40 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
     }
   }, [isLoading, pathname, router, session])
 
+  const isAuditorAllowedPath =
+    pathname === "/" || pathname.startsWith("/planificacion") || pathname.startsWith("/evaluaciones")
+
+  useEffect(() => {
+    if (!isLoading && session && appUser?.role === "auditor" && !isAuditorAllowedPath) {
+      router.replace("/")
+    }
+  }, [appUser?.role, isAuditorAllowedPath, isLoading, router, session])
+
   if (isLoading || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
           Preparando sesion...
+        </div>
+      </div>
+    )
+  }
+
+  if (appUser?.role === "auditor" && !isAuditorAllowedPath) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
+          Redirigiendo...
+        </div>
+      </div>
+    )
+  }
+
+  if (isAuditorDashboard) {
+    return (
+      <div className="min-h-dvh overflow-auto bg-background px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
+        <div className="mx-auto w-full max-w-[1520px]">
+          {children}
         </div>
       </div>
     )

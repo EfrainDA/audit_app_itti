@@ -233,6 +233,7 @@ function normalizeAuditStatus(status: DbAudit["status"]): Auditoria["estado"] {
 }
 
 export async function fetchAppData(): Promise<AppData> {
+  const currentProfile = await getCurrentProfile()
   const [
     usersResult,
     unitsResult,
@@ -296,7 +297,7 @@ export async function fetchAppData(): Promise<AppData> {
     throw firstError
   }
 
-  return {
+  const appData: AppData = {
     users: ((usersResult.data ?? []) as DbUser[]).map((user) => ({
       id: user.id,
       name: user.name,
@@ -389,9 +390,47 @@ export async function fetchAppData(): Promise<AppData> {
       fecha: notification.created_at,
     })),
   }
+
+  if (currentProfile?.role !== "auditor") {
+    return appData
+  }
+
+  const assignedLotIds = new Set(
+    appData.lotes
+      .filter((lot) => lot.auditores.includes(currentProfile.id))
+      .map((lot) => lot.id),
+  )
+  const assignedUnitIds = new Set(
+    appData.lotes
+      .filter((lot) => assignedLotIds.has(lot.id))
+      .map((lot) => lot.unidadNegocioId),
+  )
+  const assignedModelIds = new Set(
+    appData.lotes
+      .filter((lot) => assignedLotIds.has(lot.id))
+      .map((lot) => lot.modeloControlId),
+  )
+  const assignedLoteVerticales = appData.loteVerticales
+    .filter((lotVertical) => assignedLotIds.has(lotVertical.loteId))
+    .map((lotVertical) => {
+      return {
+        ...lotVertical,
+        controles: lotVertical.controles,
+      }
+    })
+
+  return {
+    ...appData,
+    unidades: appData.unidades.filter((unit) => assignedUnitIds.has(unit.id)),
+    modelos: appData.modelos.filter((model) => assignedModelIds.has(model.id)),
+    lotes: appData.lotes.filter((lot) => assignedLotIds.has(lot.id)),
+    loteVerticales: assignedLoteVerticales,
+    auditorias: appData.auditorias.filter((audit) => audit.auditorId === currentProfile.id),
+    notificaciones: appData.notificaciones.filter((notification) => notification.usuarioId === currentProfile.id),
+  }
 }
 
-async function getCurrentProfileId() {
+async function getCurrentProfile() {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError) throw sessionError
 
@@ -399,9 +438,9 @@ async function getCurrentProfileId() {
   const authUserId = authUser?.id
   if (!authUserId) throw new Error("Debes iniciar sesion para guardar datos.")
 
-  const { data, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).maybeSingle()
+  const { data, error } = await supabase.from("users").select("id,role,status").eq("auth_user_id", authUserId).maybeSingle()
   if (error) throw error
-  if (data?.id) return data.id as string
+  if (data?.id) return data as Pick<User, "id" | "role" | "status">
 
   const email = authUser.email ?? ""
   const displayName =
@@ -412,7 +451,7 @@ async function getCurrentProfileId() {
 
   const { data: existingByEmail, error: emailError } = await supabase
     .from("users")
-    .select("id")
+    .select("id,role,status")
     .eq("email", email)
     .maybeSingle()
 
@@ -423,11 +462,11 @@ async function getCurrentProfileId() {
       .from("users")
       .update({ auth_user_id: authUserId })
       .eq("id", existingByEmail.id)
-      .select("id")
+      .select("id,role,status")
       .single()
 
     if (linkError) throw linkError
-    return linkedProfile.id as string
+    return linkedProfile as Pick<User, "id" | "role" | "status">
   }
 
   const { data: createdProfile, error: insertError } = await supabase
@@ -440,11 +479,139 @@ async function getCurrentProfileId() {
       role: "auditor",
       status: "activo",
     })
-    .select("id")
+    .select("id,role,status")
     .single()
 
   if (insertError) throw insertError
-  return createdProfile.id as string
+  return createdProfile as Pick<User, "id" | "role" | "status">
+}
+
+async function getCurrentProfileId() {
+  const profile = await getCurrentProfile()
+  return profile.id
+}
+
+async function requirePlanningManager() {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "admin" && profile.role !== "supervisor") {
+    throw new Error("Solo supervisor o admin pueden gestionar lotes.")
+  }
+
+  return profile
+}
+
+async function requireControlManager() {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "admin" && profile.role !== "supervisor" && profile.role !== "auditor") {
+    throw new Error("No tienes permiso para gestionar controles.")
+  }
+
+  return profile
+}
+
+async function assertCanManageControlsForLotVertical(lotVerticalId: string, lotId?: string) {
+  const profile = await requireControlManager()
+  if (profile.role !== "auditor") return profile
+
+  let resolvedLotId = lotId
+  if (!resolvedLotId) {
+    const { data, error } = await supabase
+      .from("lot_verticals")
+      .select("lot_id")
+      .eq("id", lotVerticalId)
+      .maybeSingle()
+
+    if (error) throw error
+    resolvedLotId = (data?.lot_id as string | undefined) ?? undefined
+  }
+
+  if (!resolvedLotId) throw new Error("No se pudo validar el lote del control.")
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("lot_auditors")
+    .select("lot_id")
+    .eq("lot_id", resolvedLotId)
+    .eq("auditor_id", profile.id)
+    .maybeSingle()
+
+  if (assignmentError) throw assignmentError
+  if (!assignment) {
+    throw new Error("Solo puedes cargar controles en lotes asignados a tu usuario.")
+  }
+
+  return profile
+}
+
+async function assertCanManageExistingControl(controlId: string) {
+  const profile = await requireControlManager()
+  if (profile.role !== "auditor") return profile
+
+  const { data, error } = await supabase
+    .from("controls")
+    .select("lot_vertical_id")
+    .eq("id", controlId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data?.lot_vertical_id) throw new Error("No se pudo validar el control.")
+
+  return assertCanManageControlsForLotVertical(data.lot_vertical_id as string)
+}
+
+async function requireAdmin() {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "admin") {
+    throw new Error("Solo admin puede realizar esta accion.")
+  }
+
+  return profile
+}
+
+async function requireAdminOrSupervisor() {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "admin" && profile.role !== "supervisor") {
+    throw new Error("Solo supervisor o admin puede realizar esta accion.")
+  }
+
+  return profile
+}
+
+async function assertCanEvaluateControl(controlId: string) {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "auditor") {
+    throw new Error("Solo el auditor asignado puede modificar una evaluacion.")
+  }
+
+  const { data, error } = await supabase
+    .from("controls")
+    .select("auditor_id")
+    .eq("id", controlId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data || data.auditor_id !== profile.id) {
+    throw new Error("No tienes permiso para evaluar este control.")
+  }
+
+  return profile
+}
+
+async function assertCanReadControl(controlId: string) {
+  const profile = await getCurrentProfile()
+  if (profile.role === "admin" || profile.role === "supervisor") return profile
+
+  const { data, error } = await supabase
+    .from("controls")
+    .select("auditor_id")
+    .eq("id", controlId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data || data.auditor_id !== profile.id) {
+    throw new Error("No tienes permiso para ver este control.")
+  }
+
+  return profile
 }
 
 function makeBusinessUnitCode(name: string) {
@@ -462,6 +629,7 @@ function makeBusinessUnitCode(name: string) {
 }
 
 export async function createBusinessUnit(input: { name: string; ecosystem: string; logoUrl?: string | null }) {
+  await requireAdminOrSupervisor()
   const { error } = await supabase.from("business_units").insert({
     name: input.name.trim(),
     ecosystem: input.ecosystem.trim(),
@@ -475,6 +643,7 @@ export async function createBusinessUnit(input: { name: string; ecosystem: strin
 }
 
 export async function updateBusinessUnit(id: string, input: { name: string; ecosystem: string; logoUrl?: string | null }) {
+  await requireAdmin()
   const { error } = await supabase
     .from("business_units")
     .update({
@@ -488,22 +657,26 @@ export async function updateBusinessUnit(id: string, input: { name: string; ecos
 }
 
 export async function deleteBusinessUnit(id: string) {
+  await requireAdmin()
   const { error } = await supabase.from("business_units").delete().eq("id", id)
   if (error) throw error
 }
 
 export async function updateUserProfile(id: string, input: { role?: User["role"]; status?: User["status"] }) {
+  await requireAdmin()
   const { error } = await supabase.from("users").update(input).eq("id", id)
   if (error) throw error
 }
 
 export async function createCycle(input: { year: number; bimester: number }) {
+  await requireAdminOrSupervisor()
   await ensureCycle(input.year, input.bimester)
 }
 
 export async function updateThresholds(
   thresholds: Array<{ id: string; min: number; max: number }>,
 ) {
+  await requireAdminOrSupervisor()
   for (const threshold of thresholds) {
     const { error } = await supabase
       .from("thresholds")
@@ -518,6 +691,7 @@ export async function updateThresholds(
 }
 
 export async function createUserProfile(input: { name: string; email: string; role: User["role"]; company?: string }) {
+  await requireAdmin()
   const { error } = await supabase.from("users").insert({
     name: input.name.trim(),
     email: input.email.trim(),
@@ -530,7 +704,8 @@ export async function createUserProfile(input: { name: string; email: string; ro
 }
 
 export async function createControlModel(input: ControlModelInput) {
-  const createdBy = await getCurrentProfileId()
+  const profile = await requireAdminOrSupervisor()
+  const createdBy = profile.id
 
   const { data: model, error: modelError } = await supabase
     .from("control_models")
@@ -580,11 +755,13 @@ export async function createControlModel(input: ControlModelInput) {
 }
 
 export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
+  await requireAdminOrSupervisor()
   const { error } = await supabase.from("control_models").update({ status }).eq("id", id)
   if (error) throw error
 }
 
 export async function updateControlModel(id: string, input: ControlModelInput) {
+  await requireAdminOrSupervisor()
   const { data: currentModel, error: currentModelError } = await supabase
     .from("control_models")
     .select("status")
@@ -709,6 +886,7 @@ export async function createLot(input: {
   bimester: number
   auditorIds: string[]
 }) {
+  await requirePlanningManager()
   const cycleId = await ensureCycle(input.year, input.bimester)
 
   const { data: lot, error: lotError } = await supabase
@@ -754,11 +932,13 @@ export async function createLot(input: {
 }
 
 export async function updateLotStatus(id: string, status: Lote["estado"]) {
+  await requirePlanningManager()
   const { error } = await supabase.from("lots").update({ status }).eq("id", id)
   if (error) throw error
 }
 
 export async function addLotAuditor(lotId: string, auditorId: string) {
+  await requirePlanningManager()
   const { error } = await supabase
     .from("lot_auditors")
     .upsert(
@@ -786,6 +966,7 @@ export async function createControl(input: {
 
   if (lotVerticalId.startsWith("lv-new-")) {
     if (!input.lotId || !input.verticalId) throw new Error("No se pudo vincular el control con la vertical del lote.")
+    await assertCanManageControlsForLotVertical(lotVerticalId, input.lotId)
 
     const { data: lotVertical, error: lotVerticalError } = await supabase
       .from("lot_verticals")
@@ -801,6 +982,8 @@ export async function createControl(input: {
 
     if (lotVerticalError) throw lotVerticalError
     lotVerticalId = lotVertical.id as string
+  } else {
+    await assertCanManageControlsForLotVertical(lotVerticalId)
   }
 
   const { error } = await supabase.from("controls").insert({
@@ -825,6 +1008,7 @@ export async function updateControl(input: {
   subprocesses?: string[]
   auditorId?: string
 }) {
+  await assertCanManageExistingControl(input.id)
   const { error } = await supabase
     .from("controls")
     .update({
@@ -841,11 +1025,13 @@ export async function updateControl(input: {
 }
 
 export async function deleteControl(id: string) {
+  await assertCanManageExistingControl(id)
   const { error } = await supabase.from("controls").delete().eq("id", id)
   if (error) throw error
 }
 
 export async function fetchAnswersForControl(controlId: string) {
+  await assertCanReadControl(controlId)
   const { data, error } = await supabase
     .from("answers")
     .select("parameter_id,value,comment,audited_people,audited_roles")
@@ -863,7 +1049,8 @@ export async function fetchAnswersForControl(controlId: string) {
 }
 
 export async function saveEvaluationDraft(controlId: string, answers: EvaluationAnswerInput[]) {
-  const auditorId = await getCurrentProfileId()
+  const profile = await assertCanEvaluateControl(controlId)
+  const auditorId = profile.id
 
   if (!answers.length) return
 
@@ -890,7 +1077,8 @@ export async function finalizeEvaluation(input: {
   score: number | null
   answers: EvaluationAnswerInput[]
 }) {
-  const auditorId = await getCurrentProfileId()
+  const profile = await assertCanEvaluateControl(input.controlId)
+  const auditorId = profile.id
   await saveEvaluationDraft(input.controlId, input.answers)
 
   const { error: controlError } = await supabase
@@ -920,6 +1108,7 @@ export async function finalizeEvaluation(input: {
 }
 
 export async function sendControlToReplica(controlId: string) {
+  await assertCanEvaluateControl(controlId)
   const { error } = await supabase.from("controls").update({ status: "en_replica" }).eq("id", controlId)
   if (error) throw error
 }

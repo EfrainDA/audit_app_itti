@@ -57,6 +57,9 @@ export function Sidebar() {
   const router = useRouter()
   const { appUser, signOut } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const visibleNavigation = appUser?.role === "auditor"
+    ? navigation.filter((item) => item.href === "/" || item.href === "/planificacion" || item.href === "/evaluaciones")
+    : navigation
   const userName = appUser?.name ?? "Usuario"
   const userRole = appUser?.role ?? "sesion activa"
   const userInitials = userName
@@ -120,7 +123,7 @@ export function Sidebar() {
       </div>
 
       <nav className={cn("relative z-10 flex-1 py-4", collapsed ? "space-y-2 px-2" : "space-y-1 px-2")}>
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
           return (
             <Link
@@ -198,11 +201,15 @@ export function Sidebar() {
 
 export function MobileNav() {
   const pathname = usePathname()
+  const { appUser } = useAuth()
+  const visibleNavigation = appUser?.role === "auditor"
+    ? navigation.filter((item) => item.href === "/" || item.href === "/planificacion" || item.href === "/evaluaciones")
+    : navigation
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] lg:hidden">
       <div className="grid grid-cols-5 gap-1">
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 
           return (

@@ -44,11 +44,14 @@ import {
 import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import { downloadCsv } from "@/lib/export"
 import { updateLotStatus } from "@/lib/supabase-data"
 
 export function PlanificacionContent() {
   const { data, error: dataError, refresh } = useAppData()
+  const { appUser } = useAuth()
+  const canManageLots = appUser?.role === "admin" || appUser?.role === "supervisor"
   const lotes = data.lotes
   const loteVerticalesData = data.loteVerticales
   const auditorias = data.auditorias
@@ -159,7 +162,7 @@ export function PlanificacionContent() {
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            {canManageLots && <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
@@ -175,7 +178,7 @@ export function PlanificacionContent() {
                 </DialogHeader>
                 <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
               </DialogContent>
-            </Dialog>
+            </Dialog>}
           </div>
         </div>
 
@@ -281,7 +284,7 @@ export function PlanificacionContent() {
                             <Download className="h-4 w-4 mr-2" />
                             Exportar Excel
                           </DropdownMenuItem>
-                          {lote.estado === "abierto" && (
+                          {canManageLots && lote.estado === "abierto" && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-warning">

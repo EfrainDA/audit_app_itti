@@ -31,6 +31,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import {
   fetchAnswersForControl,
   finalizeEvaluation,
@@ -65,6 +66,7 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
 
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const { data, refresh } = useAppData()
+  const { appUser } = useAuth()
   // Buscar el control en los loteVerticales
   let control: Control | undefined
   let loteVertical = data.loteVerticales.find((lv) => {
@@ -86,6 +88,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const canEditEvaluation = appUser?.role === "auditor" && control?.auditorId === appUser.id
 
   useEffect(() => {
     fetchAnswersForControl(controlId)
@@ -111,6 +114,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   // Implementación de autoguardado con debounce (retraso de 1.5s)
   useEffect(() => {
+    if (!canEditEvaluation) return
     if (Object.keys(respuestas).length === 0) return
 
     setAutoSaveStatus("saving")
@@ -135,7 +139,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [respuestas, controlId])
+  }, [canEditEvaluation, respuestas, controlId])
 
   if (!control || !vertical || !lote || !modelo) {
     return (
@@ -251,6 +255,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       }))
 
   const handleSaveDraft = async () => {
+    if (!canEditEvaluation) return
     setFormError(null)
     setIsSubmitting(true)
 
@@ -320,6 +325,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const scoreActual = respondidos > 0 ? scoreCalculado : control.scoreControl ?? scoreCalculado
 
   const handleSendToReplica = async () => {
+    if (!canEditEvaluation) return
     setFormError(null)
     setIsSubmitting(true)
 
@@ -335,6 +341,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   }
 
   const handleFinalizeEvaluation = async () => {
+    if (!canEditEvaluation) return
     setFormError(null)
     setIsSubmitting(true)
 
@@ -396,11 +403,13 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                   <Download className="h-4 w-4" />
                   Exportar
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSubmitting}>
-                  <Save className="h-4 w-4" />
-                  Guardar
-                </Button>
-                {control.estado !== "terminado" && (
+                {canEditEvaluation && (
+                  <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSubmitting}>
+                    <Save className="h-4 w-4" />
+                    Guardar
+                  </Button>
+                )}
+                {canEditEvaluation && control.estado !== "terminado" && (
                   <Button size="sm" className="bg-warning hover:bg-warning/90 text-warning-foreground" onClick={handleSendToReplica} disabled={isSubmitting}>
                     <Send className="h-4 w-4" />
                     Enviar a Réplica
@@ -523,6 +532,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         respuesta?.valor === "cumple" && "bg-success hover:bg-success/90 text-success-foreground"
                       )}
                       onClick={() => handleSetRespuesta(parametro.id, "cumple")}
+                      disabled={!canEditEvaluation}
                     >
                       <CheckCircle2 className="h-4 w-4" />
                       Cumple (100%)
@@ -535,6 +545,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                           respuesta?.valor === "intermedio" && "bg-warning hover:bg-warning/90 text-warning-foreground"
                         )}
                         onClick={() => handleSetRespuesta(parametro.id, "intermedio")}
+                        disabled={!canEditEvaluation}
                       >
                         <MinusCircle className="h-4 w-4" />
                         Intermedio (50%)
@@ -547,6 +558,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         respuesta?.valor === "no_cumple" && "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                       )}
                       onClick={() => handleSetRespuesta(parametro.id, "no_cumple")}
+                      disabled={!canEditEvaluation}
                     >
                       <XCircle className="h-4 w-4" />
                       No Cumple (0%)
@@ -558,6 +570,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         respuesta?.valor === "na" && "bg-muted text-muted-foreground"
                       )}
                       onClick={() => handleSetRespuesta(parametro.id, "na")}
+                      disabled={!canEditEvaluation}
                     >
                       <AlertCircle className="h-4 w-4 mr-1" />
                       N/A
@@ -575,6 +588,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => handleAddRespuestaListItem(parametro.id, "personasAuditadas")}
+                            disabled={!canEditEvaluation}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" />
                             Agregar
@@ -590,6 +604,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                                 onChange={(e) =>
                                   handleSetRespuestaListItem(parametro.id, "personasAuditadas", personIndex, e.target.value)
                                 }
+                                disabled={!canEditEvaluation}
                               />
                               {respuesta.personasAuditadas.length > 1 && (
                                 <Button
@@ -600,6 +615,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                                   onClick={() =>
                                     handleRemoveRespuestaListItem(parametro.id, "personasAuditadas", personIndex)
                                   }
+                                  disabled={!canEditEvaluation}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -616,6 +632,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => handleAddRespuestaListItem(parametro.id, "cargos")}
+                            disabled={!canEditEvaluation}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" />
                             Agregar
@@ -631,6 +648,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                                 onChange={(e) =>
                                   handleSetRespuestaListItem(parametro.id, "cargos", cargoIndex, e.target.value)
                                 }
+                                disabled={!canEditEvaluation}
                               />
                               {respuesta.cargos.length > 1 && (
                                 <Button
@@ -639,6 +657,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                                   size="icon"
                                   className="mt-1 text-muted-foreground hover:text-destructive"
                                   onClick={() => handleRemoveRespuestaListItem(parametro.id, "cargos", cargoIndex)}
+                                  disabled={!canEditEvaluation}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -655,6 +674,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         className="mt-1 bg-background border-border min-h-[60px]"
                         value={respuesta.comentario}
                         onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
+                        disabled={!canEditEvaluation}
                       />
                     </div>
                   </div>
@@ -666,32 +686,34 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       </Card>
 
       {/* Acciones finales */}
-      <Card className="bg-card border-border">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Progreso de Evaluación</p>
-              <p className="text-sm text-muted-foreground">
-                {respondidos} de {totalParametros} parámetros evaluados
-              </p>
+      {canEditEvaluation && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Progreso de Evaluación</p>
+                <p className="text-sm text-muted-foreground">
+                  {respondidos} de {totalParametros} parámetros evaluados
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Borrador
+                </Button>
+                <Button
+                  className="bg-primary hover:bg-primary/90"
+                  onClick={handleFinalizeEvaluation}
+                  disabled={isSubmitting || respondidos < totalParametros}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Finalizar Evaluación
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
-                <Save className="h-4 w-4 mr-2" />
-                Guardar Borrador
-              </Button>
-              <Button
-                className="bg-primary hover:bg-primary/90"
-                onClick={handleFinalizeEvaluation}
-                disabled={isSubmitting || respondidos < totalParametros}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Finalizar Evaluación
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

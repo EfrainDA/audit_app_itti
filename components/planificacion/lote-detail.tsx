@@ -59,6 +59,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
 
@@ -69,6 +70,9 @@ interface LoteDetailProps {
 
 export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   const { data, refresh } = useAppData()
+  const { appUser } = useAuth()
+  const canManageLots = appUser?.role === "admin" || appUser?.role === "supervisor"
+  const canManageControls = appUser?.role === "admin" || appUser?.role === "supervisor" || appUser?.role === "auditor"
   const currentLote = data.lotes.find((item) => item.id === lote.id) ?? lote
   const modelo = data.modelos.find((m) => m.id === currentLote.modeloControlId)
   const auditores = currentLote.auditores
@@ -319,7 +323,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             <User className="h-4 w-4" />
             Equipo de Control de Calidad ({auditores.length})
           </h3>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          {canManageLots && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Select value={auditorToAdd} onValueChange={setAuditorToAdd}>
               <SelectTrigger className="h-9 bg-secondary border-border sm:w-64">
                 <SelectValue placeholder="Agregar auditor" />
@@ -341,7 +345,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               <Plus className="h-4 w-4 mr-2" />
               {isAddingAuditor ? "Agregando..." : "Agregar"}
             </Button>
-          </div>
+          </div>}
         </div>
         <div className="flex flex-wrap gap-2">
           {auditores.length > 0 ? (
@@ -487,7 +491,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                               </div>
 
                               <div className="flex justify-end">
-                                {control.estado === "pendiente" && lote.estado === "abierto" ? (
+                                {canManageControls && control.estado === "pendiente" && lote.estado === "abierto" ? (
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button
@@ -525,7 +529,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   </div>
 
                   {/* Botón para agregar control */}
-                  {lote.estado === "abierto" && (
+                  {canManageControls && lote.estado === "abierto" && (
                     <Button
                       variant="outline"
                       size="sm"

@@ -41,6 +41,7 @@ import {
   formatEstado,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import { downloadCsv } from "@/lib/export"
 
 interface LoteConDatos extends Lote {
@@ -91,6 +92,8 @@ function controlMatches(control: Control, searchTerm: string, filterEstado: stri
 
 export function EvaluacionesContent() {
   const { data } = useAppData()
+  const { appUser } = useAuth()
+  const canEvaluateControls = appUser?.role === "auditor"
   const lotes = data.lotes
   const unidades = data.unidades
   const users = data.users
@@ -105,7 +108,12 @@ export function EvaluacionesContent() {
       const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
       const modelo = modelos.find((m) => m.id === lote.modeloControlId)
       const auditores = lote.auditores.map((id) => users.find((u) => u.id === id)).filter(Boolean)
-      const loteVerticales = getLoteVerticalesCompletas(lote, loteVerticalesData, modelos)
+      const loteVerticales = getLoteVerticalesCompletas(lote, loteVerticalesData, modelos).map((loteVertical) => ({
+        ...loteVertical,
+        controles: canEvaluateControls
+          ? loteVertical.controles.filter((control) => control.auditorId === appUser?.id)
+          : loteVertical.controles,
+      }))
       const verticalResultados = loteVerticales.map((loteVertical) => {
         const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
         const controlesConScore = loteVertical.controles.filter((control) => control.scoreControl !== undefined)
@@ -138,7 +146,7 @@ export function EvaluacionesContent() {
         verticalResultados,
       }
     })
-  }, [loteVerticalesData, lotes, modelos, unidades, users])
+  }, [appUser?.id, canEvaluateControls, loteVerticalesData, lotes, modelos, unidades, users])
 
   const controles = lotesConDatos.flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
 
@@ -466,7 +474,7 @@ export function EvaluacionesContent() {
                                           </p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          {control.estado === "terminado" ? (
+                                          {!canEvaluateControls || control.estado === "terminado" ? (
                                             <Button variant="outline" size="sm" asChild>
                                               <Link href={`/evaluaciones/${control.id}`}>
                                                 <Eye className="mr-1 h-4 w-4" />

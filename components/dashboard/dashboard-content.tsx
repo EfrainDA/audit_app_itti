@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -69,6 +69,7 @@ import {
   type User,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import { ProgressChart, type ProgressChartDatum } from "./progress-chart"
 import { ScoreByVerticalChart, type ScoreByVerticalDatum } from "./score-by-vertical-chart"
 import { AuditoriasTable } from "./auditorias-table"
@@ -1052,7 +1053,10 @@ function SupervisorRiskMonitor({
 
 export function DashboardContent() {
   const [activeView, setActiveView] = useState<DashboardView>("analista")
+  const { appUser } = useAuth()
   const { data: appData, source: dataSource, error: dataError } = useAppData()
+  const isAuditor = appUser?.role === "auditor"
+  const isSupervisor = appUser?.role === "supervisor"
   const users = appData.users
   const unidades = appData.unidades
   const ciclos = appData.ciclos
@@ -1060,6 +1064,11 @@ export function DashboardContent() {
   const lotes = appData.lotes
   const loteVerticales = appData.loteVerticales
   const auditorias = appData.auditorias
+
+  useEffect(() => {
+    if (isAuditor) setActiveView("analista")
+    if (isSupervisor) setActiveView("supervisor")
+  }, [isAuditor, isSupervisor])
 
   const metrics = useMemo(() => {
     const activeCycle = getActiveCycle(ciclos)
@@ -1115,7 +1124,7 @@ export function DashboardContent() {
       }))
 
     const allControls = activeControls.length ? activeControls : activeAuditoriasFallback
-    const analystAuditorId = users.find((user) => user.role === "auditor")?.id
+    const analystAuditorId = isAuditor ? appUser?.id : users.find((user) => user.role === "auditor")?.id
     const analystControls = allControls.filter((control) => control.auditorId === analystAuditorId)
     const analystAssignedLotes = activeLotes.filter((lote) => analystAuditorId ? lote.auditores.includes(analystAuditorId) : false)
     const analystAssignedLote =
@@ -1242,7 +1251,7 @@ export function DashboardContent() {
       activeCycleYear: activeCycle.fechaInicio.slice(0, 4),
       progressLabel: `${globalCounts.started}/${globalCounts.total || 0}`,
     }
-  }, [auditorias, ciclos, loteVerticales, lotes, modelos, unidades, users])
+  }, [appUser?.id, auditorias, ciclos, isAuditor, loteVerticales, lotes, modelos, unidades, users])
 
   const roleDashboards = useMemo<Record<DashboardView, RoleDashboard>>(() => {
     const supervisorCounts = metrics.globalCounts
@@ -1449,33 +1458,36 @@ export function DashboardContent() {
     }
   }, [metrics, users])
 
-  const activeDashboard = roleDashboards[activeView]
-  const activeCopy = roleCopy[activeView]
-  const activeDesign = roleDesign[activeView]
+  const dashboardView: DashboardView = isAuditor ? "analista" : isSupervisor ? "supervisor" : activeView
+  const activeDashboard = roleDashboards[dashboardView]
+  const activeCopy = roleCopy[dashboardView]
+  const activeDesign = roleDesign[dashboardView]
   const ViewIcon = activeCopy.icon
-  const activeCounts = activeView === "analista" ? metrics.analystCounts : metrics.globalCounts
+  const activeCounts = dashboardView === "analista" ? metrics.analystCounts : metrics.globalCounts
 
-  if (activeView === "analista") {
+  if (dashboardView === "analista") {
     const assignedUnitName = metrics.analystAssignedUnit?.nombre || "Unidad asignada"
 
     return (
       <div className="space-y-5">
-        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
-            <TabsTrigger value="analista" className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Analista CC
-            </TabsTrigger>
-            <TabsTrigger value="supervisor" className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Supervisor
-            </TabsTrigger>
-            <TabsTrigger value="ceo" className="flex items-center gap-2">
-              <Crown className="h-4 w-4" />
-              CEO
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {!isAuditor && !isSupervisor && (
+          <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+              <TabsTrigger value="analista" className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4" />
+                Analista CC
+              </TabsTrigger>
+              <TabsTrigger value="supervisor" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Supervisor
+              </TabsTrigger>
+              <TabsTrigger value="ceo" className="flex items-center gap-2">
+                <Crown className="h-4 w-4" />
+                CEO
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         <section className="grid gap-4 xl:grid-cols-[1.58fr_0.92fr]">
           <AnalystProgressPanel counts={metrics.analystAssignedLoteCounts} className="h-full" />
@@ -1533,7 +1545,7 @@ export function DashboardContent() {
     )
   }
 
-  if (activeView === "supervisor") {
+  if (dashboardView === "supervisor") {
     const finishedAuditors = users
       .filter((user) => user.role === "auditor")
       .filter((auditor) => {
@@ -1574,22 +1586,24 @@ export function DashboardContent() {
 
     return (
       <div className="space-y-5">
-        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
-            <TabsTrigger value="analista" className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Analista CC
-            </TabsTrigger>
-            <TabsTrigger value="supervisor" className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Supervisor
-            </TabsTrigger>
-            <TabsTrigger value="ceo" className="flex items-center gap-2">
-              <Crown className="h-4 w-4" />
-              CEO
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {!isAuditor && !isSupervisor && (
+          <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+              <TabsTrigger value="analista" className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4" />
+                Analista CC
+              </TabsTrigger>
+              <TabsTrigger value="supervisor" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Supervisor
+              </TabsTrigger>
+              <TabsTrigger value="ceo" className="flex items-center gap-2">
+                <Crown className="h-4 w-4" />
+                CEO
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         <section className={cn("rounded-2xl border border-blue-500/25 bg-card p-5", roleDesign.supervisor.glow)}>
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch">
@@ -1651,22 +1665,24 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-5">
-      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
-          <TabsTrigger value="analista" className="flex items-center gap-2">
-            <UserCheck className="h-4 w-4" />
-            Analista CC
-          </TabsTrigger>
-          <TabsTrigger value="supervisor" className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            Supervisor
-          </TabsTrigger>
-          <TabsTrigger value="ceo" className="flex items-center gap-2">
-            <Crown className="h-4 w-4" />
-            CEO
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {!isAuditor && !isSupervisor && (
+        <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+            <TabsTrigger value="analista" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Analista CC
+            </TabsTrigger>
+            <TabsTrigger value="supervisor" className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Supervisor
+            </TabsTrigger>
+            <TabsTrigger value="ceo" className="flex items-center gap-2">
+              <Crown className="h-4 w-4" />
+              CEO
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       <section className={cn("rounded-2xl border border-emerald-500/25 bg-card p-5", roleDesign.ceo.glow)}>
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch">
