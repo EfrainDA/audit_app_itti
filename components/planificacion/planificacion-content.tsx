@@ -48,7 +48,7 @@ import { downloadCsv } from "@/lib/export"
 import { updateLotStatus } from "@/lib/supabase-data"
 
 export function PlanificacionContent() {
-  const { data, refresh } = useAppData()
+  const { data, error: dataError, refresh } = useAppData()
   const lotes = data.lotes
   const loteVerticalesData = data.loteVerticales
   const auditorias = data.auditorias
@@ -146,6 +146,7 @@ export function PlanificacionContent() {
 
   return (
     <div className="space-y-6">
+      {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">

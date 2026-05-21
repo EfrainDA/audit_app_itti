@@ -129,6 +129,7 @@ type DbModel = {
   valid_from: string | null
   valid_until: string | null
   created_by: string
+  users: Pick<DbUser, "name"> | null
   created_at: string
   verticals: DbVertical[]
   model_business_units: { business_unit_id: string }[]
@@ -251,6 +252,7 @@ export async function fetchAppData(): Promise<AppData> {
       .from("control_models")
       .select(`
         id,name,description,status,valid_from,valid_until,created_by,created_at,
+        users(name),
         model_business_units(business_unit_id),
         verticals(
           id,name,description,weight,evaluation_mode,contains_process,sort_order,
@@ -335,7 +337,7 @@ export async function fetchAppData(): Promise<AppData> {
       fechaVigenciaDesde: model.valid_from ?? undefined,
       fechaVigenciaHasta: model.valid_until ?? undefined,
       verticales: [...(model.verticals ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(mapVertical),
-      creadoPor: model.created_by,
+      creadoPor: model.users?.name ?? model.created_by,
       fechaCreacion: model.created_at,
       unidadesAplicables: (model.model_business_units ?? []).map((unit) => unit.business_unit_id),
     })),
@@ -393,13 +395,56 @@ async function getCurrentProfileId() {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError) throw sessionError
 
-  const authUserId = sessionData.session?.user.id
+  const authUser = sessionData.session?.user
+  const authUserId = authUser?.id
   if (!authUserId) throw new Error("Debes iniciar sesion para guardar datos.")
 
-  const { data, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).single()
+  const { data, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).maybeSingle()
   if (error) throw error
+  if (data?.id) return data.id as string
 
-  return data.id as string
+  const email = authUser.email ?? ""
+  const displayName =
+    authUser.user_metadata?.name ||
+    authUser.user_metadata?.full_name ||
+    email.split("@")[0] ||
+    "Usuario"
+
+  const { data: existingByEmail, error: emailError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle()
+
+  if (emailError) throw emailError
+
+  if (existingByEmail?.id) {
+    const { data: linkedProfile, error: linkError } = await supabase
+      .from("users")
+      .update({ auth_user_id: authUserId })
+      .eq("id", existingByEmail.id)
+      .select("id")
+      .single()
+
+    if (linkError) throw linkError
+    return linkedProfile.id as string
+  }
+
+  const { data: createdProfile, error: insertError } = await supabase
+    .from("users")
+    .insert({
+      auth_user_id: authUserId,
+      name: displayName,
+      email,
+      company: authUser.user_metadata?.company || authUser.user_metadata?.empresa || null,
+      role: "auditor",
+      status: "activo",
+    })
+    .select("id")
+    .single()
+
+  if (insertError) throw insertError
+  return createdProfile.id as string
 }
 
 function makeBusinessUnitCode(name: string) {
@@ -537,6 +582,66 @@ export async function createControlModel(input: ControlModelInput) {
 export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
   const { error } = await supabase.from("control_models").update({ status }).eq("id", id)
   if (error) throw error
+}
+
+export async function updateControlModel(id: string, input: ControlModelInput) {
+  const { data: currentModel, error: currentModelError } = await supabase
+    .from("control_models")
+    .select("status")
+    .eq("id", id)
+    .single()
+
+  if (currentModelError) throw currentModelError
+  if (currentModel.status !== "borrador") {
+    throw new Error("Solo se pueden editar modelos en estado borrador.")
+  }
+
+  const { error: modelError } = await supabase
+    .from("control_models")
+    .update({
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      status: input.status,
+    })
+    .eq("id", id)
+
+  if (modelError) throw modelError
+
+  const { error: deleteVerticalsError } = await supabase.from("verticals").delete().eq("model_id", id)
+  if (deleteVerticalsError) throw deleteVerticalsError
+
+  for (const [verticalIndex, vertical] of input.verticals.entries()) {
+    const { data: createdVertical, error: verticalError } = await supabase
+      .from("verticals")
+      .insert({
+        model_id: id,
+        name: vertical.name.trim(),
+        weight: vertical.weight,
+        evaluation_mode: vertical.evaluationMode,
+        contains_process: vertical.containsProcess ?? false,
+        sort_order: verticalIndex,
+      })
+      .select("id")
+      .single()
+
+    if (verticalError) throw verticalError
+
+    const parameters = vertical.parameters
+      .filter((parameter) => parameter.name.trim())
+      .map((parameter, parameterIndex) => ({
+        vertical_id: createdVertical.id,
+        name: parameter.name.trim(),
+        description: parameter.description?.trim() || null,
+        base_points: parameter.basePoints,
+        allows_intermediate: parameter.allowsIntermediate,
+        sort_order: parameterIndex,
+      }))
+
+    if (parameters.length) {
+      const { error: parametersError } = await supabase.from("parameters").insert(parameters)
+      if (parametersError) throw parametersError
+    }
+  }
 }
 
 export async function cloneControlModel(model: ModeloControl) {

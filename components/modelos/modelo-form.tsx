@@ -16,11 +16,14 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2, GripVertical } from "lucide-react"
-import { createControlModel, type ControlModelInput } from "@/lib/supabase-data"
+import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/supabase-data"
+import { getErrorMessage } from "@/lib/error-message"
+import type { ModeloControl } from "@/lib/data"
 
 interface ModeloFormProps {
   onClose: () => void
   onSaved?: () => Promise<void> | void
+  modelo?: ModeloControl
 }
 
 interface VerticalForm {
@@ -39,20 +42,55 @@ interface ParametroForm {
   permiteIntermedio: boolean
 }
 
-export function ModeloForm({ onClose, onSaved }: ModeloFormProps) {
-  const [nombre, setNombre] = useState("")
-  const [descripcion, setDescripcion] = useState("")
+function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
+  if (!modelo) {
+    return [
+      {
+        id: "1",
+        nombre: "",
+        peso: 100,
+        tipoEvaluacion: "distribuida",
+        parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+      },
+    ]
+  }
+
+  if (!modelo.verticales.length) {
+    return [
+      {
+        id: "1",
+        nombre: "",
+        peso: 100,
+        tipoEvaluacion: "distribuida",
+        parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+      },
+    ]
+  }
+
+  return modelo.verticales.map((vertical) => ({
+    id: vertical.id,
+    nombre: vertical.nombre,
+    peso: vertical.peso,
+    tipoEvaluacion: vertical.tipoEvaluacion,
+    parametros: vertical.parametros.length
+      ? vertical.parametros.map((parametro) => ({
+          id: parametro.id,
+          nombre: parametro.nombre,
+          descripcion: parametro.descripcion ?? "",
+          puntosBase: parametro.puntosBase,
+          permiteIntermedio: parametro.permiteIntermedio,
+        }))
+      : [{ id: `${vertical.id}-parametro`, nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+  }))
+}
+
+export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
+  const isEditing = Boolean(modelo)
+  const [nombre, setNombre] = useState(modelo?.nombre ?? "")
+  const [descripcion, setDescripcion] = useState(modelo?.descripcion ?? "")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [verticales, setVerticales] = useState<VerticalForm[]>([
-    {
-      id: "1",
-      nombre: "",
-      peso: 100,
-      tipoEvaluacion: "distribuida",
-      parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
-    },
-  ])
+  const [verticales, setVerticales] = useState<VerticalForm[]>(() => getInitialVerticales(modelo))
 
   const totalPeso = verticales.reduce((acc, v) => acc + v.peso, 0)
 
@@ -135,7 +173,7 @@ export function ModeloForm({ onClose, onSaved }: ModeloFormProps) {
     setIsSubmitting(true)
 
     try {
-      await createControlModel({
+      const payload = {
         name: nombre,
         description: descripcion,
         status,
@@ -150,11 +188,18 @@ export function ModeloForm({ onClose, onSaved }: ModeloFormProps) {
             allowsIntermediate: parametro.permiteIntermedio,
           })),
         })),
-      })
+      }
+
+      if (modelo) {
+        await updateControlModel(modelo.id, payload)
+      } else {
+        await createControlModel(payload)
+      }
+
       await onSaved?.()
       onClose()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el modelo.")
+      setError(getErrorMessage(submitError, "No se pudo guardar el modelo."))
     } finally {
       setIsSubmitting(false)
     }
@@ -346,7 +391,7 @@ export function ModeloForm({ onClose, onSaved }: ModeloFormProps) {
           Cancelar
         </Button>
         <Button variant="secondary" onClick={() => saveModel("borrador")} disabled={isSubmitting || !nombre}>
-          Guardar como Borrador
+          {isEditing ? "Guardar Cambios" : "Guardar como Borrador"}
         </Button>
         <Button
           className="bg-primary hover:bg-primary/90"

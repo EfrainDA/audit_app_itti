@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { fetchAppData, type AppData } from "@/lib/supabase-data"
+import { getErrorMessage } from "@/lib/error-message"
 
 const emptyData: AppData = {
   users: [],
@@ -28,7 +29,7 @@ export function useAppData() {
       const supabaseData = await fetchAppData()
       setData(supabaseData)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los datos de Supabase.")
+      setError(getErrorMessage(loadError, "No se pudieron cargar los datos de Supabase."))
       setData(emptyData)
     } finally {
       setIsLoading(false)

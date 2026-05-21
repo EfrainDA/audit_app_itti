@@ -39,6 +39,7 @@ import {
   type EvaluationAnswerInput,
 } from "@/lib/supabase-data"
 import { downloadCsv } from "@/lib/export"
+import { getErrorMessage } from "@/lib/error-message"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -105,7 +106,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         )
         if (answers.length) setAutoSaveStatus("saved")
       })
-      .catch((loadError) => setFormError(loadError instanceof Error ? loadError.message : "No se pudieron cargar las respuestas."))
+      .catch((loadError) => setFormError(getErrorMessage(loadError, "No se pudieron cargar las respuestas.")))
   }, [controlId])
 
   // Implementación de autoguardado con debounce (retraso de 1.5s)
@@ -128,7 +129,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       )
         .then(() => setAutoSaveStatus("saved"))
         .catch((saveError) => {
-          setFormError(saveError instanceof Error ? saveError.message : "No se pudo guardar el borrador.")
+          setFormError(getErrorMessage(saveError, "No se pudo guardar el borrador."))
           setAutoSaveStatus("idle")
         })
     }, 1500)
@@ -257,7 +258,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       await saveEvaluationDraft(controlId, getAnswersPayload())
       setAutoSaveStatus("saved")
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "No se pudo guardar el borrador.")
+      setFormError(getErrorMessage(submitError, "No se pudo guardar el borrador."))
     } finally {
       setIsSubmitting(false)
     }
@@ -327,7 +328,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       await sendControlToReplica(currentControl.id)
       await refresh()
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "No se pudo enviar a replica.")
+      setFormError(getErrorMessage(submitError, "No se pudo enviar a replica."))
     } finally {
       setIsSubmitting(false)
     }
@@ -346,7 +347,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       })
       await refresh()
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "No se pudo finalizar la evaluacion.")
+      setFormError(getErrorMessage(submitError, "No se pudo finalizar la evaluacion."))
     } finally {
       setIsSubmitting(false)
     }

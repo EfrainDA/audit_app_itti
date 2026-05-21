@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ChangeEvent } from "react"
+import { useEffect, useState, type ChangeEvent } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -64,9 +64,11 @@ import {
   updateUserProfile,
 } from "@/lib/supabase-data"
 import { downloadCsv } from "@/lib/export"
+import { getErrorMessage } from "@/lib/error-message"
+import { supabase } from "@/lib/supabase"
 
 export function AjustesContent() {
-  const { data, refresh } = useAppData()
+  const { data, error: dataError, refresh } = useAppData()
   const users = data.users
   const unidades = data.unidades
   const ciclos = data.ciclos
@@ -93,6 +95,23 @@ export function AjustesContent() {
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
   const [thresholdError, setThresholdError] = useState<string | null>(null)
   const [isSavingThresholds, setIsSavingThresholds] = useState(false)
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("ajustes-users-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          refresh()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [refresh])
 
   const resetUnidadForm = () => {
     setEditingUnidad(null)
@@ -146,7 +165,7 @@ export function AjustesContent() {
       resetUnidadForm()
       setIsUnidadOpen(false)
     } catch (submitError) {
-      setUnidadError(submitError instanceof Error ? submitError.message : "No se pudo guardar la unidad.")
+      setUnidadError(getErrorMessage(submitError, "No se pudo guardar la unidad."))
     } finally {
       setIsSavingUnidad(false)
     }
@@ -174,7 +193,7 @@ export function AjustesContent() {
       resetUserForm()
       setIsUserOpen(false)
     } catch (submitError) {
-      setUserError(submitError instanceof Error ? submitError.message : "No se pudo crear el usuario.")
+      setUserError(getErrorMessage(submitError, "No se pudo crear el usuario."))
     } finally {
       setIsSavingUser(false)
     }
@@ -198,7 +217,7 @@ export function AjustesContent() {
       await createCycle({ year: Number(newCycleYear), bimester: Number(newCycleBimester) })
       await refresh()
     } catch (submitError) {
-      setCycleError(submitError instanceof Error ? submitError.message : "No se pudo crear el ciclo.")
+      setCycleError(getErrorMessage(submitError, "No se pudo crear el ciclo."))
     } finally {
       setIsSavingCycle(false)
     }
@@ -218,7 +237,7 @@ export function AjustesContent() {
       )
       await refresh()
     } catch (submitError) {
-      setThresholdError(submitError instanceof Error ? submitError.message : "No se pudieron guardar los umbrales.")
+      setThresholdError(getErrorMessage(submitError, "No se pudieron guardar los umbrales."))
     } finally {
       setIsSavingThresholds(false)
     }
@@ -239,6 +258,7 @@ export function AjustesContent() {
 
   return (
     <div className="space-y-6">
+      {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-secondary grid w-full grid-cols-5">
           <TabsTrigger value="usuarios" className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import {
   Search,
   MoreHorizontal,
   Eye,
+  Pencil,
   Copy,
   Archive,
   FileCheck,
@@ -40,10 +41,11 @@ import { ModeloDetail } from "./modelo-detail"
 import { ModeloForm } from "./modelo-form"
 
 export function ModelosContent() {
-  const { data, refresh } = useAppData()
+  const { data, error: dataError, refresh } = useAppData()
   const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedModelo, setSelectedModelo] = useState<ModeloControl | null>(null)
+  const [editingModelo, setEditingModelo] = useState<ModeloControl | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   const filteredModelos = modelos.filter(
@@ -59,6 +61,7 @@ export function ModelosContent() {
 
   return (
     <div className="space-y-6">
+      {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="relative flex-1 max-w-md">
@@ -152,6 +155,12 @@ export function ModelosContent() {
                       <Eye className="h-4 w-4 mr-2" />
                       Ver detalle
                     </DropdownMenuItem>
+                    {modelo.estado === "borrador" && (
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingModelo(modelo); }}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Editar borrador
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleModelAction(() => cloneControlModel(modelo)); }}>
                       <Copy className="h-4 w-4 mr-2" />
                       Clonar modelo
@@ -226,6 +235,27 @@ export function ModelosContent() {
               <DialogDescription>{selectedModelo.descripcion}</DialogDescription>
             </DialogHeader>
             <ModeloDetail modelo={selectedModelo} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editingModelo && (
+        <Dialog open={!!editingModelo} onOpenChange={(open) => !open && setEditingModelo(null)}>
+          <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Modelo de Control</DialogTitle>
+              <DialogDescription>
+                Ajusta el borrador antes de publicarlo.
+              </DialogDescription>
+            </DialogHeader>
+            <ModeloForm
+              modelo={editingModelo}
+              onClose={() => setEditingModelo(null)}
+              onSaved={async () => {
+                await refresh()
+                setSelectedModelo(null)
+              }}
+            />
           </DialogContent>
         </Dialog>
       )}

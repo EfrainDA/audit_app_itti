@@ -60,6 +60,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
 import { createControl, deleteControl, updateControl } from "@/lib/supabase-data"
+import { getErrorMessage } from "@/lib/error-message"
 
 interface LoteDetailProps {
   lote: Lote
@@ -200,7 +201,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
       setIsProcessSuggestionsOpen(false)
       setShowAddControl(null)
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "No se pudo guardar el control.")
+      setFormError(getErrorMessage(submitError, "No se pudo guardar el control."))
     } finally {
       setIsSavingControl(false)
     }
@@ -247,7 +248,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
       setEditingControl(null)
       setEditControl(initialNewControl)
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el control.")
+      setFormError(getErrorMessage(submitError, "No se pudo actualizar el control."))
     } finally {
       setIsSavingControl(false)
     }

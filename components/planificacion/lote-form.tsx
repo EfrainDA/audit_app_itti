@@ -14,6 +14,7 @@ import {
 import { Building2 } from "lucide-react"
 import { useAppData } from "@/hooks/use-app-data"
 import { createLot } from "@/lib/supabase-data"
+import { getErrorMessage } from "@/lib/error-message"
 
 interface LoteFormProps {
   onClose: () => void
@@ -58,7 +59,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
       await onSaved?.()
       onClose()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo crear el lote.")
+      setError(getErrorMessage(submitError, "No se pudo crear el lote."))
     } finally {
       setIsSubmitting(false)
     }
