@@ -758,6 +758,20 @@ export async function updateLotStatus(id: string, status: Lote["estado"]) {
   if (error) throw error
 }
 
+export async function addLotAuditor(lotId: string, auditorId: string) {
+  const { error } = await supabase
+    .from("lot_auditors")
+    .upsert(
+      {
+        lot_id: lotId,
+        auditor_id: auditorId,
+      },
+      { onConflict: "lot_id,auditor_id" },
+    )
+
+  if (error) throw error
+}
+
 export async function createControl(input: {
   lotVerticalId: string
   lotId?: string

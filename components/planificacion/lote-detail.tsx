@@ -59,19 +59,24 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
-import { createControl, deleteControl, updateControl } from "@/lib/supabase-data"
+import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
 
 interface LoteDetailProps {
   lote: Lote
+  onChanged?: () => Promise<void> | void
 }
 
-export function LoteDetail({ lote }: LoteDetailProps) {
+export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   const { data, refresh } = useAppData()
-  const modelo = data.modelos.find((m) => m.id === lote.modeloControlId)
-  const auditores = lote.auditores
+  const currentLote = data.lotes.find((item) => item.id === lote.id) ?? lote
+  const modelo = data.modelos.find((m) => m.id === currentLote.modeloControlId)
+  const auditores = currentLote.auditores
     .map((id) => data.users.find((u) => u.id === id))
     .filter((auditor): auditor is (typeof data.users)[number] => Boolean(auditor))
+  const auditoresDisponibles = data.users.filter(
+    (user) => user.role === "auditor" && user.status === "activo" && !currentLote.auditores.includes(user.id),
+  )
   
   // Estado local para simular agregar controles
   const [loteVerticales, setLoteVerticales] = useState<LoteVertical[]>(() => {
@@ -117,6 +122,8 @@ export function LoteDetail({ lote }: LoteDetailProps) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [formError, setFormError] = useState<string | null>(null)
   const [isSavingControl, setIsSavingControl] = useState(false)
+  const [auditorToAdd, setAuditorToAdd] = useState("")
+  const [isAddingAuditor, setIsAddingAuditor] = useState(false)
 
   // Implementación de autoguardado con debounce (retraso de 1.5s)
   useEffect(() => {
@@ -254,6 +261,24 @@ export function LoteDetail({ lote }: LoteDetailProps) {
     }
   }
 
+  const handleAddAuditor = async () => {
+    if (!auditorToAdd) return
+
+    setFormError(null)
+    setIsAddingAuditor(true)
+
+    try {
+      await addLotAuditor(currentLote.id, auditorToAdd)
+      await refresh()
+      await onChanged?.()
+      setAuditorToAdd("")
+    } catch (submitError) {
+      setFormError(getErrorMessage(submitError, "No se pudo agregar el auditor al lote."))
+    } finally {
+      setIsAddingAuditor(false)
+    }
+  }
+
   const getTotalControles = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
   const getControlesTerminados = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
   const getSubprocesosCount = (control: Control) => {
@@ -289,22 +314,52 @@ export function LoteDetail({ lote }: LoteDetailProps) {
 
       {/* Auditores */}
       <div>
-        <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-          <User className="h-4 w-4" />
-          Equipo de Control de Calidad ({auditores.length})
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {auditores.map((auditor) => (
-            <div key={auditor?.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-sm hover:border-primary/30 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                <span className="text-primary text-[10px] font-bold uppercase">
-                  {auditor?.name.split(" ").map((n) => n[0]).join("")}
-                </span>
-              </div>
-              <span className="text-xs font-medium pr-1">{auditor?.name}</span>
-            </div>
-          ))}
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-sm font-medium flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Equipo de Control de Calidad ({auditores.length})
+          </h3>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Select value={auditorToAdd} onValueChange={setAuditorToAdd}>
+              <SelectTrigger className="h-9 bg-secondary border-border sm:w-64">
+                <SelectValue placeholder="Agregar auditor" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {auditoresDisponibles.map((auditor) => (
+                  <SelectItem key={auditor.id} value={auditor.id}>
+                    {auditor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={handleAddAuditor}
+              disabled={isAddingAuditor || !auditorToAdd}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {isAddingAuditor ? "Agregando..." : "Agregar"}
+            </Button>
+          </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {auditores.length > 0 ? (
+            auditores.map((auditor) => (
+              <div key={auditor.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-sm hover:border-primary/30 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <span className="text-primary text-[10px] font-bold uppercase">
+                    {auditor.name.split(" ").map((n) => n[0]).join("")}
+                  </span>
+                </div>
+                <span className="text-xs font-medium pr-1">{auditor.name}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">Este lote todavia no tiene auditores asignados.</p>
+          )}
+        </div>
+        {formError && <p className="mt-2 text-sm text-destructive">{formError}</p>}
       </div>
 
       {/* Verticales con sus Controles */}

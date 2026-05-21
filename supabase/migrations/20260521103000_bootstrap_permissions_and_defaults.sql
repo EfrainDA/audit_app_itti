@@ -1,6 +1,18 @@
 -- Development bootstrap for local testing.
 -- Run this in Supabase SQL editor if the app loads empty tables or writes fail.
 
+do $$
+begin
+  if to_regclass('public.users') is null
+    or to_regclass('public.business_units') is null
+    or to_regclass('public.cycles') is null
+    or to_regclass('public.thresholds') is null
+    or to_regclass('public.control_models') is null
+  then
+    raise exception 'Missing base audit tables. Run supabase/migrations/20260520120000_initial_audit_schema.sql first, then run this bootstrap file again.';
+  end if;
+end $$;
+
 alter table public.users
   add column if not exists company text;
 
@@ -128,3 +140,5 @@ values
   (2026, 5, '2026-09-01', '2026-10-31'),
   (2026, 6, '2026-11-01', '2026-12-31')
 on conflict (year, bimester) do nothing;
+
+notify pgrst, 'reload schema';

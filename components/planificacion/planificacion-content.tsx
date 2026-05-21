@@ -435,7 +435,7 @@ export function PlanificacionContent() {
                 Año {selectedLote.año}
               </DialogDescription>
             </DialogHeader>
-            <LoteDetail lote={selectedLote} />
+            <LoteDetail lote={selectedLote} onChanged={refresh} />
           </DialogContent>
         </Dialog>
       )}
