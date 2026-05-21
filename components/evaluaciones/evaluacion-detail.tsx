@@ -13,7 +13,6 @@ import {
   XCircle,
   MinusCircle,
   AlertCircle,
-  Upload,
   Save,
   Send,
   Download,
@@ -32,6 +31,14 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
+import {
+  fetchAnswersForControl,
+  finalizeEvaluation,
+  saveEvaluationDraft,
+  sendControlToReplica,
+  type EvaluationAnswerInput,
+} from "@/lib/supabase-data"
+import { downloadCsv } from "@/lib/export"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -47,8 +54,6 @@ interface Respuesta {
   comentario: string
 }
 
-const getStorageKey = (controlId: string) => `qualittyx-evaluacion-${controlId}`
-
 const createEmptyRespuesta = (parametroId: string): Respuesta => ({
   parametroId,
   valor: null,
@@ -58,7 +63,7 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
 })
 
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   // Buscar el control en los loteVerticales
   let control: Control | undefined
   let loteVertical = data.loteVerticales.find((lv) => {
@@ -78,17 +83,29 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(getStorageKey(controlId))
-    if (!saved) return
-
-    try {
-      setRespuestas(JSON.parse(saved) as Record<string, Respuesta>)
-      setAutoSaveStatus("saved")
-    } catch {
-      window.localStorage.removeItem(getStorageKey(controlId))
-    }
+    fetchAnswersForControl(controlId)
+      .then((answers) => {
+        setRespuestas(
+          Object.fromEntries(
+            answers.map((answer) => [
+              answer.parametroId,
+              {
+                parametroId: answer.parametroId,
+                valor: answer.valor,
+                personasAuditadas: answer.personasAuditadas,
+                cargos: answer.cargos,
+                comentario: answer.comentario,
+              },
+            ]),
+          ),
+        )
+        if (answers.length) setAutoSaveStatus("saved")
+      })
+      .catch((loadError) => setFormError(loadError instanceof Error ? loadError.message : "No se pudieron cargar las respuestas."))
   }, [controlId])
 
   // Implementación de autoguardado con debounce (retraso de 1.5s)
@@ -98,9 +115,22 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     setAutoSaveStatus("saving")
 
     const timer = setTimeout(() => {
-      window.localStorage.setItem(getStorageKey(controlId), JSON.stringify(respuestas))
-      console.log("Auto-saving responses for control:", controlId, respuestas)
-      setAutoSaveStatus("saved")
+      const answers = Object.values(respuestas).filter((respuesta): respuesta is Respuesta & { valor: Exclude<RespuestaValor, null> } => respuesta.valor !== null)
+      saveEvaluationDraft(
+        controlId,
+        answers.map((respuesta) => ({
+          parametroId: respuesta.parametroId,
+          valor: respuesta.valor,
+          comentario: respuesta.comentario,
+          personasAuditadas: respuesta.personasAuditadas,
+          cargos: respuesta.cargos,
+        })),
+      )
+        .then(() => setAutoSaveStatus("saved"))
+        .catch((saveError) => {
+          setFormError(saveError instanceof Error ? saveError.message : "No se pudo guardar el borrador.")
+          setAutoSaveStatus("idle")
+        })
     }, 1500)
 
     return () => clearTimeout(timer)
@@ -119,6 +149,9 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       </div>
     )
   }
+
+  const currentControl = control
+  const currentLote = lote
 
   const handleSetRespuesta = (parametroId: string, valor: RespuestaValor) => {
     setRespuestas((prev) => ({
@@ -205,9 +238,52 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     })
   }
 
-  const handleSaveDraft = () => {
-    window.localStorage.setItem(getStorageKey(controlId), JSON.stringify(respuestas))
-    setAutoSaveStatus("saved")
+  const getAnswersPayload = (): EvaluationAnswerInput[] =>
+    Object.values(respuestas)
+      .filter((respuesta): respuesta is Respuesta & { valor: Exclude<RespuestaValor, null> } => respuesta.valor !== null)
+      .map((respuesta) => ({
+        parametroId: respuesta.parametroId,
+        valor: respuesta.valor,
+        comentario: respuesta.comentario,
+        personasAuditadas: respuesta.personasAuditadas,
+        cargos: respuesta.cargos,
+      }))
+
+  const handleSaveDraft = async () => {
+    setFormError(null)
+    setIsSubmitting(true)
+
+    try {
+      await saveEvaluationDraft(controlId, getAnswersPayload())
+      setAutoSaveStatus("saved")
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "No se pudo guardar el borrador.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleExportEvaluation = () => {
+    downloadCsv(
+      `evaluacion-${controlId}.csv`,
+      vertical.parametros.map((parametro) => {
+        const respuesta = {
+          ...createEmptyRespuesta(parametro.id),
+          ...respuestas[parametro.id],
+        }
+
+        return {
+          control: currentControl.identificador,
+          vertical: vertical.nombre,
+          parametro: parametro.nombre,
+          respuesta: respuesta.valor ?? "",
+          comentario: respuesta.comentario,
+          personasAuditadas: respuesta.personasAuditadas.filter(Boolean).join("; "),
+          cargos: respuesta.cargos.filter(Boolean).join("; "),
+          puntosBase: parametro.puntosBase,
+        }
+      }),
+    )
   }
 
   // Calcular progreso basado en parámetros de la vertical
@@ -241,6 +317,40 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   const scoreCalculado = calcularScore()
   const scoreActual = respondidos > 0 ? scoreCalculado : control.scoreControl ?? scoreCalculado
+
+  const handleSendToReplica = async () => {
+    setFormError(null)
+    setIsSubmitting(true)
+
+    try {
+      await handleSaveDraft()
+      await sendControlToReplica(currentControl.id)
+      await refresh()
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "No se pudo enviar a replica.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleFinalizeEvaluation = async () => {
+    setFormError(null)
+    setIsSubmitting(true)
+
+    try {
+      await finalizeEvaluation({
+        lotId: currentLote.id,
+        controlId: currentControl.id,
+        score: scoreCalculado,
+        answers: getAnswersPayload(),
+      })
+      await refresh()
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "No se pudo finalizar la evaluacion.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -281,16 +391,16 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                     {autoSaveStatus === "saving" ? "Guardando..." : "Guardado automático"}
                   </div>
                 )}
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleExportEvaluation}>
                   <Download className="h-4 w-4" />
                   Exportar
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleSaveDraft}>
+                <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSubmitting}>
                   <Save className="h-4 w-4" />
                   Guardar
                 </Button>
                 {control.estado !== "terminado" && (
-                  <Button size="sm" className="bg-warning hover:bg-warning/90 text-warning-foreground">
+                  <Button size="sm" className="bg-warning hover:bg-warning/90 text-warning-foreground" onClick={handleSendToReplica} disabled={isSubmitting}>
                     <Send className="h-4 w-4" />
                     Enviar a Réplica
                   </Button>
@@ -316,6 +426,13 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Vertical Info */}
+      {formError && (
+        <Card className="border-destructive/25 bg-destructive/10">
+          <CardContent className="p-3 text-sm text-destructive">{formError}</CardContent>
+        </Card>
+      )}
 
       {/* Vertical Info */}
       <Card className="bg-card border-border py-0">
@@ -539,10 +656,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
                       />
                     </div>
-                    <Button variant="outline" size="sm">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Adjuntar Evidencia
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -562,13 +675,14 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleSaveDraft}>
+              <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
                 <Save className="h-4 w-4 mr-2" />
                 Guardar Borrador
               </Button>
               <Button
                 className="bg-primary hover:bg-primary/90"
-                disabled={respondidos < totalParametros}
+                onClick={handleFinalizeEvaluation}
+                disabled={isSubmitting || respondidos < totalParametros}
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Finalizar Evaluación

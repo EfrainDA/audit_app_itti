@@ -1,6 +1,9 @@
 -- Profile sync for Supabase Auth.
 -- Creates/links public.users rows when a new auth user signs up.
 
+alter table public.users
+  add column if not exists company text;
+
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
@@ -8,17 +11,19 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.users (auth_user_id, name, email, role, status)
+  insert into public.users (auth_user_id, name, email, company, role, status)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1), 'Usuario'),
     new.email,
+    coalesce(new.raw_user_meta_data->>'company', new.raw_user_meta_data->>'empresa'),
     'auditor',
     'activo'
   )
   on conflict (email) do update
     set auth_user_id = excluded.auth_user_id,
         name = coalesce(public.users.name, excluded.name),
+        company = coalesce(public.users.company, excluded.company),
         updated_at = now();
 
   return new;

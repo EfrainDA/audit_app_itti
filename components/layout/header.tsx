@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Search, HelpCircle, LogOut, Moon, Sun } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Bell, Search, HelpCircle, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
+import { markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-data"
 
 interface HeaderProps {
   title: string
@@ -23,23 +23,26 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
-  const router = useRouter()
-  const { appUser, signOut } = useAuth()
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const notifications = data.notificaciones
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme, setTheme } = useTheme()
   const unreadCount = notifications.filter(n => !n.leida).length
   const isDark = resolvedTheme === "dark"
 
-  const handleSignOut = async () => {
-    await signOut()
-    router.replace("/login")
-  }
-
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleMarkNotificationRead = async (id: string) => {
+    await markNotificationRead(id)
+    await refresh()
+  }
+
+  const handleMarkAllNotificationsRead = async () => {
+    await markAllNotificationsRead(notifications.filter((notification) => !notification.leida).map((notification) => notification.id))
+    await refresh()
+  }
 
   return (
     <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card px-4 shadow-[var(--material-shadow-soft)] sm:px-6">
@@ -83,7 +86,11 @@ export function Header({ title, subtitle }: HeaderProps) {
             <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {notifications.slice(0, 5).map((notification) => (
-              <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 py-3 cursor-pointer">
+              <DropdownMenuItem
+                key={notification.id}
+                className="flex flex-col items-start gap-1 py-3 cursor-pointer"
+                onClick={() => handleMarkNotificationRead(notification.id)}
+              >
                 <div className="flex items-center gap-2 w-full">
                   {!notification.leida && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                   <span className="font-medium text-sm">{notification.titulo}</span>
@@ -94,31 +101,18 @@ export function Header({ title, subtitle }: HeaderProps) {
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-primary cursor-pointer">
-              Ver todas las notificaciones
+            <DropdownMenuItem className="justify-center text-primary cursor-pointer" onClick={handleMarkAllNotificationsRead}>
+              Marcar todas como leidas
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-          <HelpCircle className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
+          <Link href="/ajustes" aria-label="Abrir ajustes">
+            <HelpCircle className="h-5 w-5" />
+          </Link>
         </Button>
 
-        <div className="hidden min-w-0 text-right lg:block">
-          <p className="truncate text-sm font-semibold">{appUser?.name ?? "Usuario"}</p>
-          <p className="truncate text-xs capitalize text-muted-foreground">{appUser?.role ?? "sesion activa"}</p>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Cerrar sesion"
-          title="Cerrar sesion"
-          className="text-muted-foreground hover:text-foreground"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
       </div>
     </header>
   )

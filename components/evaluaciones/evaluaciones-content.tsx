@@ -41,6 +41,7 @@ import {
   formatEstado,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
+import { downloadCsv } from "@/lib/export"
 
 interface LoteConDatos extends Lote {
   unidadNombre: string
@@ -168,6 +169,27 @@ export function EvaluacionesContent() {
     terminados: controles.filter((c) => c.estado === "terminado").length,
   }
 
+  const exportEvaluaciones = () => {
+    downloadCsv(
+      "evaluaciones-controles.csv",
+      lotesConDatos.flatMap((lote) =>
+        lote.loteVerticales.flatMap((loteVertical) =>
+          loteVertical.controles.map((control) => ({
+            unidad: lote.unidadNombre,
+            modelo: lote.modeloNombre,
+            ciclo: lote.ciclo,
+            año: lote.año,
+            control: control.identificador,
+            proceso: control.proceso ?? "",
+            subproceso: control.subproceso ?? "",
+            estado: control.estado,
+            score: control.scoreControl ?? "",
+          })),
+        ),
+      ),
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -240,7 +262,7 @@ export function EvaluacionesContent() {
             <SelectItem value="terminado">Terminados</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline">
+        <Button variant="outline" onClick={exportEvaluaciones}>
           <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>

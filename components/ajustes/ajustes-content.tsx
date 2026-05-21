@@ -53,28 +53,49 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getEstadoBadgeColor, formatEstado, type UnidadNegocio } from "@/lib/data"
-import { useUnidades } from "@/hooks/use-unidades"
 import { useAppData } from "@/hooks/use-app-data"
+import {
+  createBusinessUnit,
+  createCycle,
+  createUserProfile,
+  deleteBusinessUnit,
+  updateBusinessUnit,
+  updateThresholds,
+  updateUserProfile,
+} from "@/lib/supabase-data"
+import { downloadCsv } from "@/lib/export"
 
 export function AjustesContent() {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const users = data.users
+  const unidades = data.unidades
   const ciclos = data.ciclos
   const umbrales = data.umbrales
   const [activeTab, setActiveTab] = useState("usuarios")
   const [searchTerm, setSearchTerm] = useState("")
-  const { unidades, setUnidades } = useUnidades()
   const [isUnidadOpen, setIsUnidadOpen] = useState(false)
   const [editingUnidad, setEditingUnidad] = useState<UnidadNegocio | null>(null)
   const [unidadNombre, setUnidadNombre] = useState("")
   const [unidadEcosistema, setUnidadEcosistema] = useState("")
   const [unidadLogo, setUnidadLogo] = useState("")
+  const [unidadError, setUnidadError] = useState<string | null>(null)
+  const [isSavingUnidad, setIsSavingUnidad] = useState(false)
+  const [isUserOpen, setIsUserOpen] = useState(false)
+  const [userName, setUserName] = useState("")
+  const [userEmail, setUserEmail] = useState("")
+  const [userRole, setUserRole] = useState<"admin" | "supervisor" | "auditor" | "auditado">("auditor")
+  const [userError, setUserError] = useState<string | null>(null)
+  const [isSavingUser, setIsSavingUser] = useState(false)
+  const [newCycleYear, setNewCycleYear] = useState("2026")
+  const [newCycleBimester, setNewCycleBimester] = useState("1")
+  const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
 
   const resetUnidadForm = () => {
     setEditingUnidad(null)
     setUnidadNombre("")
     setUnidadEcosistema("")
     setUnidadLogo("")
+    setUnidadError(null)
   }
 
   const handleUnidadLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -98,36 +119,100 @@ export function AjustesContent() {
     setIsUnidadOpen(true)
   }
 
-  const handleSubmitUnidad = () => {
-    if (editingUnidad) {
-      setUnidades((current) =>
-        current.map((unidad) =>
-          unidad.id === editingUnidad.id
-            ? {
-                ...unidad,
-                nombre: unidadNombre.trim(),
-                ecosistema: unidadEcosistema.trim(),
-                logo: unidadLogo || unidad.logo,
-              }
-            : unidad
-        )
-      )
-    } else {
-      const nextUnidad: UnidadNegocio = {
-        id: `unidad-${Date.now()}`,
-        nombre: unidadNombre.trim(),
-        ecosistema: unidadEcosistema.trim(),
-        codigo: "",
-        zona: "",
-        responsable: "",
-        logo: unidadLogo || "/placeholder-logo.png",
+  const handleSubmitUnidad = async () => {
+    setUnidadError(null)
+    setIsSavingUnidad(true)
+
+    try {
+      if (editingUnidad) {
+        await updateBusinessUnit(editingUnidad.id, {
+          name: unidadNombre,
+          ecosystem: unidadEcosistema,
+          logoUrl: unidadLogo || editingUnidad.logo,
+        })
+      } else {
+        await createBusinessUnit({
+          name: unidadNombre,
+          ecosystem: unidadEcosistema,
+          logoUrl: unidadLogo || null,
+        })
       }
 
-      setUnidades((current) => [nextUnidad, ...current])
+      await refresh()
+      resetUnidadForm()
+      setIsUnidadOpen(false)
+    } catch (submitError) {
+      setUnidadError(submitError instanceof Error ? submitError.message : "No se pudo guardar la unidad.")
+    } finally {
+      setIsSavingUnidad(false)
     }
+  }
 
-    resetUnidadForm()
-    setIsUnidadOpen(false)
+  const handleDeleteUnidad = async (id: string) => {
+    await deleteBusinessUnit(id)
+    await refresh()
+  }
+
+  const resetUserForm = () => {
+    setUserName("")
+    setUserEmail("")
+    setUserRole("auditor")
+    setUserError(null)
+  }
+
+  const handleCreateUser = async () => {
+    setUserError(null)
+    setIsSavingUser(true)
+
+    try {
+      await createUserProfile({ name: userName, email: userEmail, role: userRole })
+      await refresh()
+      resetUserForm()
+      setIsUserOpen(false)
+    } catch (submitError) {
+      setUserError(submitError instanceof Error ? submitError.message : "No se pudo crear el usuario.")
+    } finally {
+      setIsSavingUser(false)
+    }
+  }
+
+  const handleUpdateUserStatus = async (id: string, status: "activo" | "inactivo") => {
+    await updateUserProfile(id, { status })
+    await refresh()
+  }
+
+  const handleUpdateUserRole = async (id: string, role: "admin" | "supervisor" | "auditor" | "auditado") => {
+    await updateUserProfile(id, { role })
+    await refresh()
+  }
+
+  const handleCreateCycle = async () => {
+    await createCycle({ year: Number(newCycleYear), bimester: Number(newCycleBimester) })
+    await refresh()
+  }
+
+  const handleSaveThresholds = async () => {
+    await updateThresholds(
+      umbrales.map((umbral) => ({
+        id: umbral.id,
+        min: thresholdDrafts[umbral.id]?.min ?? umbral.min,
+        max: thresholdDrafts[umbral.id]?.max ?? umbral.max,
+      })),
+    )
+    await refresh()
+  }
+
+  const exportUsers = () => {
+    downloadCsv(
+      "usuarios.csv",
+      users.map((user) => ({
+        nombre: user.name,
+        email: user.email,
+        empresa: user.company ?? "",
+        rol: user.role,
+        estado: user.status,
+      })),
+    )
   }
 
   return (
@@ -165,11 +250,17 @@ export function AjustesContent() {
                 <CardDescription>Administra los usuarios y sus roles en el sistema</CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={exportUsers}>
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
-                <Dialog>
+                <Dialog
+                  open={isUserOpen}
+                  onOpenChange={(open) => {
+                    setIsUserOpen(open)
+                    if (!open) resetUserForm()
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button size="sm" className="bg-primary hover:bg-primary/90">
                       <Plus className="h-4 w-4 mr-2" />
@@ -186,15 +277,15 @@ export function AjustesContent() {
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
                         <Label>Nombre Completo</Label>
-                        <Input placeholder="Nombre del usuario" className="bg-secondary" />
+                        <Input value={userName} onChange={(event) => setUserName(event.target.value)} placeholder="Nombre del usuario" className="bg-secondary" />
                       </div>
                       <div className="space-y-2">
                         <Label>Correo Electrónico</Label>
-                        <Input type="email" placeholder="usuario@empresa.com" className="bg-secondary" />
+                        <Input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-secondary" />
                       </div>
                       <div className="space-y-2">
                         <Label>Rol</Label>
-                        <Select>
+                        <Select value={userRole} onValueChange={(value) => setUserRole(value as typeof userRole)}>
                           <SelectTrigger className="bg-secondary">
                             <SelectValue placeholder="Selecciona un rol" />
                           </SelectTrigger>
@@ -206,9 +297,12 @@ export function AjustesContent() {
                           </SelectContent>
                         </Select>
                       </div>
+                      {userError && <p className="text-sm text-destructive">{userError}</p>}
                       <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline">Cancelar</Button>
-                        <Button className="bg-primary">Crear Usuario</Button>
+                        <Button variant="outline" onClick={() => setIsUserOpen(false)}>Cancelar</Button>
+                        <Button className="bg-primary" onClick={handleCreateUser} disabled={isSavingUser || !userName.trim() || !userEmail.trim()}>
+                          {isSavingUser ? "Creando..." : "Crear Usuario"}
+                        </Button>
                       </div>
                     </div>
                   </DialogContent>
@@ -273,17 +367,17 @@ export function AjustesContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
                                 <Edit className="h-4 w-4 mr-2" />
-                                Editar
+                                {user.role === "admin" ? "Quitar admin" : "Hacer admin"}
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                Cambiar Rol
+                              <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
+                                {user.role === "auditor" ? "Pasar a supervisor" : "Pasar a auditor"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Desactivar
+                                {user.status === "activo" ? "Desactivar" : "Reactivar"}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -373,6 +467,7 @@ export function AjustesContent() {
                         className="bg-secondary border-border"
                       />
                     </div>
+                    {unidadError && <p className="text-sm text-destructive">{unidadError}</p>}
                     <div className="flex justify-end gap-3 border-t border-border pt-4">
                       <Button
                         variant="outline"
@@ -387,9 +482,9 @@ export function AjustesContent() {
                       <Button
                         className="bg-primary hover:bg-primary/90"
                         onClick={handleSubmitUnidad}
-                        disabled={!unidadNombre.trim() || !unidadEcosistema.trim()}
+                        disabled={isSavingUnidad || !unidadNombre.trim() || !unidadEcosistema.trim()}
                       >
-                        {editingUnidad ? "Guardar Cambios" : "Crear Unidad"}
+                        {isSavingUnidad ? "Guardando..." : editingUnidad ? "Guardar Cambios" : "Crear Unidad"}
                       </Button>
                     </div>
                   </div>
@@ -440,7 +535,7 @@ export function AjustesContent() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => setUnidades((current) => current.filter((item) => item.id !== unidad.id))}
+                              onClick={() => handleDeleteUnidad(unidad.id)}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Eliminar
@@ -464,10 +559,23 @@ export function AjustesContent() {
                 <CardTitle className="text-base">Configuración de Ciclos</CardTitle>
                 <CardDescription>Define los períodos bimestrales para auditorías</CardDescription>
               </div>
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
+              <div className="flex items-center gap-2">
+                <Input className="h-9 w-24 bg-secondary" value={newCycleYear} onChange={(event) => setNewCycleYear(event.target.value)} />
+                <Select value={newCycleBimester} onValueChange={setNewCycleBimester}>
+                  <SelectTrigger className="h-9 w-32 bg-secondary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6].map((bimester) => (
+                      <SelectItem key={bimester} value={String(bimester)}>Bim. {bimester}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={handleCreateCycle}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Ciclo
               </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -496,7 +604,14 @@ export function AjustesContent() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setNewCycleYear(String(ciclo.año))
+                              setNewCycleBimester(String(ciclo.bimestre))
+                            }}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -549,7 +664,16 @@ export function AjustesContent() {
                           <Label className="text-xs text-muted-foreground">Mínimo</Label>
                           <Input
                             type="number"
-                            defaultValue={umbral.min}
+                            value={thresholdDrafts[umbral.id]?.min ?? umbral.min}
+                            onChange={(event) =>
+                              setThresholdDrafts((current) => ({
+                                ...current,
+                                [umbral.id]: {
+                                  min: Number(event.target.value),
+                                  max: current[umbral.id]?.max ?? umbral.max,
+                                },
+                              }))
+                            }
                             className="mt-1 bg-background"
                           />
                         </div>
@@ -557,7 +681,16 @@ export function AjustesContent() {
                           <Label className="text-xs text-muted-foreground">Máximo</Label>
                           <Input
                             type="number"
-                            defaultValue={umbral.max}
+                            value={thresholdDrafts[umbral.id]?.max ?? umbral.max}
+                            onChange={(event) =>
+                              setThresholdDrafts((current) => ({
+                                ...current,
+                                [umbral.id]: {
+                                  min: current[umbral.id]?.min ?? umbral.min,
+                                  max: Number(event.target.value),
+                                },
+                              }))
+                            }
                             className="mt-1 bg-background"
                           />
                         </div>
@@ -567,7 +700,7 @@ export function AjustesContent() {
                 ))}
               </div>
               <div className="flex justify-end">
-                <Button className="bg-primary hover:bg-primary/90">Guardar Cambios</Button>
+                <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveThresholds}>Guardar Cambios</Button>
               </div>
             </CardContent>
           </Card>
@@ -581,10 +714,6 @@ export function AjustesContent() {
                 <CardTitle className="text-base">Registro de Actividad</CardTitle>
                 <CardDescription>Historial de acciones realizadas en el sistema</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar Logs
-              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -598,27 +727,11 @@ export function AjustesContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    { timestamp: "2026-05-13 10:45:23", user: "Efraín González", action: "MODEL_PUBLISHED", entity: "Modelo Operativo 2026", details: "Estado: Borrador → Publicado" },
-                    { timestamp: "2026-05-13 09:30:15", user: "Carlos López", action: "SCORE_UPDATED", entity: "AUD-0001", details: "Score: 75% → 78%" },
-                    { timestamp: "2026-05-12 16:20:00", user: "María García", action: "LOT_CREATED", entity: "Lote Ciclo 3 - Sede Central", details: "Auditores: 2 asignados" },
-                    { timestamp: "2026-05-12 14:15:30", user: "Ana Martínez", action: "EVIDENCE_UPLOADED", entity: "Control C-0005", details: "Archivo: evidencia_001.pdf" },
-                    { timestamp: "2026-05-11 11:00:00", user: "Sistema", action: "LOGIN", entity: "Efraín González", details: "IP: 192.168.1.100" },
-                  ].map((log, idx) => (
-                    <TableRow key={idx} className="border-border">
-                      <TableCell className="text-sm text-muted-foreground font-mono">
-                        {log.timestamp}
-                      </TableCell>
-                      <TableCell>{log.user}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {log.action}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{log.entity}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{log.details}</TableCell>
-                    </TableRow>
-                  ))}
+                  <TableRow className="border-border">
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      No hay una tabla de auditoria configurada todavia.
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>

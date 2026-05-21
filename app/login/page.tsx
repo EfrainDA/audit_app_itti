@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRight, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react"
+import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ function LoginContent() {
   const { session, refreshProfile } = useAuth()
   const [mode, setMode] = useState<AuthMode>("login")
   const [name, setName] = useState("")
+  const [company, setCompany] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -53,12 +54,17 @@ function LoginContent() {
         return
       }
 
+      const cleanName = name.trim()
+      const cleanCompany = company.trim()
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: name.trim() || email.split("@")[0],
+            name: cleanName || email.split("@")[0],
+            company: cleanCompany,
+            empresa: cleanCompany,
           },
           emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
         },
@@ -70,47 +76,32 @@ function LoginContent() {
         await refreshProfile()
         router.replace(next)
       } else {
-        setMessage("Revisa tu correo para confirmar la cuenta y luego inicia sesion.")
+        setMessage("Revisa tu correo para confirmar la cuenta y luego inicia sesi\u00f3n.")
       }
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : "No se pudo completar la autenticacion.")
+      setError(authError instanceof Error ? authError.message : "No se pudo completar la autenticaci\u00f3n.")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <main className="grid min-h-screen bg-background lg:grid-cols-[1fr_0.92fr]">
-      <section className="flex min-h-screen flex-col justify-between border-r border-border/70 bg-card px-8 py-8 lg:px-12">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
-            <Image src="/logo1.png" alt="Qualittyx" width={28} height={28} className="h-7 w-7 object-contain" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Qualittyx</p>
-            <p className="text-xs text-muted-foreground">Control de calidad empresarial</p>
-          </div>
-        </div>
-
-        <div className="max-w-xl py-14">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            <ShieldCheck className="h-4 w-4" />
-            Acceso seguro
-          </div>
-          <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Ingresa al centro operativo de auditorias.
-          </h1>
-          <p className="mt-4 max-w-lg text-sm leading-6 text-muted-foreground">
-            Gestiona lotes, controles, evidencias y calificaciones desde una sesion conectada a Supabase.
-          </p>
-        </div>
-
-        <p className="text-xs text-muted-foreground">Supabase Auth activo para este workspace.</p>
-      </section>
-
-      <section className="flex items-center justify-center px-5 py-10">
-        <Card className="w-full max-w-md border-border/70 bg-card">
+    <main className="flex min-h-screen items-center justify-center bg-[#061126] px-5 py-10">
+      <section className="w-full max-w-md">
+        <Card className="w-full border-white/10 bg-white text-slate-950 shadow-[0_24px_70px_rgba(0,0,0,0.30)]">
           <CardHeader className="space-y-3">
+            <div className="flex w-full justify-center pb-3">
+              <div className="flex w-full items-center justify-center rounded-xl bg-[#061126] px-6 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <Image
+                src="/logo1.png"
+                alt="Qualittyx"
+                width={250}
+                height={82}
+                className="h-auto w-56 max-w-full object-contain"
+                priority
+              />
+              </div>
+            </div>
             <Tabs value={mode} onValueChange={(value) => setMode(value as AuthMode)}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Ingresar</TabsTrigger>
@@ -128,8 +119,23 @@ function LoginContent() {
                     id="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Ej. Ana Fariña"
+                    placeholder={"Ej. Ana Fari\u00f1a"}
                     autoComplete="name"
+                    required
+                  />
+                </div>
+              )}
+
+              {mode === "register" && (
+                <div className="space-y-2">
+                  <Label htmlFor="company">Empresa a la que pertenece</Label>
+                  <Input
+                    id="company"
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                    placeholder="Ej. itti"
+                    autoComplete="organization"
+                    required
                   />
                 </div>
               )}
@@ -148,14 +154,14 @@ function LoginContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password">{"Contrase\u00f1a"}</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Minimo 6 caracteres"
+                    placeholder={"M\u00ednimo 6 caracteres"}
                     autoComplete={mode === "login" ? "current-password" : "new-password"}
                     minLength={6}
                     required
@@ -200,8 +206,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-background">
-          <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
+        <main className="flex min-h-screen items-center justify-center bg-[#061126]">
+          <div className="rounded-xl border border-white/10 bg-white px-5 py-4 text-sm font-medium text-slate-600">
             Preparando acceso...
           </div>
         </main>

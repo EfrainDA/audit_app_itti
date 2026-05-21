@@ -272,14 +272,31 @@ const toneBadgeStyles: Record<StatCard["tone"], string> = {
   neutral: "border-border/70 bg-muted text-muted-foreground",
 }
 
-function getActiveCycle(ciclos: Ciclo[]) {
+function getVirtualCurrentCycle(): Ciclo {
+  const today = new Date()
+  const year = today.getFullYear()
+  const bimester = Math.floor(today.getMonth() / 2) + 1
+  const startMonth = (bimester - 1) * 2
+  const start = new Date(year, startMonth, 1)
+  const end = new Date(year, startMonth + 2, 0)
+
+  return {
+    id: "virtual-current-cycle",
+    año: year,
+    bimestre: bimester,
+    fechaInicio: start.toISOString().slice(0, 10),
+    fechaFin: end.toISOString().slice(0, 10),
+  }
+}
+
+function getActiveCycle(ciclos: Ciclo[]): Ciclo {
   const today = new Date()
 
   return ciclos.find((ciclo) => {
     const start = new Date(`${ciclo.fechaInicio}T00:00:00`)
     const end = new Date(`${ciclo.fechaFin}T23:59:59`)
     return today >= start && today <= end
-  }) ?? ciclos[ciclos.length - 1]
+  }) ?? ciclos[ciclos.length - 1] ?? getVirtualCurrentCycle()
 }
 
 function getCounts(controls: ControlContext[]): CountMetrics {

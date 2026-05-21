@@ -29,10 +29,37 @@ export type AppData = {
   notificaciones: Notificacion[]
 }
 
+export type ControlModelInput = {
+  name: string
+  description?: string
+  status: ModeloControl["estado"]
+  verticals: Array<{
+    name: string
+    weight: number
+    evaluationMode: Vertical["tipoEvaluacion"]
+    containsProcess?: boolean
+    parameters: Array<{
+      name: string
+      description?: string
+      basePoints: number
+      allowsIntermediate: boolean
+    }>
+  }>
+}
+
+export type EvaluationAnswerInput = {
+  parametroId: string
+  valor: "cumple" | "no_cumple" | "intermedio" | "na"
+  comentario?: string
+  personasAuditadas: string[]
+  cargos: string[]
+}
+
 type DbUser = {
   id: string
   name: string
   email: string
+  company: string | null
   role: User["role"]
   status: User["status"]
   avatar: string | null
@@ -216,7 +243,7 @@ export async function fetchAppData(): Promise<AppData> {
     auditsResult,
     notificationsResult,
   ] = await Promise.all([
-    supabase.from("users").select("id,name,email,role,status,avatar").order("name"),
+    supabase.from("users").select("id,name,email,company,role,status,avatar").order("name"),
     supabase.from("business_units").select("id,name,ecosystem,code,zone,owner_name,logo_url").order("name"),
     supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester"),
     supabase.from("thresholds").select("id,name,min_value,max_value,color").order("min_value"),
@@ -272,6 +299,7 @@ export async function fetchAppData(): Promise<AppData> {
       id: user.id,
       name: user.name,
       email: user.email,
+      company: user.company ?? undefined,
       role: user.role,
       status: user.status,
       avatar: user.avatar ?? undefined,
@@ -359,4 +387,431 @@ export async function fetchAppData(): Promise<AppData> {
       fecha: notification.created_at,
     })),
   }
+}
+
+async function getCurrentProfileId() {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError) throw sessionError
+
+  const authUserId = sessionData.session?.user.id
+  if (!authUserId) throw new Error("Debes iniciar sesion para guardar datos.")
+
+  const { data, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).single()
+  if (error) throw error
+
+  return data.id as string
+}
+
+function makeBusinessUnitCode(name: string) {
+  const slug =
+    name
+      .trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 24) || "UNIDAD"
+
+  return `${slug}-${Date.now().toString(36).toUpperCase()}`
+}
+
+export async function createBusinessUnit(input: { name: string; ecosystem: string; logoUrl?: string | null }) {
+  const { error } = await supabase.from("business_units").insert({
+    name: input.name.trim(),
+    ecosystem: input.ecosystem.trim(),
+    code: makeBusinessUnitCode(input.name),
+    zone: "",
+    owner_name: "",
+    logo_url: input.logoUrl || null,
+  })
+
+  if (error) throw error
+}
+
+export async function updateBusinessUnit(id: string, input: { name: string; ecosystem: string; logoUrl?: string | null }) {
+  const { error } = await supabase
+    .from("business_units")
+    .update({
+      name: input.name.trim(),
+      ecosystem: input.ecosystem.trim(),
+      logo_url: input.logoUrl || null,
+    })
+    .eq("id", id)
+
+  if (error) throw error
+}
+
+export async function deleteBusinessUnit(id: string) {
+  const { error } = await supabase.from("business_units").delete().eq("id", id)
+  if (error) throw error
+}
+
+export async function updateUserProfile(id: string, input: { role?: User["role"]; status?: User["status"] }) {
+  const { error } = await supabase.from("users").update(input).eq("id", id)
+  if (error) throw error
+}
+
+export async function createCycle(input: { year: number; bimester: number }) {
+  await ensureCycle(input.year, input.bimester)
+}
+
+export async function updateThresholds(
+  thresholds: Array<{ id: string; min: number; max: number }>,
+) {
+  for (const threshold of thresholds) {
+    const { error } = await supabase
+      .from("thresholds")
+      .update({
+        min_value: threshold.min,
+        max_value: threshold.max,
+      })
+      .eq("id", threshold.id)
+
+    if (error) throw error
+  }
+}
+
+export async function createUserProfile(input: { name: string; email: string; role: User["role"]; company?: string }) {
+  const { error } = await supabase.from("users").insert({
+    name: input.name.trim(),
+    email: input.email.trim(),
+    company: input.company?.trim() || null,
+    role: input.role,
+    status: "activo",
+  })
+
+  if (error) throw error
+}
+
+export async function createControlModel(input: ControlModelInput) {
+  const createdBy = await getCurrentProfileId()
+
+  const { data: model, error: modelError } = await supabase
+    .from("control_models")
+    .insert({
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      status: input.status,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single()
+
+  if (modelError) throw modelError
+
+  for (const [verticalIndex, vertical] of input.verticals.entries()) {
+    const { data: createdVertical, error: verticalError } = await supabase
+      .from("verticals")
+      .insert({
+        model_id: model.id,
+        name: vertical.name.trim(),
+        weight: vertical.weight,
+        evaluation_mode: vertical.evaluationMode,
+        contains_process: vertical.containsProcess ?? false,
+        sort_order: verticalIndex,
+      })
+      .select("id")
+      .single()
+
+    if (verticalError) throw verticalError
+
+    const parameters = vertical.parameters
+      .filter((parameter) => parameter.name.trim())
+      .map((parameter, parameterIndex) => ({
+        vertical_id: createdVertical.id,
+        name: parameter.name.trim(),
+        description: parameter.description?.trim() || null,
+        base_points: parameter.basePoints,
+        allows_intermediate: parameter.allowsIntermediate,
+        sort_order: parameterIndex,
+      }))
+
+    if (parameters.length) {
+      const { error: parametersError } = await supabase.from("parameters").insert(parameters)
+      if (parametersError) throw parametersError
+    }
+  }
+}
+
+export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
+  const { error } = await supabase.from("control_models").update({ status }).eq("id", id)
+  if (error) throw error
+}
+
+export async function cloneControlModel(model: ModeloControl) {
+  await createControlModel({
+    name: `${model.nombre} copia`,
+    description: model.descripcion,
+    status: "borrador",
+    verticals: model.verticales.map((vertical) => ({
+      name: vertical.nombre,
+      weight: vertical.peso,
+      evaluationMode: vertical.tipoEvaluacion,
+      containsProcess: vertical.contieneProceso,
+      parameters: vertical.parametros.map((parameter) => ({
+        name: parameter.nombre,
+        description: parameter.descripcion,
+        basePoints: parameter.puntosBase,
+        allowsIntermediate: parameter.permiteIntermedio,
+      })),
+    })),
+  })
+}
+
+function getBimesterDates(year: number, bimester: number) {
+  const startMonth = (bimester - 1) * 2
+  const start = new Date(Date.UTC(year, startMonth, 1))
+  const end = new Date(Date.UTC(year, startMonth + 2, 0))
+
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  }
+}
+
+async function ensureCycle(year: number, bimester: number) {
+  const { data: existing, error: existingError } = await supabase
+    .from("cycles")
+    .select("id")
+    .eq("year", year)
+    .eq("bimester", bimester)
+    .maybeSingle()
+
+  if (existingError) throw existingError
+  if (existing) return existing.id as string
+
+  const dates = getBimesterDates(year, bimester)
+  const { data: created, error: createError } = await supabase
+    .from("cycles")
+    .insert({
+      year,
+      bimester,
+      start_date: dates.startDate,
+      end_date: dates.endDate,
+    })
+    .select("id")
+    .single()
+
+  if (createError) throw createError
+  return created.id as string
+}
+
+export async function createLot(input: {
+  businessUnitId: string
+  modelId: string
+  year: number
+  bimester: number
+  auditorIds: string[]
+}) {
+  const cycleId = await ensureCycle(input.year, input.bimester)
+
+  const { data: lot, error: lotError } = await supabase
+    .from("lots")
+    .insert({
+      business_unit_id: input.businessUnitId,
+      model_id: input.modelId,
+      cycle_id: cycleId,
+      status: "abierto",
+    })
+    .select("id")
+    .single()
+
+  if (lotError) throw lotError
+
+  if (input.auditorIds.length) {
+    const { error: auditorsError } = await supabase.from("lot_auditors").insert(
+      input.auditorIds.map((auditorId) => ({
+        lot_id: lot.id,
+        auditor_id: auditorId,
+      })),
+    )
+    if (auditorsError) throw auditorsError
+  }
+
+  const { data: verticals, error: verticalsError } = await supabase
+    .from("verticals")
+    .select("id")
+    .eq("model_id", input.modelId)
+    .order("sort_order")
+
+  if (verticalsError) throw verticalsError
+
+  if (verticals?.length) {
+    const { error: lotVerticalsError } = await supabase.from("lot_verticals").insert(
+      verticals.map((vertical) => ({
+        lot_id: lot.id,
+        vertical_id: vertical.id,
+      })),
+    )
+    if (lotVerticalsError) throw lotVerticalsError
+  }
+}
+
+export async function updateLotStatus(id: string, status: Lote["estado"]) {
+  const { error } = await supabase.from("lots").update({ status }).eq("id", id)
+  if (error) throw error
+}
+
+export async function createControl(input: {
+  lotVerticalId: string
+  lotId?: string
+  verticalId?: string
+  identifier: string
+  correspondsToProcess: boolean
+  process?: string
+  subprocesses?: string[]
+  auditorId?: string
+}) {
+  let lotVerticalId = input.lotVerticalId
+
+  if (lotVerticalId.startsWith("lv-new-")) {
+    if (!input.lotId || !input.verticalId) throw new Error("No se pudo vincular el control con la vertical del lote.")
+
+    const { data: lotVertical, error: lotVerticalError } = await supabase
+      .from("lot_verticals")
+      .upsert(
+        {
+          lot_id: input.lotId,
+          vertical_id: input.verticalId,
+        },
+        { onConflict: "lot_id,vertical_id" },
+      )
+      .select("id")
+      .single()
+
+    if (lotVerticalError) throw lotVerticalError
+    lotVerticalId = lotVertical.id as string
+  }
+
+  const { error } = await supabase.from("controls").insert({
+    lot_vertical_id: lotVerticalId,
+    identifier: input.identifier.trim(),
+    status: "pendiente",
+    corresponds_to_process: input.correspondsToProcess,
+    process: input.process?.trim() || null,
+    subprocess: input.subprocesses?.length ? input.subprocesses.join(", ") : null,
+    subprocesses: input.subprocesses ?? [],
+    auditor_id: input.auditorId || null,
+  })
+
+  if (error) throw error
+}
+
+export async function updateControl(input: {
+  id: string
+  identifier: string
+  correspondsToProcess: boolean
+  process?: string
+  subprocesses?: string[]
+  auditorId?: string
+}) {
+  const { error } = await supabase
+    .from("controls")
+    .update({
+      identifier: input.identifier.trim(),
+      corresponds_to_process: input.correspondsToProcess,
+      process: input.process?.trim() || null,
+      subprocess: input.subprocesses?.length ? input.subprocesses.join(", ") : null,
+      subprocesses: input.subprocesses ?? [],
+      auditor_id: input.auditorId || null,
+    })
+    .eq("id", input.id)
+
+  if (error) throw error
+}
+
+export async function deleteControl(id: string) {
+  const { error } = await supabase.from("controls").delete().eq("id", id)
+  if (error) throw error
+}
+
+export async function fetchAnswersForControl(controlId: string) {
+  const { data, error } = await supabase
+    .from("answers")
+    .select("parameter_id,value,comment,audited_people,audited_roles")
+    .eq("control_id", controlId)
+
+  if (error) throw error
+
+  return (data ?? []).map((answer) => ({
+    parametroId: answer.parameter_id as string,
+    valor: answer.value as EvaluationAnswerInput["valor"],
+    comentario: (answer.comment as string | null) ?? "",
+    personasAuditadas: ((answer.audited_people as string[] | null) ?? []).length ? (answer.audited_people as string[]) : [""],
+    cargos: ((answer.audited_roles as string[] | null) ?? []).length ? (answer.audited_roles as string[]) : [""],
+  }))
+}
+
+export async function saveEvaluationDraft(controlId: string, answers: EvaluationAnswerInput[]) {
+  const auditorId = await getCurrentProfileId()
+
+  if (!answers.length) return
+
+  const { error } = await supabase.from("answers").upsert(
+    answers.map((answer) => ({
+      control_id: controlId,
+      parameter_id: answer.parametroId,
+      value: answer.valor,
+      comment: answer.comentario?.trim() || null,
+      audited_people: answer.personasAuditadas.map((item) => item.trim()).filter(Boolean),
+      audited_roles: answer.cargos.map((item) => item.trim()).filter(Boolean),
+      auditor_id: auditorId,
+      answered_at: new Date().toISOString(),
+    })),
+    { onConflict: "control_id,parameter_id" },
+  )
+
+  if (error) throw error
+}
+
+export async function finalizeEvaluation(input: {
+  lotId: string
+  controlId: string
+  score: number | null
+  answers: EvaluationAnswerInput[]
+}) {
+  const auditorId = await getCurrentProfileId()
+  await saveEvaluationDraft(input.controlId, input.answers)
+
+  const { error: controlError } = await supabase
+    .from("controls")
+    .update({
+      status: "terminado",
+      control_score: input.score,
+      auditor_id: auditorId,
+    })
+    .eq("id", input.controlId)
+
+  if (controlError) throw controlError
+
+  const { error: auditError } = await supabase.from("audits").upsert(
+    {
+      lot_id: input.lotId,
+      control_id: input.controlId,
+      audit_date: new Date().toISOString().slice(0, 10),
+      status: "terminado",
+      total_score: input.score,
+      auditor_id: auditorId,
+    },
+    { onConflict: "control_id" },
+  )
+
+  if (auditError) throw auditError
+}
+
+export async function sendControlToReplica(controlId: string) {
+  const { error } = await supabase.from("controls").update({ status: "en_replica" }).eq("id", controlId)
+  if (error) throw error
+}
+
+export async function markNotificationRead(id: string) {
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id)
+  if (error) throw error
+}
+
+export async function markAllNotificationsRead(ids: string[]) {
+  if (!ids.length) return
+  const { error } = await supabase.from("notifications").update({ read: true }).in("id", ids)
+  if (error) throw error
 }

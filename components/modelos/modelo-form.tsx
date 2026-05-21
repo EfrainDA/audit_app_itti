@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2, GripVertical } from "lucide-react"
+import { createControlModel, type ControlModelInput } from "@/lib/supabase-data"
+import { useAppData } from "@/hooks/use-app-data"
 
 interface ModeloFormProps {
   onClose: () => void
@@ -38,8 +40,11 @@ interface ParametroForm {
 }
 
 export function ModeloForm({ onClose }: ModeloFormProps) {
+  const { refresh } = useAppData()
   const [nombre, setNombre] = useState("")
   const [descripcion, setDescripcion] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [verticales, setVerticales] = useState<VerticalForm[]>([
     {
       id: "1",
@@ -126,9 +131,34 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
     )
   }
 
-  const handleSubmit = () => {
-    console.log({ nombre, descripcion, verticales })
-    onClose()
+  const saveModel = async (status: ControlModelInput["status"]) => {
+    setError(null)
+    setIsSubmitting(true)
+
+    try {
+      await createControlModel({
+        name: nombre,
+        description: descripcion,
+        status,
+        verticals: verticales.map((vertical) => ({
+          name: vertical.nombre,
+          weight: vertical.peso,
+          evaluationMode: vertical.tipoEvaluacion,
+          parameters: vertical.parametros.map((parametro) => ({
+            name: parametro.nombre,
+            description: parametro.descripcion,
+            basePoints: parametro.puntosBase,
+            allowsIntermediate: parametro.permiteIntermedio,
+          })),
+        })),
+      })
+      await refresh()
+      onClose()
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el modelo.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -312,18 +342,19 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 border-t border-border">
+        {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>
-        <Button variant="secondary">
+        <Button variant="secondary" onClick={() => saveModel("borrador")} disabled={isSubmitting || !nombre}>
           Guardar como Borrador
         </Button>
         <Button
           className="bg-primary hover:bg-primary/90"
-          onClick={handleSubmit}
-          disabled={!nombre || totalPeso !== 100}
+          onClick={() => saveModel("publicado")}
+          disabled={isSubmitting || !nombre || totalPeso !== 100}
         >
-          Publicar Modelo
+          {isSubmitting ? "Guardando..." : "Publicar Modelo"}
         </Button>
       </div>
     </div>

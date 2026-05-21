@@ -59,13 +59,14 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
+import { createControl, deleteControl, updateControl } from "@/lib/supabase-data"
 
 interface LoteDetailProps {
   lote: Lote
 }
 
 export function LoteDetail({ lote }: LoteDetailProps) {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const modelo = data.modelos.find((m) => m.id === lote.modeloControlId)
   const auditores = lote.auditores
     .map((id) => data.users.find((u) => u.id === id))
@@ -113,25 +114,18 @@ export function LoteDetail({ lote }: LoteDetailProps) {
   const [isControlSuggestionsOpen, setIsControlSuggestionsOpen] = useState(false)
   const [isProcessSuggestionsOpen, setIsProcessSuggestionsOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSavingControl, setIsSavingControl] = useState(false)
 
   // Implementación de autoguardado con debounce (retraso de 1.5s)
   useEffect(() => {
-    if (loteVerticales.length === 0) return
-
-    setAutoSaveStatus('saving')
-
-    const timer = setTimeout(() => {
-      console.log("Auto-saving plan for lote:", lote.id, loteVerticales)
-      setAutoSaveStatus('saved')
-    }, 1500)
-
-    return () => clearTimeout(timer)
-  }, [loteVerticales, lote.id])
+    if (loteVerticales.length > 0) setAutoSaveStatus('saved')
+  }, [loteVerticales])
 
   const existingControlNames = useMemo(() => {
     const loteIdsForUnidad = data.lotes
-      .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
-      .map((mockLote) => mockLote.id)
+      .filter((unitLot) => unitLot.unidadNegocioId === lote.unidadNegocioId)
+      .map((unitLot) => unitLot.id)
 
     const persistedNames = data.loteVerticales
       .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
@@ -154,8 +148,8 @@ export function LoteDetail({ lote }: LoteDetailProps) {
 
   const existingProcessNames = useMemo(() => {
     const loteIdsForUnidad = data.lotes
-      .filter((mockLote) => mockLote.unidadNegocioId === lote.unidadNegocioId)
-      .map((mockLote) => mockLote.id)
+      .filter((unitLot) => unitLot.unidadNegocioId === lote.unidadNegocioId)
+      .map((unitLot) => unitLot.id)
 
     const persistedNames = data.loteVerticales
       .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
@@ -181,52 +175,40 @@ export function LoteDetail({ lote }: LoteDetailProps) {
     (name) => name.toLowerCase() === newControl.proceso.trim().toLowerCase()
   )
 
-  const handleAddControl = (loteVerticalId: string) => {
+  const handleAddControl = async (loteVerticalId: string) => {
     const identificador = newControl.correspondeProceso ? newControl.proceso.trim() : newControl.identificador.trim()
     if (!identificador) return
 
-    const nuevoControl: Control = {
-      id: `c-${Date.now()}`,
-      loteVerticalId,
-      identificador,
-      correspondeProceso: newControl.correspondeProceso,
-      proceso: newControl.correspondeProceso ? newControl.proceso || undefined : undefined,
-      subproceso: newControl.correspondeProceso && newControl.subprocesos.length > 0 ? newControl.subprocesos.join(", ") : undefined,
-      subprocesos: newControl.correspondeProceso ? newControl.subprocesos : undefined,
-      estado: "pendiente",
-      fechaCreacion: new Date().toISOString().split("T")[0],
-      auditorId: newControl.auditorId || undefined,
+    const targetVertical = loteVerticales.find((lv) => lv.id === loteVerticalId)
+    setFormError(null)
+    setIsSavingControl(true)
+
+    try {
+      await createControl({
+        lotVerticalId: loteVerticalId,
+        lotId: lote.id,
+        verticalId: targetVertical?.verticalId,
+        identifier: identificador,
+        correspondsToProcess: newControl.correspondeProceso,
+        process: newControl.correspondeProceso ? newControl.proceso : undefined,
+        subprocesses: newControl.correspondeProceso ? newControl.subprocesos : undefined,
+        auditorId: newControl.auditorId || undefined,
+      })
+      await refresh()
+      setNewControl(initialNewControl)
+      setIsControlSuggestionsOpen(false)
+      setIsProcessSuggestionsOpen(false)
+      setShowAddControl(null)
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "No se pudo guardar el control.")
+    } finally {
+      setIsSavingControl(false)
     }
-
-    setLoteVerticales((prev) =>
-      prev.map((lv) =>
-        lv.id === loteVerticalId
-          ? { ...lv, controles: [...lv.controles, nuevoControl] }
-          : lv
-      )
-    )
-
-    setNewControl({
-      identificador: "",
-      auditorId: "",
-      correspondeProceso: false,
-      proceso: "",
-      subprocesos: [],
-      subprocesoTemp: "",
-    })
-    setIsControlSuggestionsOpen(false)
-    setIsProcessSuggestionsOpen(false)
-    setShowAddControl(null)
   }
 
-  const handleDeleteControl = (loteVerticalId: string, controlId: string) => {
-    setLoteVerticales((prev) =>
-      prev.map((lv) =>
-        lv.id === loteVerticalId
-          ? { ...lv, controles: lv.controles.filter((c) => c.id !== controlId) }
-          : lv
-      )
-    )
+  const handleDeleteControl = async (_loteVerticalId: string, controlId: string) => {
+    await deleteControl(controlId)
+    await refresh()
   }
 
   const openEditControl = (loteVerticalId: string, control: Control) => {
@@ -243,37 +225,32 @@ export function LoteDetail({ lote }: LoteDetailProps) {
     })
   }
 
-  const handleUpdateControl = () => {
+  const handleUpdateControl = async () => {
     if (!editingControl) return
 
     const identificador = editControl.correspondeProceso ? editControl.proceso.trim() : editControl.identificador.trim()
     if (!identificador) return
 
-    setLoteVerticales((prev) =>
-      prev.map((lv) =>
-        lv.id === editingControl.loteVerticalId
-          ? {
-              ...lv,
-              controles: lv.controles.map((control) =>
-                control.id === editingControl.controlId
-                  ? {
-                      ...control,
-                      identificador,
-                      auditorId: editControl.auditorId || undefined,
-                      correspondeProceso: editControl.correspondeProceso,
-                      proceso: editControl.correspondeProceso ? editControl.proceso.trim() || undefined : undefined,
-                      subproceso: editControl.correspondeProceso && editControl.subprocesos.length > 0 ? editControl.subprocesos.join(", ") : undefined,
-                      subprocesos: editControl.correspondeProceso ? editControl.subprocesos : undefined,
-                    }
-                  : control
-              ),
-            }
-          : lv
-      )
-    )
+    setFormError(null)
+    setIsSavingControl(true)
 
-    setEditingControl(null)
-    setEditControl(initialNewControl)
+    try {
+      await updateControl({
+        id: editingControl.controlId,
+        identifier: identificador,
+        correspondsToProcess: editControl.correspondeProceso,
+        process: editControl.correspondeProceso ? editControl.proceso : undefined,
+        subprocesses: editControl.correspondeProceso ? editControl.subprocesos : undefined,
+        auditorId: editControl.auditorId || undefined,
+      })
+      await refresh()
+      setEditingControl(null)
+      setEditControl(initialNewControl)
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el control.")
+    } finally {
+      setIsSavingControl(false)
+    }
   }
 
   const getTotalControles = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
@@ -754,16 +731,17 @@ export function LoteDetail({ lote }: LoteDetailProps) {
               </>
             )}
           </div>
+          {formError && <p className="text-sm text-destructive">{formError}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddControl(null)}>
               Cancelar
             </Button>
             <Button
               onClick={() => showAddControl && handleAddControl(showAddControl)}
-              disabled={newControl.correspondeProceso ? !newControl.proceso.trim() : !newControl.identificador.trim()}
+              disabled={isSavingControl || (newControl.correspondeProceso ? !newControl.proceso.trim() : !newControl.identificador.trim())}
               className="bg-primary hover:bg-primary/90"
             >
-              Agregar Control
+              {isSavingControl ? "Guardando..." : "Agregar Control"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -920,6 +898,7 @@ export function LoteDetail({ lote }: LoteDetailProps) {
               </>
             )}
           </div>
+          {formError && <p className="text-sm text-destructive">{formError}</p>}
           <DialogFooter>
             <Button
               variant="outline"
@@ -932,10 +911,10 @@ export function LoteDetail({ lote }: LoteDetailProps) {
             </Button>
             <Button
               onClick={handleUpdateControl}
-              disabled={editControl.correspondeProceso ? !editControl.proceso.trim() : !editControl.identificador.trim()}
+              disabled={isSavingControl || (editControl.correspondeProceso ? !editControl.proceso.trim() : !editControl.identificador.trim())}
               className="bg-primary hover:bg-primary/90"
             >
-              Guardar Cambios
+              {isSavingControl ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </DialogContent>

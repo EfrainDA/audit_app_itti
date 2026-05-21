@@ -35,11 +35,12 @@ import {
 } from "@/components/ui/dialog"
 import { getEstadoBadgeColor, formatEstado, type ModeloControl } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
+import { cloneControlModel, updateControlModelStatus } from "@/lib/supabase-data"
 import { ModeloDetail } from "./modelo-detail"
 import { ModeloForm } from "./modelo-form"
 
 export function ModelosContent() {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedModelo, setSelectedModelo] = useState<ModeloControl | null>(null)
@@ -50,6 +51,11 @@ export function ModelosContent() {
       modelo.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       modelo.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const handleModelAction = async (action: () => Promise<void>) => {
+    await action()
+    await refresh()
+  }
 
   return (
     <div className="space-y-6">
@@ -146,14 +152,14 @@ export function ModelosContent() {
                       <Eye className="h-4 w-4 mr-2" />
                       Ver detalle
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleModelAction(() => cloneControlModel(modelo)); }}>
                       <Copy className="h-4 w-4 mr-2" />
                       Clonar modelo
                     </DropdownMenuItem>
                     {modelo.estado === 'borrador' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="text-success">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "publicado")); }} className="text-success">
                           Publicar
                         </DropdownMenuItem>
                       </>
@@ -161,7 +167,7 @@ export function ModelosContent() {
                     {modelo.estado === 'publicado' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="text-destructive">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "deprecado")); }} className="text-destructive">
                           <Archive className="h-4 w-4 mr-2" />
                           Deprecar
                         </DropdownMenuItem>

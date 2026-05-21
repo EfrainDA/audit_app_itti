@@ -12,21 +12,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Building2 } from "lucide-react"
-import { useUnidades } from "@/hooks/use-unidades"
 import { useAppData } from "@/hooks/use-app-data"
+import { createLot } from "@/lib/supabase-data"
 
 interface LoteFormProps {
   onClose: () => void
 }
 
 export function LoteForm({ onClose }: LoteFormProps) {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const [unidadId, setUnidadId] = useState("")
   const [año, setAño] = useState("2026")
   const [ciclo, setCiclo] = useState("")
   const [modeloId, setModeloId] = useState("")
   const [auditores, setAuditores] = useState<string[]>([])
-  const { unidades } = useUnidades()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const unidades = data.unidades
 
   const auditoresDisponibles = data.users.filter((u) => u.role === "auditor" && u.status === "activo")
   const modelosPublicados = data.modelos.filter((m) => m.estado === "publicado")
@@ -39,9 +41,25 @@ export function LoteForm({ onClose }: LoteFormProps) {
     )
   }
 
-  const handleSubmit = () => {
-    console.log({ unidadId, año, ciclo, modeloId, auditores })
-    onClose()
+  const handleSubmit = async () => {
+    setError(null)
+    setIsSubmitting(true)
+
+    try {
+      await createLot({
+        businessUnitId: unidadId,
+        modelId: modeloId,
+        year: Number(año),
+        bimester: Number(ciclo),
+        auditorIds: auditores,
+      })
+      await refresh()
+      onClose()
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo crear el lote.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -152,15 +170,16 @@ export function LoteForm({ onClose }: LoteFormProps) {
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t border-border">
+        {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>
         <Button
           className="bg-primary hover:bg-primary/90"
           onClick={handleSubmit}
-          disabled={!unidadId || !ciclo || !modeloId || auditores.length === 0}
+          disabled={isSubmitting || !unidadId || !ciclo || !modeloId || auditores.length === 0}
         >
-          Crear Lote
+          {isSubmitting ? "Creando..." : "Crear Lote"}
         </Button>
       </div>
     </div>

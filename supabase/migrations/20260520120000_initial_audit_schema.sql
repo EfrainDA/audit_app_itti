@@ -59,6 +59,7 @@ create table if not exists public.users (
   auth_user_id uuid unique references auth.users(id) on delete set null,
   name text not null,
   email text not null unique,
+  company text,
   role public.user_role not null default 'auditor',
   status public.record_status not null default 'activo',
   avatar text,

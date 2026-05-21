@@ -43,11 +43,12 @@ import {
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
-import { useUnidades } from "@/hooks/use-unidades"
 import { useAppData } from "@/hooks/use-app-data"
+import { downloadCsv } from "@/lib/export"
+import { updateLotStatus } from "@/lib/supabase-data"
 
 export function PlanificacionContent() {
-  const { data } = useAppData()
+  const { data, refresh } = useAppData()
   const lotes = data.lotes
   const loteVerticalesData = data.loteVerticales
   const auditorias = data.auditorias
@@ -57,7 +58,7 @@ export function PlanificacionContent() {
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
-  const { unidades } = useUnidades()
+  const unidades = data.unidades
 
   const lotesConDatos = lotes.map((lote) => {
     const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
@@ -107,6 +108,42 @@ export function PlanificacionContent() {
       lote.unidadNombre.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const exportLotes = () => {
+    downloadCsv(
+      "planificacion-lotes.csv",
+      lotesConDatos.map((lote) => ({
+        unidad: lote.unidadNombre,
+        ciclo: lote.ciclo,
+        año: lote.año,
+        estado: lote.estado,
+        auditores: lote.auditoresNombres,
+        auditorias: lote.totalAuditorias,
+        terminadas: lote.auditoriasTerminadas,
+        calificacion: lote.calificacionFinal ?? "",
+      })),
+    )
+  }
+
+  const exportSingleLote = (lote: (typeof lotesConDatos)[number]) => {
+    downloadCsv(`lote-${lote.id}.csv`, [
+      {
+        unidad: lote.unidadNombre,
+        ciclo: lote.ciclo,
+        año: lote.año,
+        estado: lote.estado,
+        auditores: lote.auditoresNombres,
+        auditorias: lote.totalAuditorias,
+        terminadas: lote.auditoriasTerminadas,
+        calificacion: lote.calificacionFinal ?? "",
+      },
+    ])
+  }
+
+  const handleCloseLote = async (loteId: string) => {
+    await updateLotStatus(loteId, "cerrado")
+    await refresh()
+  }
+
   return (
     <div className="space-y-6">
       {/* Tabs */}
@@ -117,7 +154,7 @@ export function PlanificacionContent() {
             <TabsTrigger value="calendario">Calendario</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={exportLotes}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
@@ -239,14 +276,14 @@ export function PlanificacionContent() {
                             <Eye className="h-4 w-4 mr-2" />
                             Ver detalle
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportSingleLote(lote); }}>
                             <Download className="h-4 w-4 mr-2" />
                             Exportar Excel
                           </DropdownMenuItem>
                           {lote.estado === "abierto" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="text-warning">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-warning">
                                 <Lock className="h-4 w-4 mr-2" />
                                 Cerrar Lote
                               </DropdownMenuItem>

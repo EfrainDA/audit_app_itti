@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   Activity,
@@ -12,9 +13,19 @@ import {
   Settings2,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/components/auth/auth-provider"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Activity },
@@ -43,7 +54,23 @@ function getIconTone(href: string) {
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { appUser, signOut } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const userName = appUser?.name ?? "Usuario"
+  const userRole = appUser?.role ?? "sesion activa"
+  const userInitials = userName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "U"
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace("/login")
+  }
 
   return (
     <aside
@@ -131,22 +158,39 @@ export function Sidebar() {
       </nav>
 
       <div className={cn("relative z-10 border-t border-white/10 px-2 py-4", collapsed && "px-1")}>
-        <div
-          className={cn(
-            "flex items-center gap-3 rounded-lg border border-white/12 bg-white/5 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]",
-            collapsed && "justify-center border-transparent bg-transparent"
-          )}
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 shadow-[0_8px_18px_rgba(56,189,248,0.18)]">
-            <span className="text-xs font-bold text-cyan-200">EG</span>
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">Efrain Gonzalez</p>
-              <p className="truncate text-xs text-white/60">Admin Command</p>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] transition-colors hover:bg-white/10",
+                collapsed && "justify-center border-transparent bg-transparent px-1"
+              )}
+              title={collapsed ? userName : undefined}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 shadow-[0_8px_18px_rgba(56,189,248,0.18)]">
+                <span className="text-xs font-bold text-cyan-200">{userInitials}</span>
+              </div>
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{userName}</p>
+                  <p className="truncate text-xs capitalize text-white/60">{userRole}</p>
+                </div>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="right" className="w-56">
+            <DropdownMenuLabel>
+              <p className="truncate text-sm font-semibold">{userName}</p>
+              <p className="truncate text-xs capitalize text-muted-foreground">{userRole}</p>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar sesion
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   )

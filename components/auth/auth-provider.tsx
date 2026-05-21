@@ -23,6 +23,7 @@ function mapProfile(row: {
   role: User["role"]
   status: User["status"]
   avatar: string | null
+  company: string | null
 }): User {
   return {
     id: row.id,
@@ -31,6 +32,7 @@ function mapProfile(row: {
     role: row.role,
     status: row.status,
     avatar: row.avatar ?? undefined,
+    company: row.company ?? undefined,
   }
 }
 
@@ -41,10 +43,11 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
     authUser.user_metadata?.full_name ||
     email.split("@")[0] ||
     "Usuario"
+  const company = authUser.user_metadata?.company || authUser.user_metadata?.empresa || null
 
   const { data: existingByAuthId, error: authIdError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar")
+    .select("id,name,email,role,status,avatar,company")
     .eq("auth_user_id", authUser.id)
     .maybeSingle()
 
@@ -53,7 +56,7 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
 
   const { data: existingByEmail, error: emailError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar")
+    .select("id,name,email,role,status,avatar,company")
     .eq("email", email)
     .maybeSingle()
 
@@ -62,9 +65,9 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
   if (existingByEmail) {
     const { data: linkedProfile, error: updateError } = await supabase
       .from("users")
-      .update({ auth_user_id: authUser.id })
+      .update({ auth_user_id: authUser.id, company: company ?? existingByEmail.company })
       .eq("id", existingByEmail.id)
-      .select("id,name,email,role,status,avatar")
+      .select("id,name,email,role,status,avatar,company")
       .single()
 
     if (updateError) throw updateError
@@ -77,10 +80,11 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
       auth_user_id: authUser.id,
       name: displayName,
       email,
+      company,
       role: "auditor",
       status: "activo",
     })
-    .select("id,name,email,role,status,avatar")
+    .select("id,name,email,role,status,avatar,company")
     .single()
 
   if (insertError) throw insertError
