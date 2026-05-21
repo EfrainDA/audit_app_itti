@@ -17,10 +17,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2, GripVertical } from "lucide-react"
 import { createControlModel, type ControlModelInput } from "@/lib/supabase-data"
-import { useAppData } from "@/hooks/use-app-data"
 
 interface ModeloFormProps {
   onClose: () => void
+  onSaved?: () => Promise<void> | void
 }
 
 interface VerticalForm {
@@ -39,8 +39,7 @@ interface ParametroForm {
   permiteIntermedio: boolean
 }
 
-export function ModeloForm({ onClose }: ModeloFormProps) {
-  const { refresh } = useAppData()
+export function ModeloForm({ onClose, onSaved }: ModeloFormProps) {
   const [nombre, setNombre] = useState("")
   const [descripcion, setDescripcion] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -152,7 +151,7 @@ export function ModeloForm({ onClose }: ModeloFormProps) {
           })),
         })),
       })
-      await refresh()
+      await onSaved?.()
       onClose()
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el modelo.")

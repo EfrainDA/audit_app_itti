@@ -84,7 +84,7 @@ export function ModelosContent() {
                 Establece la metodología de evaluación configurando las verticales, los parámetros de calidad y la asignación de puntajes.
               </DialogDescription>
             </DialogHeader>
-            <ModeloForm onClose={() => setIsCreateOpen(false)} />
+            <ModeloForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
           </DialogContent>
         </Dialog>
       </div>

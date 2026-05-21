@@ -172,7 +172,7 @@ export function PlanificacionContent() {
                     Define el ciclo de auditoría para una unidad de negocio
                   </DialogDescription>
                 </DialogHeader>
-                <LoteForm onClose={() => setIsCreateOpen(false)} />
+                <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
               </DialogContent>
             </Dialog>
           </div>

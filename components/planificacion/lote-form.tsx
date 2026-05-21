@@ -17,9 +17,10 @@ import { createLot } from "@/lib/supabase-data"
 
 interface LoteFormProps {
   onClose: () => void
+  onSaved?: () => Promise<void> | void
 }
 
-export function LoteForm({ onClose }: LoteFormProps) {
+export function LoteForm({ onClose, onSaved }: LoteFormProps) {
   const { data, refresh } = useAppData()
   const [unidadId, setUnidadId] = useState("")
   const [año, setAño] = useState("2026")
@@ -54,6 +55,7 @@ export function LoteForm({ onClose }: LoteFormProps) {
         auditorIds: auditores,
       })
       await refresh()
+      await onSaved?.()
       onClose()
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo crear el lote.")

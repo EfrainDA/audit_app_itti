@@ -88,7 +88,11 @@ export function AjustesContent() {
   const [isSavingUser, setIsSavingUser] = useState(false)
   const [newCycleYear, setNewCycleYear] = useState("2026")
   const [newCycleBimester, setNewCycleBimester] = useState("1")
+  const [cycleError, setCycleError] = useState<string | null>(null)
+  const [isSavingCycle, setIsSavingCycle] = useState(false)
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
+  const [thresholdError, setThresholdError] = useState<string | null>(null)
+  const [isSavingThresholds, setIsSavingThresholds] = useState(false)
 
   const resetUnidadForm = () => {
     setEditingUnidad(null)
@@ -187,19 +191,37 @@ export function AjustesContent() {
   }
 
   const handleCreateCycle = async () => {
-    await createCycle({ year: Number(newCycleYear), bimester: Number(newCycleBimester) })
-    await refresh()
+    setCycleError(null)
+    setIsSavingCycle(true)
+
+    try {
+      await createCycle({ year: Number(newCycleYear), bimester: Number(newCycleBimester) })
+      await refresh()
+    } catch (submitError) {
+      setCycleError(submitError instanceof Error ? submitError.message : "No se pudo crear el ciclo.")
+    } finally {
+      setIsSavingCycle(false)
+    }
   }
 
   const handleSaveThresholds = async () => {
-    await updateThresholds(
-      umbrales.map((umbral) => ({
-        id: umbral.id,
-        min: thresholdDrafts[umbral.id]?.min ?? umbral.min,
-        max: thresholdDrafts[umbral.id]?.max ?? umbral.max,
-      })),
-    )
-    await refresh()
+    setThresholdError(null)
+    setIsSavingThresholds(true)
+
+    try {
+      await updateThresholds(
+        umbrales.map((umbral) => ({
+          id: umbral.id,
+          min: thresholdDrafts[umbral.id]?.min ?? umbral.min,
+          max: thresholdDrafts[umbral.id]?.max ?? umbral.max,
+        })),
+      )
+      await refresh()
+    } catch (submitError) {
+      setThresholdError(submitError instanceof Error ? submitError.message : "No se pudieron guardar los umbrales.")
+    } finally {
+      setIsSavingThresholds(false)
+    }
   }
 
   const exportUsers = () => {
@@ -571,13 +593,14 @@ export function AjustesContent() {
                     ))}
                   </SelectContent>
                 </Select>
-              <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={handleCreateCycle}>
+              <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={handleCreateCycle} disabled={isSavingCycle}>
                 <Plus className="h-4 w-4 mr-2" />
-                Nuevo Ciclo
+                {isSavingCycle ? "Guardando..." : "Nuevo Ciclo"}
               </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {cycleError && <p className="mb-4 text-sm text-destructive">{cycleError}</p>}
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
@@ -699,8 +722,11 @@ export function AjustesContent() {
                   </Card>
                 ))}
               </div>
+              {thresholdError && <p className="text-sm text-destructive">{thresholdError}</p>}
               <div className="flex justify-end">
-                <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveThresholds}>Guardar Cambios</Button>
+                <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveThresholds} disabled={isSavingThresholds}>
+                  {isSavingThresholds ? "Guardando..." : "Guardar Cambios"}
+                </Button>
               </div>
             </CardContent>
           </Card>
