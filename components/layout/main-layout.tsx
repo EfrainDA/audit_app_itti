@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { Sidebar } from "./sidebar"
+import { MobileNav, Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
 
@@ -34,15 +34,16 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
   }
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-dvh overflow-hidden bg-background">
       <Sidebar />
-      <div className="relative flex-1 flex flex-col overflow-hidden">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header title={title} subtitle={subtitle} />
-        <main className="flex-1 overflow-auto scroll-smooth px-4 py-5 [scrollbar-gutter:stable] sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-auto scroll-smooth px-3 pb-24 pt-4 [scrollbar-gutter:stable] sm:px-6 sm:py-5 lg:px-8 lg:pb-5">
           <div className="mx-auto w-full max-w-[1520px]">
             {children}
           </div>
         </main>
+        <MobileNav />
       </div>
     </div>
   )

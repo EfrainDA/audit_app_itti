@@ -445,8 +445,8 @@ function KpiCard({ stat }: { stat: StatCard }) {
         <div className={cn("absolute inset-x-0 top-0 h-1 opacity-80", toneAccentStyles[stat.tone])} />
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
-          <div className="mt-2 flex items-end gap-2">
-            <p className="text-3xl font-semibold leading-none tracking-tight">{stat.value}</p>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <p className="text-2xl font-semibold leading-none tracking-tight sm:text-3xl">{stat.value}</p>
             <Badge variant="outline" className={cn("mb-1 text-[11px] font-semibold", toneBadgeStyles[stat.tone])}>
               {stat.delta}
             </Badge>
@@ -476,12 +476,12 @@ function ChartShell({
 }) {
   return (
     <Card className={cn("overflow-hidden border-border/70 bg-card", className)}>
-      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-        <div>
+      <CardHeader className="flex flex-col items-start justify-between gap-3 pb-2 sm:flex-row sm:items-center sm:gap-4">
+        <div className="min-w-0">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        {showIcon && <RealisticIcon icon={Icon} tone="primary" size="md" />}
+        {showIcon && <RealisticIcon icon={Icon} tone="primary" size="md" className="hidden sm:flex" />}
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
@@ -600,7 +600,7 @@ function AnalystProgressPanel({ counts, className }: { counts: CountMetrics; cla
           <div className={cn("h-full rounded-full transition-all", semaphore.bg)} style={{ width: `${counts.progressPct}%` }} />
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {[
             { label: "Iniciadas", value: counts.started, className: "border-primary/25 bg-background text-primary" },
             { label: "Terminadas", value: counts.completed, className: "border-success/25 bg-background text-success" },
@@ -677,7 +677,7 @@ function AnalystUnitScore({
 function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[760px]">
         <thead>
           <tr className="border-b border-border">
             <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Control</th>
@@ -788,7 +788,7 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                   <p className="font-semibold">{lote.unidadNombre}</p>
                   <p className="text-xs text-muted-foreground">{lote.modeloNombre}</p>
                 </div>
-                <div className="grid grid-cols-5 gap-2 text-center text-xs sm:min-w-[520px]">
+                <div className="grid min-w-[520px] grid-cols-5 gap-2 text-center text-xs">
                   <div className={cn("rounded-md border px-2 py-1.5", semaphore.border)}>
                     <p className={cn("text-sm font-semibold", semaphore.text)}>{lote.progressPct}%</p>
                     <p className="text-muted-foreground">avance</p>
@@ -902,7 +902,7 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
         })}
       </CardContent>
       <Dialog open={Boolean(selectedLote)} onOpenChange={(open) => !open && setSelectedLoteId(null)}>
-        <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
           {selectedLote && (
             <>
               <DialogHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0 pr-10 text-left">
@@ -1516,8 +1516,8 @@ export function DashboardContent() {
         </section>
 
         <Card className="border-border/70 bg-card">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <div>
+          <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0">
               <CardTitle className="text-base font-semibold">Auditorias en curso y pendientes</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">Controles asignados como analista con accion directa de evaluacion.</p>
             </div>
@@ -1623,8 +1623,8 @@ export function DashboardContent() {
         </section>
 
         <Card className="overflow-hidden border-border/70 bg-card">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <div>
+          <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0">
               <CardTitle className="text-base font-semibold">Centro de decisiones</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">Lecturas accionables para seguimiento del ciclo.</p>
             </div>

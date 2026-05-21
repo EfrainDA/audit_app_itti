@@ -192,7 +192,7 @@ export function EvaluacionesContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
@@ -232,7 +232,7 @@ export function EvaluacionesContent() {
       </div>
 
       <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-        <TabsList className="bg-secondary">
+        <TabsList className="w-full bg-secondary sm:w-fit">
           <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
           <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
         </TabsList>
@@ -240,8 +240,8 @@ export function EvaluacionesContent() {
 
       {activeView === "evaluaciones" && (
         <>
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="relative max-w-md flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="relative w-full max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por lote, unidad, control o proceso..."
@@ -251,7 +251,7 @@ export function EvaluacionesContent() {
           />
         </div>
         <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-[190px] border-border bg-secondary/70">
+          <SelectTrigger className="w-full border-border bg-secondary/70 sm:w-[190px]">
             <Filter className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -262,7 +262,7 @@ export function EvaluacionesContent() {
             <SelectItem value="terminado">Terminados</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={exportEvaluaciones}>
+        <Button variant="outline" className="w-full sm:w-auto" onClick={exportEvaluaciones}>
           <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>
@@ -282,8 +282,8 @@ export function EvaluacionesContent() {
           <Accordion type="multiple" className="space-y-3">
             {lotesConDatos.map((lote) => (
               <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/60 bg-background">
-                <AccordionTrigger className="px-4 py-3 hover:bg-secondary/35 hover:no-underline">
-                  <div className="grid w-full grid-cols-1 gap-3 pr-4 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center">
+                <AccordionTrigger className="px-3 py-3 hover:bg-secondary/35 hover:no-underline sm:px-4">
+                  <div className="grid min-w-0 w-full grid-cols-1 gap-3 pr-2 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center md:pr-4">
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 overflow-hidden rounded">
                         {lote.unidadLogo ? (
@@ -309,7 +309,7 @@ export function EvaluacionesContent() {
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
                   <div className="overflow-x-auto rounded-lg border border-border/60">
-                    <table className="w-full">
+                    <table className="w-full min-w-[760px]">
                       <thead>
                         <tr className="border-b border-border bg-secondary/45">
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Vertical</th>
@@ -355,9 +355,9 @@ export function EvaluacionesContent() {
 
           return (
             <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
-              <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-secondary/35">
-                <div className="flex w-full flex-col gap-3 pr-4 text-left lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-start gap-3">
+              <AccordionTrigger className="px-3 py-4 hover:no-underline hover:bg-secondary/35 sm:px-5">
+                <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left lg:flex-row lg:items-center lg:justify-between lg:pr-4">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg overflow-hidden">
                       {lote.unidadLogo ? (
                         <Image
@@ -373,14 +373,14 @@ export function EvaluacionesContent() {
                         </div>
                       )}
                     </div>
-                    <div>
-                      <p className="font-semibold">{lote.unidadNombre}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{lote.unidadNombre}</p>
+                      <p className="truncate text-sm text-muted-foreground">
                         Ciclo {lote.ciclo} - {lote.año} | {lote.modeloNombre}
                       </p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                         <User className="h-3.5 w-3.5" />
-                        {lote.auditoresNombres || "Sin auditores asignados"}
+                        <span className="truncate">{lote.auditoresNombres || "Sin auditores asignados"}</span>
                       </p>
                     </div>
                   </div>
@@ -393,7 +393,7 @@ export function EvaluacionesContent() {
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5">
+              <AccordionContent className="px-3 pb-5 sm:px-5">
                 <Accordion type="multiple" defaultValue={lote.loteVerticales.map((lv) => lv.id)} className="space-y-3">
                   {lote.loteVerticales.map((loteVertical) => {
                     const modelo = modelos.find((m) => m.id === lote.modeloControlId)

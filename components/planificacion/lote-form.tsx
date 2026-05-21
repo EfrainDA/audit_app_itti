@@ -67,7 +67,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Unidad de Negocio *</Label>
           <Select value={unidadId} onValueChange={setUnidadId}>
@@ -149,11 +149,11 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
         <p className="text-sm text-muted-foreground">
           Selecciona los auditores que participarán en este lote
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {auditoresDisponibles.map((auditor) => (
             <div
               key={auditor.id}
-              className="flex items-center space-x-3 p-3 rounded-lg bg-secondary hover:bg-secondary/80 cursor-pointer"
+              className="flex min-w-0 items-center gap-3 rounded-lg bg-secondary p-3 hover:bg-secondary/80 cursor-pointer"
               onClick={() => toggleAuditor(auditor.id)}
             >
               <Checkbox
@@ -161,19 +161,19 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
                 checked={auditores.includes(auditor.id)}
                 onCheckedChange={() => toggleAuditor(auditor.id)}
               />
-              <div className="flex-1">
-                <label htmlFor={auditor.id} className="text-sm font-medium cursor-pointer">
+              <div className="min-w-0 flex-1">
+                <label htmlFor={auditor.id} className="block truncate text-sm font-medium cursor-pointer">
                   {auditor.name}
                 </label>
-                <p className="text-xs text-muted-foreground">{auditor.email}</p>
+                <p className="truncate text-xs text-muted-foreground">{auditor.email}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-border">
-        {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
+      <div className="flex flex-col gap-3 pt-4 border-t border-border sm:flex-row sm:justify-end">
+        {error && <p className="text-sm text-destructive sm:mr-auto">{error}</p>}
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>

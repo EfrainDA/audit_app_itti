@@ -557,7 +557,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           setShowAddControl(null)
         }}
       >
-        <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-border bg-card sm:w-[90vw] lg:w-[70vw]">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Control</DialogTitle>
           </DialogHeader>
@@ -812,7 +812,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           }
         }}
       >
-        <DialogContent className="w-[70vw] max-w-[90vw] bg-card border-border">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-border bg-card sm:w-[90vw] lg:w-[70vw]">
           <DialogHeader>
             <DialogTitle>Editar Control</DialogTitle>
           </DialogHeader>

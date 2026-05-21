@@ -83,7 +83,7 @@ export function AuditoriasTable() {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[880px]">
         <thead>
           <tr className="border-b border-border">
             <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">

@@ -234,8 +234,8 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
 
       {/* Verticales */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h3 className="font-medium">Verticales</h3>
             <p className="text-sm text-muted-foreground">
               Define las dimensiones de evaluación
@@ -249,12 +249,12 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
         <div className="space-y-4">
           {verticales.map((vertical, index) => (
             <Card key={vertical.id} className="bg-card border-border shadow-sm rounded-xl">
-              <CardContent className="p-3">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start gap-3 mb-1">
-                  <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-grab" />
-                  <div className="flex-1 space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="md:col-span-2 space-y-2">
+                  <GripVertical className="hidden h-5 w-5 text-muted-foreground mt-2 cursor-grab sm:block" />
+                  <div className="min-w-0 flex-1 space-y-5">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                      <div className="space-y-2 lg:col-span-2">
                         <Label>Nombre de la Vertical</Label>
                         <Input
                           value={vertical.nombre}
@@ -293,7 +293,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
 
                     {/* Parámetros */}
                     <div className="border-t border-border pt-4">
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm font-medium text-foreground">Parámetros</p>
                         <Badge variant="outline" className="text-xs">
                           Total: {vertical.parametros.reduce((acc, p) => acc + p.puntosBase, 0)} / 100 pts
@@ -303,7 +303,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                         {vertical.parametros.map((parametro) => (
                           <div
                             key={parametro.id}
-                            className="grid min-h-[42px] grid-cols-1 items-center gap-1.5 rounded-md border border-border/70 bg-secondary px-2 py-1.5 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto]"
+                            className="grid min-h-[42px] grid-cols-1 items-center gap-2 rounded-md border border-border/70 bg-secondary px-2 py-2 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto] md:gap-1.5 md:py-1.5"
                           >
                             <Input
                               value={parametro.nombre}

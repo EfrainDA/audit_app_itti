@@ -45,13 +45,13 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="relative flex h-16 items-center justify-between border-b border-border/70 bg-card px-4 shadow-[var(--material-shadow-soft)] sm:px-6">
-      <div className="min-w-0">
-        <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
+    <header className="relative flex min-h-16 items-center justify-between gap-3 border-b border-border/70 bg-card px-3 py-2 shadow-[var(--material-shadow-soft)] sm:h-16 sm:px-6 sm:py-0">
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-lg font-bold text-foreground sm:text-xl">{title}</h1>
         {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 lg:gap-4">
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <Input
@@ -82,7 +82,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] max-w-80">
             <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {notifications.slice(0, 5).map((notification) => (

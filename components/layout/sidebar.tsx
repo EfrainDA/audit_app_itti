@@ -75,7 +75,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300",
+        "relative hidden flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300 lg:flex",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -193,5 +193,40 @@ export function Sidebar() {
         </DropdownMenu>
       </div>
     </aside>
+  )
+}
+
+export function MobileNav() {
+  const pathname = usePathname()
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] lg:hidden">
+      <div className="grid grid-cols-5 gap-1">
+        {navigation.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors",
+                isActive ? "bg-white/12 text-white" : "text-white/62 hover:bg-white/8 hover:text-white"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg border",
+                  isActive ? getIconTone(item.href) : "border-white/10 bg-white/5"
+                )}
+              >
+                <item.icon className="h-4 w-4" strokeWidth={1.8} />
+              </span>
+              <span className="w-full truncate text-center leading-tight">{item.name}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
   )
 }

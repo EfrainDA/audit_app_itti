@@ -149,24 +149,24 @@ export function PlanificacionContent() {
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
-          <TabsList className="bg-secondary">
+        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:justify-between">
+          <TabsList className="w-full bg-secondary sm:w-fit">
             <TabsTrigger value="lotes">Lotes</TabsTrigger>
             <TabsTrigger value="calendario">Calendario</TabsTrigger>
           </TabsList>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportLotes}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={exportLotes}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
+                <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Lote
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[70vw] max-w-[90vw]">
+              <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
                 <DialogHeader>
                   <DialogTitle>Crear Nuevo Lote</DialogTitle>
                   <DialogDescription>
@@ -181,7 +181,7 @@ export function PlanificacionContent() {
 
         <TabsContent value="lotes" className="space-y-6">
           {/* Search */}
-          <div className="relative max-w-md">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por unidad de negocio..."
@@ -192,7 +192,7 @@ export function PlanificacionContent() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
@@ -232,16 +232,16 @@ export function PlanificacionContent() {
           </div>
 
           {/* Lotes Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filteredLotes.map((lote) => (
               <Card
                 key={lote.id}
-                className="bg-card border-border shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
+                className="min-w-0 bg-card border-border shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
                 onClick={() => setSelectedLote(lote)}
               >
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 flex items-center justify-center overflow-hidden rounded-md">
                         {lote.unidadLogo ? (
@@ -252,13 +252,13 @@ export function PlanificacionContent() {
                           </div>
                         )}
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{lote.unidadNombre}</h3>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold">{lote.unidadNombre}</h3>
                         <p className="text-xs text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
                       </div>
                     </div>
                   </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <Badge className={getEstadoBadgeColor(lote.estado)}>
                         {lote.estado === "abierto" ? (
                           <><Unlock className="h-3 w-3 mr-1" /> Abierto</>
@@ -295,7 +295,7 @@ export function PlanificacionContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-4">
                     <div className="text-center p-2 bg-secondary/60 rounded-lg border border-border/70">
                       <p className="text-lg font-bold text-foreground">{lote.totalAuditorias}</p>
                       <p className="text-xs text-muted-foreground">Auditorías</p>
@@ -336,7 +336,7 @@ export function PlanificacionContent() {
                 La calificación final es calculada a partir de la suma de los porcentajes obtenidos en cada vertical, ponderados por el peso asignado a cada una en el modelo de control.
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Unidad de Negocio</th>
@@ -384,7 +384,7 @@ export function PlanificacionContent() {
               <CardTitle className="text-base">Ciclos del Año 2026</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 {[1, 2, 3, 4, 5, 6].map((bimestre) => {
                   const lotesBimestre = lotes.filter((l) => l.ciclo === bimestre && l.año === 2026)
                   const isActive = bimestre === 3
@@ -423,7 +423,7 @@ export function PlanificacionContent() {
       {/* Lote Detail Dialog */}
       {selectedLote && (
         <Dialog open={!!selectedLote} onOpenChange={(open) => !open && setSelectedLote(null)}>
-          <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 {lotesConDatos.find((l) => l.id === selectedLote.id)?.unidadNombre} - Ciclo {selectedLote.ciclo}

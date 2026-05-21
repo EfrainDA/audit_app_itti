@@ -260,7 +260,7 @@ export function AjustesContent() {
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-secondary grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-5 bg-secondary">
           <TabsTrigger value="usuarios" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Usuarios</span>
@@ -286,13 +286,13 @@ export function AjustesContent() {
         {/* Usuarios Tab */}
         <TabsContent value="usuarios" className="space-y-4">
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="min-w-0">
                 <CardTitle className="text-base">Gestión de Usuarios</CardTitle>
                 <CardDescription>Administra los usuarios y sus roles en el sistema</CardDescription>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={exportUsers}>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={exportUsers}>
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
@@ -304,7 +304,7 @@ export function AjustesContent() {
                   }}
                 >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="bg-primary hover:bg-primary/90">
+                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
                       <Plus className="h-4 w-4 mr-2" />
                       Nuevo Usuario
                     </Button>
@@ -340,7 +340,7 @@ export function AjustesContent() {
                         </Select>
                       </div>
                       {userError && <p className="text-sm text-destructive">{userError}</p>}
-                      <div className="flex justify-end gap-2 pt-4">
+                      <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end">
                         <Button variant="outline" onClick={() => setIsUserOpen(false)}>Cancelar</Button>
                         <Button className="bg-primary" onClick={handleCreateUser} disabled={isSavingUser || !userName.trim() || !userEmail.trim()}>
                           {isSavingUser ? "Creando..." : "Crear Usuario"}
@@ -352,7 +352,7 @@ export function AjustesContent() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="relative mb-4 max-w-md">
+              <div className="relative mb-4 w-full max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar usuarios..."
@@ -596,15 +596,15 @@ export function AjustesContent() {
         {/* Ciclos Tab */}
         <TabsContent value="ciclos" className="space-y-4">
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="min-w-0">
                 <CardTitle className="text-base">Configuración de Ciclos</CardTitle>
                 <CardDescription>Define los períodos bimestrales para auditorías</CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <Input className="h-9 w-24 bg-secondary" value={newCycleYear} onChange={(event) => setNewCycleYear(event.target.value)} />
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <Input className="h-9 w-full bg-secondary sm:w-24" value={newCycleYear} onChange={(event) => setNewCycleYear(event.target.value)} />
                 <Select value={newCycleBimester} onValueChange={setNewCycleBimester}>
-                  <SelectTrigger className="h-9 w-32 bg-secondary">
+                  <SelectTrigger className="h-9 w-full bg-secondary sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -613,7 +613,7 @@ export function AjustesContent() {
                     ))}
                   </SelectContent>
                 </Select>
-              <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={handleCreateCycle} disabled={isSavingCycle}>
+              <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleCreateCycle} disabled={isSavingCycle}>
                 <Plus className="h-4 w-4 mr-2" />
                 {isSavingCycle ? "Guardando..." : "Nuevo Ciclo"}
               </Button>
@@ -677,7 +677,7 @@ export function AjustesContent() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {umbrales.map((umbral) => (
                   <Card
                     key={umbral.id}
@@ -744,7 +744,7 @@ export function AjustesContent() {
               </div>
               {thresholdError && <p className="text-sm text-destructive">{thresholdError}</p>}
               <div className="flex justify-end">
-                <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveThresholds} disabled={isSavingThresholds}>
+                <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleSaveThresholds} disabled={isSavingThresholds}>
                   {isSavingThresholds ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
@@ -755,8 +755,8 @@ export function AjustesContent() {
         {/* Audit Log Tab */}
         <TabsContent value="auditlog" className="space-y-4">
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="min-w-0">
                 <CardTitle className="text-base">Registro de Actividad</CardTitle>
                 <CardDescription>Historial de acciones realizadas en el sistema</CardDescription>
               </div>

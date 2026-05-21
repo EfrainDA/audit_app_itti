@@ -63,8 +63,8 @@ export function ModelosContent() {
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+        <div className="relative w-full max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar modelos..."
@@ -75,12 +75,12 @@ export function ModelosContent() {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
+            <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
               <Plus className="h-4 w-4" />
               Nuevo Modelo
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Modelo de Control</DialogTitle>
               <DialogDescription>
@@ -93,7 +93,7 @@ export function ModelosContent() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="success" size="md" />
@@ -128,14 +128,14 @@ export function ModelosContent() {
         {filteredModelos.map((modelo) => (
           <Card
             key={modelo.id}
-            className="bg-card border-border cursor-pointer"
+            className="min-w-0 bg-card border-border cursor-pointer"
             onClick={() => setSelectedModelo(modelo)}
           >
             <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-lg">{modelo.nombre}</h3>
+                    <h3 className="min-w-0 truncate font-semibold text-lg">{modelo.nombre}</h3>
                     <Badge className={getEstadoBadgeColor(modelo.estado)}>
                       {formatEstado(modelo.estado)}
                     </Badge> {/* Ensure consistent badge styling */}
@@ -224,7 +224,7 @@ export function ModelosContent() {
       {/* Modelo Detail Dialog */}
       {selectedModelo && (
         <Dialog open={!!selectedModelo} onOpenChange={(open) => !open && setSelectedModelo(null)}>
-          <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 {selectedModelo.nombre}
@@ -241,7 +241,7 @@ export function ModelosContent() {
 
       {editingModelo && (
         <Dialog open={!!editingModelo} onOpenChange={(open) => !open && setEditingModelo(null)}>
-          <DialogContent className="w-[70vw] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
               <DialogTitle>Editar Modelo de Control</DialogTitle>
               <DialogDescription>
