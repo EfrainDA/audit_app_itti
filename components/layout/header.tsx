@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Search, HelpCircle, Moon, Sun } from "lucide-react"
+import { Bell, Search, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -15,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAppData } from "@/hooks/use-app-data"
+import { useAuth } from "@/components/auth/auth-provider"
 import { markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-data"
 
 interface HeaderProps {
@@ -24,6 +24,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { data, refresh } = useAppData()
+  const { appUser } = useAuth()
   const notifications = data.notificaciones
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme, setTheme } = useTheme()
@@ -60,16 +61,18 @@ export function Header({ title, subtitle }: HeaderProps) {
           />
         </div>
 
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
-          title={isDark ? "Modo claro" : "Modo oscuro"}
-          className="icon-orb relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-        >
-          {mounted && isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
+        {appUser?.role !== "auditor" && (
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
+            title={isDark ? "Modo claro" : "Modo oscuro"}
+            className="icon-orb relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+          >
+            {mounted && isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -106,12 +109,6 @@ export function Header({ title, subtitle }: HeaderProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
-          <Link href="/ajustes" aria-label="Abrir ajustes">
-            <HelpCircle className="h-5 w-5" />
-          </Link>
-        </Button>
 
       </div>
     </header>

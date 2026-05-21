@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
 import {
   AlertCircle,
@@ -90,7 +89,11 @@ function controlMatches(control: Control, searchTerm: string, filterEstado: stri
   return matchesSearch && matchesEstado
 }
 
-export function EvaluacionesContent() {
+interface EvaluacionesContentProps {
+  view?: "evaluaciones" | "calificaciones"
+}
+
+export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesContentProps) {
   const { data } = useAppData()
   const { appUser } = useAuth()
   const canEvaluateControls = appUser?.role === "auditor"
@@ -101,7 +104,6 @@ export function EvaluacionesContent() {
   const loteVerticalesData = data.loteVerticales
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<string>("all")
-  const [activeView, setActiveView] = useState("evaluaciones")
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
     return lotes.map((lote) => {
@@ -200,55 +202,50 @@ export function EvaluacionesContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
-          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
-            <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Controles</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
-          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <RealisticIcon icon={AlertCircle} tone="neutral" size="md" />
-            <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.pendientes}</p>
-              <p className="text-sm text-muted-foreground">Pendientes</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
-          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <RealisticIcon icon={Clock} tone="primary" size="md" />
-            <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.enCurso}</p>
-              <p className="text-sm text-muted-foreground">En Curso</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
-          <CardContent className="flex h-full items-center gap-3 px-4 py-0">
-            <RealisticIcon icon={CheckCircle2} tone="success" size="md" />
-            <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{stats.terminados}</p>
-              <p className="text-sm text-muted-foreground">Terminados</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {view === "evaluaciones" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
+            <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+              <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
+              <div>
+                <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
+                <p className="text-sm text-muted-foreground">Total Controles</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
+            <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+              <RealisticIcon icon={AlertCircle} tone="neutral" size="md" />
+              <div>
+                <p className="text-2xl font-semibold leading-none tracking-tight">{stats.pendientes}</p>
+                <p className="text-sm text-muted-foreground">Pendientes</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
+            <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+              <RealisticIcon icon={Clock} tone="primary" size="md" />
+              <div>
+                <p className="text-2xl font-semibold leading-none tracking-tight">{stats.enCurso}</p>
+                <p className="text-sm text-muted-foreground">En Curso</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
+            <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+              <RealisticIcon icon={CheckCircle2} tone="success" size="md" />
+              <div>
+                <p className="text-2xl font-semibold leading-none tracking-tight">{stats.terminados}</p>
+                <p className="text-sm text-muted-foreground">Terminados</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-        <TabsList className="w-full bg-secondary sm:w-fit">
-          <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
-          <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {activeView === "evaluaciones" && (
+      {view === "evaluaciones" && (
         <>
-      <div className="flex flex-col gap-4 lg:flex-row">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <div className="relative w-full max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -270,7 +267,7 @@ export function EvaluacionesContent() {
             <SelectItem value="terminado">Terminados</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="w-full sm:w-auto" onClick={exportEvaluaciones}>
+        <Button variant="outline" className="w-full sm:w-auto lg:ml-auto" onClick={exportEvaluaciones}>
           <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>
@@ -278,7 +275,7 @@ export function EvaluacionesContent() {
         </>
       )}
 
-      {activeView === "calificaciones" && (
+      {view === "calificaciones" && (
       <Card className="border-border/70 bg-card">
         <CardHeader>
           <CardTitle className="text-base">Calificacion por Unidad de Negocio</CardTitle>
@@ -354,7 +351,7 @@ export function EvaluacionesContent() {
       </Card>
       )}
 
-      {activeView === "evaluaciones" && (
+      {view === "evaluaciones" && (
         <>
       <Accordion type="multiple" defaultValue={lotesFiltrados.map((lote) => lote.id)} className="space-y-4">
         {lotesFiltrados.map((lote) => {

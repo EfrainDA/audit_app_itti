@@ -668,6 +668,20 @@ export async function updateUserProfile(id: string, input: { role?: User["role"]
   if (error) throw error
 }
 
+export async function updateOwnProfile(input: { name: string; company?: string; avatar?: string | null }) {
+  const profile = await getCurrentProfile()
+  const { error } = await supabase
+    .from("users")
+    .update({
+      name: input.name.trim(),
+      company: input.company?.trim() || null,
+      avatar: input.avatar || null,
+    })
+    .eq("id", profile.id)
+
+  if (error) throw error
+}
+
 export async function createCycle(input: { year: number; bimester: number }) {
   await requireAdminOrSupervisor()
   await ensureCycle(input.year, input.bimester)
@@ -757,6 +771,23 @@ export async function createControlModel(input: ControlModelInput) {
 export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
   await requireAdminOrSupervisor()
   const { error } = await supabase.from("control_models").update({ status }).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteControlModel(id: string) {
+  await requireAdmin()
+
+  const { count, error: usageError } = await supabase
+    .from("lots")
+    .select("id", { count: "exact", head: true })
+    .eq("model_id", id)
+
+  if (usageError) throw usageError
+  if ((count ?? 0) > 0) {
+    throw new Error("No se puede eliminar un modelo que ya esta asociado a lotes.")
+  }
+
+  const { error } = await supabase.from("control_models").delete().eq("id", id)
   if (error) throw error
 }
 

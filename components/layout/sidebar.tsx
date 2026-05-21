@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   Activity,
+  Award,
   Cpu,
   CalendarDays,
   ClipboardList,
@@ -32,6 +33,7 @@ const navigation = [
   { name: "Modelos de Control", href: "/modelos", icon: Cpu },
   { name: "Planificación", href: "/planificacion", icon: CalendarDays },
   { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardList },
+  { name: "Calificaciones", href: "/calificaciones", icon: Award },
   { name: "Ajustes", href: "/ajustes", icon: Settings2 },
 ]
 
@@ -45,6 +47,8 @@ function getIconTone(href: string) {
       return "border-indigo-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(129,140,248,0.34),rgba(79,70,229,0.20))] text-indigo-100 shadow-[0_8px_18px_rgba(129,140,248,0.18)]"
     case "/evaluaciones":
       return "border-emerald-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(52,211,153,0.34),rgba(5,150,105,0.20))] text-emerald-100 shadow-[0_8px_18px_rgba(52,211,153,0.18)]"
+    case "/calificaciones":
+      return "border-amber-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(251,191,36,0.34),rgba(217,119,6,0.20))] text-amber-100 shadow-[0_8px_18px_rgba(251,191,36,0.18)]"
     case "/ajustes":
       return "border-violet-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(167,139,250,0.34),rgba(124,58,237,0.20))] text-violet-100 shadow-[0_8px_18px_rgba(167,139,250,0.18)]"
     default:
@@ -58,13 +62,14 @@ export function Sidebar() {
   const { appUser, signOut } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const visibleNavigation = appUser?.role === "auditor"
-    ? navigation.filter((item) => item.href === "/" || item.href === "/planificacion" || item.href === "/evaluaciones")
+    ? navigation.filter((item) => item.href !== "/modelos" && item.href !== "/ajustes")
     : navigation
   const userName = appUser?.name ?? "Usuario"
   const userRole = appUser?.role ?? "sesion activa"
   const userInitials = userName
     .split(" ")
     .filter(Boolean)
+    .filter((_, index, parts) => index === 0 || index === parts.length - 1)
     .slice(0, 2)
     .map((part) => part[0])
     .join("")
@@ -172,7 +177,11 @@ export function Sidebar() {
               title={collapsed ? userName : undefined}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 shadow-[0_8px_18px_rgba(56,189,248,0.18)]">
-                <span className="text-xs font-bold text-cyan-200">{userInitials}</span>
+                {appUser?.avatar ? (
+                  <img src={appUser.avatar} alt={userName} className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-cyan-200">{userInitials}</span>
+                )}
               </div>
               {!collapsed && (
                 <div className="min-w-0 flex-1">
@@ -182,12 +191,23 @@ export function Sidebar() {
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="right" className="w-56">
+          <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56">
             <DropdownMenuLabel>
               <p className="truncate text-sm font-semibold">{userName}</p>
               <p className="truncate text-xs capitalize text-muted-foreground">{userRole}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {appUser?.role === "auditor" && (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href="/ajustes">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Preferencias
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar sesion
@@ -203,12 +223,12 @@ export function MobileNav() {
   const pathname = usePathname()
   const { appUser } = useAuth()
   const visibleNavigation = appUser?.role === "auditor"
-    ? navigation.filter((item) => item.href === "/" || item.href === "/planificacion" || item.href === "/evaluaciones")
+    ? navigation.filter((item) => item.href !== "/modelos" && item.href !== "/ajustes")
     : navigation
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] lg:hidden">
-      <div className="grid grid-cols-5 gap-1">
+      <div className={cn("grid gap-1", visibleNavigation.length >= 6 ? "grid-cols-6" : visibleNavigation.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
         {visibleNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 

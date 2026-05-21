@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ChangeEvent } from "react"
+import { useTheme } from "next-themes"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,12 @@ import {
   Trash2,
   Download,
   Shield,
+  Camera,
+  KeyRound,
+  Moon,
+  Palette,
+  Save,
+  Sun,
 } from "lucide-react"
 import {
   Table,
@@ -62,6 +69,7 @@ import {
   deleteBusinessUnit,
   updateBusinessUnit,
   updateThresholds,
+  updateOwnProfile,
   updateUserProfile,
 } from "@/lib/supabase-data"
 import { downloadCsv } from "@/lib/export"
@@ -70,9 +78,14 @@ import { supabase } from "@/lib/supabase"
 
 export function AjustesContent() {
   const { data, error: dataError, refresh } = useAppData()
-  const { appUser } = useAuth()
-  const isSupervisor = appUser?.role === "supervisor"
+  const { appUser, refreshProfile } = useAuth()
+  const { resolvedTheme, setTheme } = useTheme()
+  const isAuditor = appUser?.role === "auditor"
   const isAdmin = appUser?.role === "admin"
+  const canManageSettings = appUser?.role === "admin" || appUser?.role === "supervisor"
+  const canManageUsers = isAdmin
+  const canCreateUnits = canManageSettings
+  const canModifyUnits = isAdmin
   const users = data.users
   const unidades = data.unidades
   const ciclos = data.ciclos
@@ -99,16 +112,22 @@ export function AjustesContent() {
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
   const [thresholdError, setThresholdError] = useState<string | null>(null)
   const [isSavingThresholds, setIsSavingThresholds] = useState(false)
-  const visibleTabs = isSupervisor
-    ? ["unidades", "ciclos", "umbrales"]
-    : ["usuarios", "unidades", "ciclos", "umbrales", "auditlog"]
-  const currentTab = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0]
+  const [profileName, setProfileName] = useState(appUser?.name ?? "")
+  const [profileCompany, setProfileCompany] = useState(appUser?.company ?? "")
+  const [profileAvatar, setProfileAvatar] = useState(appUser?.avatar ?? "")
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState("")
+  const [profilePassword, setProfilePassword] = useState("")
+  const [profilePasswordConfirm, setProfilePasswordConfirm] = useState("")
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const currentTab = activeTab
 
   useEffect(() => {
-    if (!visibleTabs.includes(activeTab)) {
-      setActiveTab(visibleTabs[0])
-    }
-  }, [activeTab, visibleTabs])
+    setProfileName(appUser?.name ?? "")
+    setProfileCompany(appUser?.company ?? "")
+    setProfileAvatar(appUser?.avatar ?? "")
+  }, [appUser?.avatar, appUser?.company, appUser?.name])
 
   useEffect(() => {
     const channel = supabase
@@ -146,6 +165,86 @@ export function AjustesContent() {
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleProfileAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setProfileAvatar(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSaveProfile = async () => {
+    setProfileError(null)
+    setProfileSuccess(null)
+
+    if (!profileName.trim()) {
+      setProfileError("El nombre no puede quedar vacio.")
+      return
+    }
+
+    if ((profilePassword || profilePasswordConfirm || profileCurrentPassword) && !profileCurrentPassword) {
+      setProfileError("Ingresa tu contrasena actual para cambiarla.")
+      return
+    }
+
+    if ((profilePassword || profilePasswordConfirm || profileCurrentPassword) && !profilePassword) {
+      setProfileError("Ingresa la nueva contrasena.")
+      return
+    }
+
+    if ((profilePassword || profilePasswordConfirm) && profilePassword !== profilePasswordConfirm) {
+      setProfileError("Las contrasenas no coinciden.")
+      return
+    }
+
+    if (profilePassword && profilePassword.length < 6) {
+      setProfileError("La contrasena debe tener al menos 6 caracteres.")
+      return
+    }
+
+    setIsSavingProfile(true)
+    try {
+      await updateOwnProfile({
+        name: profileName,
+        company: profileCompany,
+        avatar: profileAvatar || null,
+      })
+
+      if (profilePassword) {
+        const email = appUser?.email
+        if (!email) throw new Error("No se pudo validar el correo de tu sesion.")
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: profileCurrentPassword,
+        })
+
+        if (signInError) {
+          throw new Error("La contrasena actual no es correcta.")
+        }
+
+        const { error } = await supabase.auth.updateUser({ password: profilePassword })
+        if (error) throw error
+        setProfileCurrentPassword("")
+        setProfilePassword("")
+        setProfilePasswordConfirm("")
+      }
+
+      await refreshProfile()
+      await refresh()
+      setProfileSuccess("Datos actualizados correctamente.")
+    } catch (submitError) {
+      setProfileError(getErrorMessage(submitError, "No se pudieron guardar tus datos."))
+    } finally {
+      setIsSavingProfile(false)
+    }
   }
 
   const openEditUnidad = (unidad: UnidadNegocio) => {
@@ -270,17 +369,128 @@ export function AjustesContent() {
     )
   }
 
+  if (isAuditor) {
+    const isDark = resolvedTheme === "dark"
+    const initials = profileName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "U"
+
+    return (
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-base">Perfil personal</CardTitle>
+            <CardDescription>Actualiza tus datos, foto de perfil, contrasena y preferencia visual.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/20 bg-primary/10">
+                {profileAvatar ? (
+                  <img src={profileAvatar} alt={profileName || "Perfil"} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-primary">{initials}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="profile-avatar">Foto de perfil</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button variant="outline" asChild>
+                    <label htmlFor="profile-avatar" className="cursor-pointer">
+                      <Camera className="h-4 w-4 mr-2" />
+                      Cambiar foto
+                    </label>
+                  </Button>
+                  {profileAvatar && (
+                    <Button variant="ghost" onClick={() => setProfileAvatar("")}>
+                      Quitar foto
+                    </Button>
+                  )}
+                </div>
+                <input id="profile-avatar" type="file" accept="image/*" className="hidden" onChange={handleProfileAvatarChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="profile-name">Nombre y apellido</Label>
+                <Input id="profile-name" value={profileName} onChange={(event) => setProfileName(event.target.value)} className="bg-secondary" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-email">Correo electronico</Label>
+                <Input id="profile-email" value={appUser?.email ?? ""} disabled className="bg-secondary" />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="profile-company">Empresa</Label>
+                <Input id="profile-company" value={profileCompany} onChange={(event) => setProfileCompany(event.target.value)} className="bg-secondary" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 rounded-lg border border-border/70 bg-secondary/35 p-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <KeyRound className="h-4 w-4 text-primary" />
+                  Cambiar contrasena
+                </div>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="profile-current-password">Contrasena actual</Label>
+                <Input id="profile-current-password" type="password" value={profileCurrentPassword} onChange={(event) => setProfileCurrentPassword(event.target.value)} className="bg-background" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-password">Nueva contrasena</Label>
+                <Input id="profile-password" type="password" value={profilePassword} onChange={(event) => setProfilePassword(event.target.value)} className="bg-background" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-password-confirm">Confirmar contrasena</Label>
+                <Input id="profile-password-confirm" type="password" value={profilePasswordConfirm} onChange={(event) => setProfilePasswordConfirm(event.target.value)} className="bg-background" />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <Palette className="h-4 w-4 text-primary" />
+                Tema
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button variant={!isDark ? "default" : "outline"} onClick={() => setTheme("light")}>
+                  <Sun className="h-4 w-4 mr-2" />
+                  Claro
+                </Button>
+                <Button variant={isDark ? "default" : "outline"} onClick={() => setTheme("dark")}>
+                  <Moon className="h-4 w-4 mr-2" />
+                  Oscuro
+                </Button>
+              </div>
+            </div>
+
+            {profileError && <p className="text-sm text-destructive">{profileError}</p>}
+            {profileSuccess && <p className="text-sm text-success">{profileSuccess}</p>}
+            <div className="flex justify-end border-t border-border pt-4">
+              <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                <Save className="h-4 w-4 mr-2" />
+                {isSavingProfile ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full bg-secondary ${isSupervisor ? "grid-cols-3" : "grid-cols-5"}`}>
-          {isAdmin && (
-            <TabsTrigger value="usuarios" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Usuarios</span>
-            </TabsTrigger>
-          )}
+        <TabsList className="grid w-full grid-cols-5 bg-secondary">
+          <TabsTrigger value="usuarios" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Usuarios</span>
+          </TabsTrigger>
           <TabsTrigger value="unidades" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Unidades</span>
@@ -293,12 +503,10 @@ export function AjustesContent() {
             <Gauge className="h-4 w-4" />
             <span className="hidden sm:inline">Umbrales</span>
           </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="auditlog" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Audit Log</span>
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="auditlog" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">Audit Log</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Usuarios Tab */}
@@ -322,7 +530,7 @@ export function AjustesContent() {
                   }}
                 >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
+                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" disabled={!canManageUsers}>
                       <Plus className="h-4 w-4 mr-2" />
                       Nuevo Usuario
                     </Button>
@@ -337,15 +545,15 @@ export function AjustesContent() {
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
                         <Label>Nombre Completo</Label>
-                        <Input value={userName} onChange={(event) => setUserName(event.target.value)} placeholder="Nombre del usuario" className="bg-secondary" />
+                        <Input value={userName} disabled={!canManageUsers} onChange={(event) => setUserName(event.target.value)} placeholder="Nombre del usuario" className="bg-secondary" />
                       </div>
                       <div className="space-y-2">
                         <Label>Correo Electrónico</Label>
-                        <Input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-secondary" />
+                        <Input value={userEmail} disabled={!canManageUsers} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-secondary" />
                       </div>
                       <div className="space-y-2">
                         <Label>Rol</Label>
-                        <Select value={userRole} onValueChange={(value) => setUserRole(value as typeof userRole)}>
+                        <Select value={userRole} onValueChange={(value) => setUserRole(value as typeof userRole)} disabled={!canManageUsers}>
                           <SelectTrigger className="bg-secondary">
                             <SelectValue placeholder="Selecciona un rol" />
                           </SelectTrigger>
@@ -360,7 +568,7 @@ export function AjustesContent() {
                       {userError && <p className="text-sm text-destructive">{userError}</p>}
                       <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end">
                         <Button variant="outline" onClick={() => setIsUserOpen(false)}>Cancelar</Button>
-                        <Button className="bg-primary" onClick={handleCreateUser} disabled={isSavingUser || !userName.trim() || !userEmail.trim()}>
+                        <Button className="bg-primary" onClick={handleCreateUser} disabled={!canManageUsers || isSavingUser || !userName.trim() || !userEmail.trim()}>
                           {isSavingUser ? "Creando..." : "Crear Usuario"}
                         </Button>
                       </div>
@@ -422,20 +630,20 @@ export function AjustesContent() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" disabled={!canManageUsers}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
+                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 {user.role === "admin" ? "Quitar admin" : "Hacer admin"}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
+                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
                                 {user.role === "auditor" ? "Pasar a supervisor" : "Pasar a auditor"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
+                              <DropdownMenuItem disabled={!canManageUsers} className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 {user.status === "activo" ? "Desactivar" : "Reactivar"}
                               </DropdownMenuItem>
@@ -466,7 +674,7 @@ export function AjustesContent() {
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={resetUnidadForm}>
+                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={resetUnidadForm} disabled={!canCreateUnits}>
                     <Plus className="h-4 w-4 mr-2" />
                     Nueva Unidad
                   </Button>
@@ -495,7 +703,7 @@ export function AjustesContent() {
                           Se usará como identificador visual en planificación y lotes.
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" asChild>
+                      <Button variant="outline" size="sm" asChild disabled={!canCreateUnits}>
                         <label htmlFor="unidad-logo" className="cursor-pointer">
                           <ImagePlus className="h-4 w-4 mr-2" />
                           Cargar
@@ -506,6 +714,7 @@ export function AjustesContent() {
                         type="file"
                         accept="image/*"
                         className="hidden"
+                        disabled={!canCreateUnits}
                         onChange={handleUnidadLogoChange}
                       />
                     </div>
@@ -513,6 +722,7 @@ export function AjustesContent() {
                       <Label>Nombre de la Unidad de Negocio *</Label>
                       <Input
                         value={unidadNombre}
+                        disabled={!canCreateUnits}
                         onChange={(event) => setUnidadNombre(event.target.value)}
                         placeholder="Ej. ueno bank"
                         className="bg-secondary border-border"
@@ -522,6 +732,7 @@ export function AjustesContent() {
                       <Label>Ecosistema al que pertenece *</Label>
                       <Input
                         value={unidadEcosistema}
+                        disabled={!canCreateUnits}
                         onChange={(event) => setUnidadEcosistema(event.target.value)}
                         placeholder="Ej. Financiero, Pagos, Seguros"
                         className="bg-secondary border-border"
@@ -542,7 +753,7 @@ export function AjustesContent() {
                       <Button
                         className="bg-primary hover:bg-primary/90"
                         onClick={handleSubmitUnidad}
-                        disabled={isSavingUnidad || !unidadNombre.trim() || !unidadEcosistema.trim()}
+                        disabled={!canCreateUnits || isSavingUnidad || !unidadNombre.trim() || !unidadEcosistema.trim()}
                       >
                         {isSavingUnidad ? "Guardando..." : editingUnidad ? "Guardar Cambios" : "Crear Unidad"}
                       </Button>
@@ -581,7 +792,7 @@ export function AjustesContent() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {isAdmin ? (
+                        {canModifyUnits ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon">
@@ -624,8 +835,8 @@ export function AjustesContent() {
                 <CardDescription>Define los períodos bimestrales para auditorías</CardDescription>
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Input className="h-9 w-full bg-secondary sm:w-24" value={newCycleYear} onChange={(event) => setNewCycleYear(event.target.value)} />
-                <Select value={newCycleBimester} onValueChange={setNewCycleBimester}>
+                <Input className="h-9 w-full bg-secondary sm:w-24" value={newCycleYear} disabled={!canManageSettings} onChange={(event) => setNewCycleYear(event.target.value)} />
+                <Select value={newCycleBimester} onValueChange={setNewCycleBimester} disabled={!canManageSettings}>
                   <SelectTrigger className="h-9 w-full bg-secondary sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -635,7 +846,7 @@ export function AjustesContent() {
                     ))}
                   </SelectContent>
                 </Select>
-              <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleCreateCycle} disabled={isSavingCycle}>
+              <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleCreateCycle} disabled={!canManageSettings || isSavingCycle}>
                 <Plus className="h-4 w-4 mr-2" />
                 {isSavingCycle ? "Guardando..." : "Nuevo Ciclo"}
               </Button>
@@ -672,6 +883,7 @@ export function AjustesContent() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            disabled={!canManageSettings}
                             onClick={() => {
                               setNewCycleYear(String(ciclo.año))
                               setNewCycleBimester(String(ciclo.bimestre))
@@ -730,6 +942,7 @@ export function AjustesContent() {
                           <Input
                             type="number"
                             value={thresholdDrafts[umbral.id]?.min ?? umbral.min}
+                            disabled={!canManageSettings}
                             onChange={(event) =>
                               setThresholdDrafts((current) => ({
                                 ...current,
@@ -747,6 +960,7 @@ export function AjustesContent() {
                           <Input
                             type="number"
                             value={thresholdDrafts[umbral.id]?.max ?? umbral.max}
+                            disabled={!canManageSettings}
                             onChange={(event) =>
                               setThresholdDrafts((current) => ({
                                 ...current,
@@ -766,7 +980,7 @@ export function AjustesContent() {
               </div>
               {thresholdError && <p className="text-sm text-destructive">{thresholdError}</p>}
               <div className="flex justify-end">
-                <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleSaveThresholds} disabled={isSavingThresholds}>
+                <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleSaveThresholds} disabled={!canManageSettings || isSavingThresholds}>
                   {isSavingThresholds ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>

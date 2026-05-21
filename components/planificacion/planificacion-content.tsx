@@ -37,6 +37,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   getEstadoBadgeColor,
   formatEstado,
   type Lote,
@@ -51,6 +58,7 @@ import { updateLotStatus } from "@/lib/supabase-data"
 export function PlanificacionContent() {
   const { data, error: dataError, refresh } = useAppData()
   const { appUser } = useAuth()
+  const isAuditor = appUser?.role === "auditor"
   const canManageLots = appUser?.role === "admin" || appUser?.role === "supervisor"
   const lotes = data.lotes
   const loteVerticalesData = data.loteVerticales
@@ -58,6 +66,9 @@ export function PlanificacionContent() {
   const users = data.users
   const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
+  const [unidadFilter, setUnidadFilter] = useState("all")
+  const [cicloFilter, setCicloFilter] = useState("all")
+  const [anioFilter, setAnioFilter] = useState("all")
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
@@ -106,10 +117,19 @@ export function PlanificacionContent() {
     }
   })
 
-  const filteredLotes = lotesConDatos.filter(
-    (lote) =>
-      lote.unidadNombre.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const ciclosDisponibles = Array.from(new Set(lotesConDatos.map((lote) => lote.ciclo))).sort((a, b) => a - b)
+  const aniosDisponibles = Array.from(new Set(lotesConDatos.map((lote) => lote.año))).sort((a, b) => b - a)
+
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+
+  const filteredLotes = lotesConDatos.filter((lote) => {
+    const matchesSearch = !normalizedSearch || lote.unidadNombre.toLowerCase().includes(normalizedSearch)
+    const matchesUnidad = unidadFilter === "all" || lote.unidadNegocioId === unidadFilter
+    const matchesCiclo = cicloFilter === "all" || String(lote.ciclo) === cicloFilter
+    const matchesAnio = anioFilter === "all" || String(lote.año) === anioFilter
+
+    return matchesSearch && matchesUnidad && matchesCiclo && matchesAnio
+  })
 
   const exportLotes = () => {
     downloadCsv(
@@ -147,24 +167,24 @@ export function PlanificacionContent() {
     await refresh()
   }
 
+  const selectedLoteConDatos = selectedLote ? lotesConDatos.find((lote) => lote.id === selectedLote.id) : null
+
   return (
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:justify-between">
-          <TabsList className="w-full bg-secondary sm:w-fit">
-            <TabsTrigger value="lotes">Lotes</TabsTrigger>
-            <TabsTrigger value="calendario">Calendario</TabsTrigger>
-          </TabsList>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={exportLotes}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            {canManageLots && <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Tabs value={isAuditor ? "lotes" : activeTab} onValueChange={setActiveTab} className="w-full">
+        {false && (
+        <div className="hidden">
+          {!isAuditor && (
+            <TabsList className="w-full bg-secondary sm:w-fit">
+              <TabsTrigger value="lotes">Lotes</TabsTrigger>
+              <TabsTrigger value="calendario">Calendario</TabsTrigger>
+            </TabsList>
+          )}
+          <div className={isAuditor ? "hidden" : "flex flex-col gap-2 sm:flex-row"}>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto">
+                <Button className={canManageLots ? "w-full bg-primary hover:bg-primary/90 sm:w-auto" : "hidden"}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Lote
                 </Button>
@@ -178,22 +198,12 @@ export function PlanificacionContent() {
                 </DialogHeader>
                 <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
               </DialogContent>
-            </Dialog>}
+            </Dialog>
           </div>
         </div>
+        )}
 
         <TabsContent value="lotes" className="space-y-6">
-          {/* Search */}
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por unidad de negocio..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-secondary border-border"
-            />
-          </div>
-
           {/* Stats */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
@@ -228,10 +238,57 @@ export function PlanificacionContent() {
                 <RealisticIcon icon={FileCheck} tone="success" size="md" />
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{auditorias.length}</p>
-                  <p className="text-sm text-muted-foreground">Auditorías</p>
+                  <p className="text-sm text-muted-foreground">Controles</p>
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Search */}
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.4fr)_minmax(180px,0.9fr)_minmax(140px,0.7fr)_minmax(120px,0.6fr)] xl:max-w-5xl">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por unidad de negocio..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 bg-secondary border-border"
+                />
+              </div>
+              <Select value={unidadFilter} onValueChange={setCicloFilter}>
+                <SelectTrigger className="w-full bg-secondary border-border">
+                  <SelectValue placeholder="Ciclo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Ciclo</SelectItem>
+                  {ciclosDisponibles.map((ciclo) => (
+                    <SelectItem key={ciclo} value={String(ciclo)}>
+                      Ciclo {ciclo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={anioFilter} onValueChange={setAnioFilter}>
+                <SelectTrigger className="w-full bg-secondary border-border">
+                  <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Año</SelectItem>
+                  {aniosDisponibles.map((anio) => (
+                    <SelectItem key={anio} value={String(anio)}>
+                      {anio}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {canManageLots && (
+              <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto xl:ml-4" onClick={() => setIsCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Lote
+              </Button>
+            )}
           </div>
 
           {/* Lotes Grid */}
@@ -428,8 +485,10 @@ export function PlanificacionContent() {
         <Dialog open={!!selectedLote} onOpenChange={(open) => !open && setSelectedLote(null)}>
           <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {lotesConDatos.find((l) => l.id === selectedLote.id)?.unidadNombre} - Ciclo {selectedLote.ciclo}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+              <DialogTitle className="flex flex-wrap items-center gap-2">
+                {selectedLoteConDatos?.unidadNombre} - Ciclo {selectedLote.ciclo}
                 <Badge className={getEstadoBadgeColor(selectedLote.estado)}>
                   {formatEstado(selectedLote.estado)}
                 </Badge>
@@ -437,6 +496,14 @@ export function PlanificacionContent() {
               <DialogDescription>
                 Año {selectedLote.año}
               </DialogDescription>
+                </div>
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                  <Button variant="outline" size="sm" disabled={!selectedLoteConDatos} onClick={() => selectedLoteConDatos && exportSingleLote(selectedLoteConDatos)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </div>
+              </div>
             </DialogHeader>
             <LoteDetail lote={selectedLote} onChanged={refresh} />
           </DialogContent>

@@ -529,22 +529,21 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   </div>
 
                   {/* Botón para agregar control */}
-                  {canManageControls && lote.estado === "abierto" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-dashed"
-                      onClick={() => {
-                        setNewControl(initialNewControl)
-                        setIsControlSuggestionsOpen(false)
-                        setIsProcessSuggestionsOpen(false)
-                        setShowAddControl(loteVertical.id)
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Agregar Control
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-dashed"
+                    disabled={!canManageControls || lote.estado !== "abierto"}
+                    onClick={() => {
+                      setNewControl(initialNewControl)
+                      setIsControlSuggestionsOpen(false)
+                      setIsProcessSuggestionsOpen(false)
+                      setShowAddControl(loteVertical.id)
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar Control
+                  </Button>
                 </AccordionContent>
               </AccordionItem>
             )
