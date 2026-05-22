@@ -105,7 +105,7 @@ export function ModelosContent() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="success" size="md" />
@@ -136,8 +136,8 @@ export function ModelosContent() {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-md flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full flex-1 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar modelos..."
@@ -174,7 +174,7 @@ export function ModelosContent() {
             onClick={() => setSelectedModelo(modelo)}
           >
             <CardContent className="p-4">
-              <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="mb-2 flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <h3 className="min-w-0 truncate text-base font-semibold leading-tight">{modelo.nombre}</h3>

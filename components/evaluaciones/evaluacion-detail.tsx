@@ -393,24 +393,24 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
                 {autoSaveStatus !== "idle" && (
                   <div className="flex h-8 items-center rounded-md border border-border bg-secondary/60 px-3 text-xs font-medium text-muted-foreground">
                     {autoSaveStatus === "saving" ? "Guardando..." : "Guardado automático"}
                   </div>
                 )}
-                <Button variant="outline" size="sm" onClick={handleExportEvaluation}>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleExportEvaluation}>
                   <Download className="h-4 w-4" />
                   Exportar
                 </Button>
                 {canEditEvaluation && (
-                  <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSubmitting}>
+                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleSaveDraft} disabled={isSubmitting}>
                     <Save className="h-4 w-4" />
                     Guardar
                   </Button>
                 )}
                 {canEditEvaluation && control.estado !== "terminado" && (
-                  <Button size="sm" className="bg-warning hover:bg-warning/90 text-warning-foreground" onClick={handleSendToReplica} disabled={isSubmitting}>
+                  <Button size="sm" className="flex-1 bg-warning text-warning-foreground hover:bg-warning/90 sm:flex-none" onClick={handleSendToReplica} disabled={isSubmitting}>
                     <Send className="h-4 w-4" />
                     Enviar a Réplica
                   </Button>
@@ -490,12 +490,12 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                 )}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-3 mb-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                         <span className="text-primary text-sm font-medium">{index + 1}</span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h5 className="font-medium">{parametro.nombre}</h5>
                         {parametro.descripcion && (
                           <p className="mt-2 text-sm text-muted-foreground">
@@ -689,20 +689,20 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       {canEditEvaluation && (
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Progreso de Evaluación</p>
                 <p className="text-sm text-muted-foreground">
                   {respondidos} de {totalParametros} parámetros evaluados
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={handleSaveDraft} disabled={isSubmitting}>
                   <Save className="h-4 w-4 mr-2" />
                   Guardar Borrador
                 </Button>
                 <Button
-                  className="bg-primary hover:bg-primary/90"
+                  className="w-full bg-primary hover:bg-primary/90 sm:w-auto"
                   onClick={handleFinalizeEvaluation}
                   disabled={isSubmitting || respondidos < totalParametros}
                 >

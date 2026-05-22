@@ -486,24 +486,24 @@ export function AjustesContent() {
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-secondary">
-          <TabsTrigger value="usuarios" className="flex items-center gap-2">
+        <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:grid-cols-5 sm:overflow-visible">
+          <TabsTrigger value="usuarios" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Usuarios</span>
           </TabsTrigger>
-          <TabsTrigger value="unidades" className="flex items-center gap-2">
+          <TabsTrigger value="unidades" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Unidades</span>
           </TabsTrigger>
-          <TabsTrigger value="ciclos" className="flex items-center gap-2">
+          <TabsTrigger value="ciclos" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Ciclos</span>
           </TabsTrigger>
-          <TabsTrigger value="umbrales" className="flex items-center gap-2">
+          <TabsTrigger value="umbrales" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <Gauge className="h-4 w-4" />
             <span className="hidden sm:inline">Umbrales</span>
           </TabsTrigger>
-          <TabsTrigger value="auditlog" className="flex items-center gap-2">
+          <TabsTrigger value="auditlog" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <History className="h-4 w-4" />
             <span className="hidden sm:inline">Audit Log</span>
           </TabsTrigger>

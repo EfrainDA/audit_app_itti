@@ -28,9 +28,9 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 md:gap-4">
         <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+          <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
             <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <Layers3 className="h-6 w-6 text-primary" />
             </div>
@@ -41,7 +41,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
           </CardContent>
         </Card>
         <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+          <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
             <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <ListChecks className="h-6 w-6 text-chart-2" />
             </div>
@@ -52,7 +52,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
           </CardContent>
         </Card>
         <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
-          <CardContent className="flex items-center justify-center gap-4 px-5 py-4 text-center">
+          <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
             <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
               <CirclePercent className="h-6 w-6 text-warning" />
             </div>
@@ -103,13 +103,13 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
               className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-sm"
             >
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <div className="flex items-center gap-3 text-left">
+                <div className="flex min-w-0 items-center gap-3 text-left">
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                     <span className="text-primary font-bold">{vertical.peso}%</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h4 className="font-semibold text-foreground">{vertical.nombre}</h4>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <Badge variant="outline" className="text-xs">
                         {vertical.tipoEvaluacion === 'cascada' ? 'Cascada' : 'Distribuida'}
                       </Badge>
@@ -122,7 +122,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
                 <div className="space-y-2 pt-1">
                   {vertical.parametros.map((parametro) => (
                     <Card key={parametro.id} className="bg-secondary border-border shadow-sm rounded-lg">
-                      <CardContent className="flex min-h-[76px] items-center justify-between gap-4 p-3">
+                      <CardContent className="flex min-h-[76px] flex-col items-start justify-between gap-3 p-3 sm:flex-row sm:items-center sm:gap-4">
                         <div className="min-w-0 space-y-2">
                           <div>
                             <h5 className="text-sm font-semibold leading-tight">{parametro.nombre}</h5>
@@ -133,7 +133,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:gap-4">
                             <span className="flex items-center gap-1 leading-none">
                             {parametro.permiteIntermedio ? (
                               <>

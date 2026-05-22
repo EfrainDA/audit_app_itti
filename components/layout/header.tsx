@@ -46,18 +46,18 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="relative flex min-h-16 items-center justify-between gap-3 border-b border-border/70 bg-card px-3 py-2 shadow-[var(--material-shadow-soft)] sm:h-16 sm:px-6 sm:py-0">
-      <div className="min-w-0 flex-1">
+    <header className="relative flex min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-card px-3 py-2 shadow-[var(--material-shadow-soft)] sm:gap-3 sm:px-5 md:px-6 lg:h-16 lg:py-0">
+      <div className="min-w-0 flex-1 pr-1">
         <h1 className="truncate text-lg font-bold text-foreground sm:text-xl">{title}</h1>
-        {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
+        {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p>}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 lg:gap-4">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <Input
             placeholder="Buscar..."
-            className="w-72 border-border/80 bg-card pl-9"
+            className="w-48 border-border/80 bg-card pl-9 lg:w-72"
           />
         </div>
 

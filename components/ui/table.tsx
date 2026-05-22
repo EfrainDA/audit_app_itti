@@ -8,11 +8,11 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto rounded-lg border border-border/55 bg-card shadow-[inset_0_1px_0_oklch(1_0_0_/_0.42),0_8px_20px_oklch(0.30_0.032_252_/_0.04)]"
+      className="responsive-scroll relative w-full overflow-x-auto rounded-lg border border-border/55 bg-card shadow-[inset_0_1px_0_oklch(1_0_0_/_0.42),0_8px_20px_oklch(0.30_0.032_252_/_0.04)]"
     >
       <table
         data-slot="table"
-        className={cn('w-full min-w-max caption-bottom text-sm', className)}
+        className={cn('w-full min-w-[44rem] caption-bottom text-sm sm:min-w-max', className)}
         {...props}
       />
     </div>
@@ -83,7 +83,7 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
     <td
       data-slot="table-cell"
       className={cn(
-        'px-3 py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'max-w-[18rem] px-3 py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] [&_*]:min-w-0',
         className,
       )}
       {...props}

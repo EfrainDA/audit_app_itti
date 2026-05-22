@@ -56,7 +56,7 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
       <Sidebar />
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header title={title} subtitle={subtitle} />
-        <main className="flex-1 overflow-auto scroll-smooth px-3 pb-24 pt-4 [scrollbar-gutter:stable] sm:px-6 sm:py-5 lg:px-8 lg:pb-5">
+        <main className="min-w-0 flex-1 overflow-auto scroll-smooth px-3 pb-24 pt-4 [scrollbar-gutter:stable] sm:px-5 sm:py-5 md:px-6 lg:px-8 lg:pb-5">
           <div className="mx-auto w-full max-w-[1520px]">
             {children}
           </div>

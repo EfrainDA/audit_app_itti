@@ -83,11 +83,11 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative hidden flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300 lg:flex",
+        "relative hidden flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300 dark:border-neutral-800 dark:bg-[#050505] dark:shadow-[18px_0_42px_rgba(0,0,0,0.42)] lg:flex",
         collapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.08)]">
+      <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.08)] dark:border-neutral-800">
         {!collapsed && (
           <Link href="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <div className="relative flex h-10 w-full max-w-[260px] items-center justify-center">
@@ -119,7 +119,7 @@ export function Sidebar() {
           className={cn(
             "absolute text-white/80 hover:bg-white/10 hover:text-white",
             collapsed
-              ? "right-1/2 h-9 w-9 translate-x-1/2 rounded-xl border border-white/14 bg-[#06122d]"
+              ? "right-1/2 h-9 w-9 translate-x-1/2 rounded-xl border border-white/14 bg-[#06122d] dark:border-neutral-700 dark:bg-neutral-950"
               : "right-4"
           )}
         >
@@ -227,8 +227,8 @@ export function MobileNav() {
     : navigation
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] lg:hidden">
-      <div className={cn("grid gap-1", visibleNavigation.length >= 6 ? "grid-cols-6" : visibleNavigation.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] dark:border-neutral-800 dark:bg-[#050505]/98 dark:shadow-[0_-16px_36px_rgba(0,0,0,0.44)] lg:hidden">
+      <div className="responsive-scroll grid auto-cols-[minmax(4.75rem,1fr)] grid-flow-col gap-1 overflow-x-auto pb-1 sm:grid-flow-row sm:grid-cols-6 sm:overflow-visible sm:pb-0">
         {visibleNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 
@@ -237,7 +237,7 @@ export function MobileNav() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors",
+                "flex min-w-[4.75rem] flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors sm:min-w-0",
                 isActive ? "bg-white/12 text-white" : "text-white/62 hover:bg-white/8 hover:text-white"
               )}
             >

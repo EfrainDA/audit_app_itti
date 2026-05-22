@@ -82,7 +82,7 @@ export function AuditoriasTable() {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="responsive-scroll overflow-x-auto">
       <table className="w-full min-w-[880px]">
         <thead>
           <tr className="border-b border-border">

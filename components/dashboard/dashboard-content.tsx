@@ -441,20 +441,20 @@ function buildAnalystVerticalSummaries(
 
 function KpiCard({ stat }: { stat: StatCard }) {
   return (
-    <Card className={cn("group h-full overflow-hidden py-0 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_oklch(0.28_0.025_252/0.12)]", toneCardStyles[stat.tone])}>
-      <CardContent className="relative flex h-full min-h-24 items-center justify-between gap-3 p-4">
-        <div className={cn("absolute inset-x-0 top-0 h-1 opacity-80", toneAccentStyles[stat.tone])} />
+    <Card className={cn("h-full overflow-hidden border-border/70 bg-card py-0 shadow-[var(--material-shadow-soft)] transition-colors hover:border-primary/25", toneCardStyles[stat.tone])}>
+      <CardContent className="relative flex min-h-[6.25rem] items-center justify-between gap-3 p-4">
+        <div className={cn("absolute inset-x-0 top-0 h-1 opacity-90", toneAccentStyles[stat.tone])} />
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
-          <div className="mt-2 flex flex-wrap items-end gap-2">
-            <p className="text-2xl font-semibold leading-none tracking-tight sm:text-3xl">{stat.value}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
+          <div className="mt-1.5 flex flex-wrap items-end gap-2">
+            <p className="text-2xl font-semibold leading-none tracking-tight">{stat.value}</p>
             <Badge variant="outline" className={cn("mb-1 text-[11px] font-semibold", toneBadgeStyles[stat.tone])}>
               {stat.delta}
             </Badge>
           </div>
-          <p className="mt-1.5 text-sm text-muted-foreground">{stat.description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{stat.description}</p>
         </div>
-        <RealisticIcon icon={stat.icon} tone={stat.tone} size="md" />
+        <RealisticIcon icon={stat.icon} tone={stat.tone} size="md" className="shadow-[0_10px_22px_oklch(0.30_0.032_252/0.10)]" />
       </CardContent>
     </Card>
   )
@@ -585,29 +585,30 @@ function AnalystProgressPanel({ counts, className }: { counts: CountMetrics; cla
   const semaphore = getSemaphore(counts.progressPct)
 
   return (
-    <Card className={cn("overflow-hidden border border-primary/25 bg-card py-0 shadow-[0_16px_34px_oklch(0.28_0.025_252/0.08)]", className)}>
-      <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
-        <div className="flex items-center justify-between gap-4">
+    <Card className={cn("overflow-hidden border border-cyan-500/25 bg-card py-0 shadow-[var(--material-shadow-soft)]", className)}>
+      <CardContent className="relative flex h-full flex-col justify-between gap-4 p-4 sm:p-5">
+        <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500/80" />
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso del lote asignado</p>
-            <div className="mt-2 flex items-end gap-3">
-              <p className={cn("text-5xl font-semibold leading-none tracking-tight", semaphore.text)}>{counts.progressPct}%</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso del lote asignado</p>
+            <div className="mt-1.5 flex items-end gap-3">
+              <p className={cn("text-4xl font-semibold leading-none tracking-tight", semaphore.text)}>{counts.progressPct}%</p>
             </div>
           </div>
-          <RealisticIcon icon={Gauge} tone={semaphore.tone} size="xl" />
+          <RealisticIcon icon={Gauge} tone={semaphore.tone} size="lg" />
         </div>
 
-        <div className="h-3 overflow-hidden rounded-full bg-muted">
+        <div className="h-2.5 overflow-hidden rounded-full bg-muted">
           <div className={cn("h-full rounded-full transition-all", semaphore.bg)} style={{ width: `${counts.progressPct}%` }} />
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2">
           {[
             { label: "Iniciadas", value: counts.started, className: "border-primary/25 bg-background text-primary" },
             { label: "Terminadas", value: counts.completed, className: "border-success/25 bg-background text-success" },
             { label: "Pendientes", value: counts.pending, className: "border-destructive/25 bg-background text-destructive" },
           ].map((item) => (
-            <div key={item.label} className={cn("rounded-lg border p-3 text-center", item.className)}>
+            <div key={item.label} className={cn("rounded-lg border bg-secondary/35 p-2.5 text-center", item.className)}>
               <p className="text-xl font-semibold leading-none">{item.value}</p>
               <p className="mt-1 text-[11px] font-medium text-muted-foreground">{item.label}</p>
             </div>
@@ -630,17 +631,18 @@ function AnalystUnitScore({
   const semaphore = getSemaphore(score)
 
   return (
-    <Card className="gap-0 overflow-hidden border border-border/70 bg-card py-0">
-      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3">
+    <Card className="gap-0 overflow-hidden border border-border/70 bg-card py-0 shadow-[var(--material-shadow-soft)]">
+      <div className="h-1 bg-primary/80" />
+      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
         <div className="flex min-w-0 flex-col justify-center">
           <CardTitle className="text-sm font-semibold">Calificacion General lograda</CardTitle>
           <p className="text-xs text-muted-foreground">Unidad asignada: {unitName}</p>
         </div>
-        <div className={cn("flex min-w-24 items-center justify-center rounded-xl border bg-background px-3 py-1.5", semaphore.border)}>
-          <p className={cn("text-2xl font-semibold leading-none tracking-tight", semaphore.text)}>{score}%</p>
+        <div className={cn("flex min-w-20 items-center justify-center rounded-lg border bg-background px-3 py-1.5", semaphore.border)}>
+          <p className={cn("text-xl font-semibold leading-none tracking-tight", semaphore.text)}>{score}%</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 p-3 pt-0">
+      <CardContent className="space-y-2.5 p-4 pt-0">
         {verticals.map((vertical) => {
           const verticalSemaphore = getSemaphore(vertical.averageScore ?? 0)
           const contributionProgress =
@@ -649,7 +651,7 @@ function AnalystUnitScore({
               : 0
 
           return (
-            <div key={vertical.id} className="rounded-lg border border-border/60 bg-background p-3">
+            <div key={vertical.id} className="rounded-lg border border-border/60 bg-secondary/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{vertical.name}</p>
@@ -664,7 +666,7 @@ function AnalystUnitScore({
                   </p>
                 </div>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-muted">
                 <div className={cn("h-full rounded-full", verticalSemaphore.bg)} style={{ width: `${contributionProgress}%` }} />
               </div>
             </div>
@@ -677,7 +679,7 @@ function AnalystUnitScore({
 
 function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="responsive-scroll overflow-x-auto">
       <table className="w-full min-w-[760px]">
         <thead>
           <tr className="border-b border-border">
@@ -789,7 +791,7 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                   <p className="font-semibold">{lote.unidadNombre}</p>
                   <p className="text-xs text-muted-foreground">{lote.modeloNombre}</p>
                 </div>
-                <div className="grid min-w-[520px] grid-cols-5 gap-2 text-center text-xs">
+                <div className="responsive-scroll grid min-w-[520px] grid-cols-5 gap-2 overflow-x-auto text-center text-xs">
                   <div className={cn("rounded-md border px-2 py-1.5", semaphore.border)}>
                     <p className={cn("text-sm font-semibold", semaphore.text)}>{lote.progressPct}%</p>
                     <p className="text-muted-foreground">avance</p>
@@ -1469,10 +1471,10 @@ export function DashboardContent() {
     const assignedUnitName = metrics.analystAssignedUnit?.nombre || "Unidad asignada"
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         {!isAuditor && !isSupervisor && (
           <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+            <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:w-fit sm:grid-cols-3 sm:overflow-visible">
               <TabsTrigger value="analista" className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4" />
                 Analista CC
@@ -1489,33 +1491,35 @@ export function DashboardContent() {
           </Tabs>
         )}
 
-        <section className="grid gap-4 xl:grid-cols-[1.58fr_0.92fr]">
-          <AnalystProgressPanel counts={metrics.analystAssignedLoteCounts} className="h-full" />
+        <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
+          <AnalystProgressPanel counts={metrics.analystAssignedLoteCounts} />
 
-          <div className="grid gap-4">
-            <Card className="border-primary/25 bg-card py-0">
-              <CardContent className="flex min-h-28 items-center justify-between gap-4 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <Card className="overflow-hidden border-primary/25 bg-card py-0 shadow-[var(--material-shadow-soft)]">
+              <div className="h-1 bg-primary/80" />
+              <CardContent className="flex min-h-[7rem] items-center justify-between gap-4 p-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo Activo</p>
-                  <p className="mt-2 text-xs text-muted-foreground">{metrics.activeCycleYear}</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">{metrics.activeCycleYear}</p>
                 </div>
-                <p className="text-4xl font-semibold leading-none text-primary">{String(metrics.activeCycle.bimestre).padStart(2, "0")}</p>
+                <p className="text-3xl font-semibold leading-none text-primary">{String(metrics.activeCycle.bimestre).padStart(2, "0")}</p>
               </CardContent>
             </Card>
-            <Card className="border-warning/25 bg-card py-0">
-              <CardContent className="flex min-h-28 items-center justify-between gap-4 p-4">
+            <Card className="overflow-hidden border-warning/25 bg-card py-0 shadow-[var(--material-shadow-soft)]">
+              <div className="h-1 bg-warning/80" />
+              <CardContent className="flex min-h-[7rem] items-center justify-between gap-4 p-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cierre del ciclo</p>
-                  <p className="mt-2 text-xs text-muted-foreground">dias restantes</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">dias restantes</p>
                 </div>
-                <p className="text-4xl font-semibold leading-none text-warning">{metrics.daysToCycleClose}</p>
+                <p className="text-3xl font-semibold leading-none text-warning">{metrics.daysToCycleClose}</p>
               </CardContent>
             </Card>
           </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="grid gap-4">
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {activeDashboard.cards.map((stat) => (
               <KpiCard key={stat.title} stat={stat} />
             ))}
@@ -1527,7 +1531,7 @@ export function DashboardContent() {
           />
         </section>
 
-        <Card className="border-border/70 bg-card">
+        <Card className="border-border/70 bg-card py-0">
           <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="min-w-0">
               <CardTitle className="text-base font-semibold">Auditorias en curso y pendientes</CardTitle>
@@ -1588,7 +1592,7 @@ export function DashboardContent() {
       <div className="space-y-5">
         {!isAuditor && !isSupervisor && (
           <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+            <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:w-fit sm:grid-cols-3 sm:overflow-visible">
               <TabsTrigger value="analista" className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4" />
                 Analista CC
@@ -1667,7 +1671,7 @@ export function DashboardContent() {
     <div className="space-y-5">
       {!isAuditor && !isSupervisor && (
         <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-secondary sm:w-fit">
+          <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:w-fit sm:grid-cols-3 sm:overflow-visible">
             <TabsTrigger value="analista" className="flex items-center gap-2">
               <UserCheck className="h-4 w-4" />
               Analista CC

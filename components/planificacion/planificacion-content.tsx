@@ -205,7 +205,7 @@ export function PlanificacionContent() {
 
         <TabsContent value="lotes" className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
@@ -246,7 +246,7 @@ export function PlanificacionContent() {
 
           {/* Search */}
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.4fr)_minmax(180px,0.9fr)_minmax(140px,0.7fr)_minmax(120px,0.6fr)] xl:max-w-5xl">
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(180px,1.4fr)_minmax(150px,0.9fr)_minmax(130px,0.7fr)_minmax(120px,0.6fr)] xl:max-w-5xl">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -299,7 +299,7 @@ export function PlanificacionContent() {
                 className="min-w-0 bg-card border-border shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
                 onClick={() => setSelectedLote(lote)}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex flex-col gap-2">
                     <div className="flex items-center gap-3">
@@ -355,7 +355,7 @@ export function PlanificacionContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-4">
+                  <div className="grid grid-cols-1 gap-2 mb-4 min-[420px]:grid-cols-3 sm:gap-4">
                     <div className="text-center p-2 bg-secondary/60 rounded-lg border border-border/70">
                       <p className="text-lg font-bold text-foreground">{lote.totalAuditorias}</p>
                       <p className="text-xs text-muted-foreground">Auditorías</p>
@@ -395,7 +395,7 @@ export function PlanificacionContent() {
               <p className="text-sm text-muted-foreground mb-4">
                 La calificación final es calculada a partir de la suma de los porcentajes obtenidos en cada vertical, ponderados por el peso asignado a cada una en el modelo de control.
               </p>
-              <div className="overflow-x-auto">
+              <div className="responsive-scroll overflow-x-auto">
                 <table className="w-full min-w-[760px]">
                   <thead>
                     <tr className="border-b border-border">

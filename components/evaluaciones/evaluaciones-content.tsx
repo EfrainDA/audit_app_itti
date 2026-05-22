@@ -203,7 +203,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
   return (
     <div className="space-y-6">
       {view === "evaluaciones" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
             <CardContent className="flex h-full items-center gap-3 px-4 py-0">
               <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
@@ -245,8 +245,8 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
 
       {view === "evaluaciones" && (
         <>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="relative w-full max-w-md flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative w-full flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por lote, unidad, control o proceso..."
@@ -313,7 +313,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <div className="overflow-x-auto rounded-lg border border-border/60">
+                  <div className="responsive-scroll overflow-x-auto rounded-lg border border-border/60">
                     <table className="w-full min-w-[760px]">
                       <thead>
                         <tr className="border-b border-border bg-secondary/45">
