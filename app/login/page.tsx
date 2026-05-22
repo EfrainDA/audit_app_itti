@@ -138,7 +138,7 @@ function LoginContent() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-5 py-6 text-slate-950">
+    <main className="login-light flex min-h-screen items-center justify-center bg-[#f6f8fb] px-5 py-6 text-slate-950">
       <section className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.11)] lg:grid-cols-[0.9fr_1.1fr]">
         <aside className="hidden min-h-[540px] flex-col justify-center bg-[#071733] p-8 text-white lg:flex">
           <div>
@@ -358,7 +358,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb]">
+        <main className="login-light flex min-h-screen items-center justify-center bg-[#f6f8fb]">
           <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-medium text-slate-600 shadow-sm">
             Preparando acceso...
           </div>

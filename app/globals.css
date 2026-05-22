@@ -103,6 +103,35 @@
   --icon-border: oklch(0.44 0 0 / 0.64);
 }
 
+.login-light {
+  color-scheme: light;
+  --background: oklch(0.985 0.004 248);
+  --foreground: oklch(0.205 0.018 252);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.018 252);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.018 252);
+  --primary: oklch(0.56 0.16 253);
+  --primary-foreground: oklch(0.995 0 0);
+  --secondary: oklch(0.952 0.009 248);
+  --secondary-foreground: oklch(0.25 0.026 252);
+  --muted: oklch(0.948 0.008 248);
+  --muted-foreground: oklch(0.48 0.028 250);
+  --accent: oklch(0.66 0.15 197);
+  --accent-foreground: oklch(0.18 0.02 252);
+  --destructive: oklch(0.64 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.89 0.008 248);
+  --input: oklch(0.975 0.004 248);
+  --ring: oklch(0.54 0.08 235);
+  --success: oklch(0.61 0.16 147);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.78 0.16 85);
+  --warning-foreground: oklch(0.16 0.018 252);
+  --material-shadow: 0 22px 54px oklch(0.30 0.032 252 / 0.10);
+  --material-shadow-soft: 0 12px 30px oklch(0.30 0.032 252 / 0.075);
+}
+
 @theme inline {
   --font-sans: var(--font-google), 'Roboto', 'Google Sans', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', monospace;
@@ -469,5 +498,43 @@
   .dark .shadow-xl,
   .dark .shadow-2xl {
     box-shadow: var(--material-shadow-soft) !important;
+  }
+
+  .dark .login-light.bg-\[\#f6f8fb\],
+  .dark .login-light .bg-\[\#f6f8fb\] {
+    background-color: #f6f8fb !important;
+  }
+
+  .dark .login-light .bg-white {
+    background-color: #fff !important;
+  }
+
+  .dark .login-light .bg-slate-50 {
+    background-color: oklch(0.984 0.003 247.858) !important;
+  }
+
+  .dark .login-light .border-slate-200 {
+    border-color: oklch(0.929 0.013 255.508) !important;
+  }
+
+  .dark .login-light .text-slate-300 {
+    color: oklch(0.869 0.022 252.894) !important;
+  }
+
+  .dark .login-light .text-slate-600 {
+    color: oklch(0.446 0.043 257.281) !important;
+  }
+
+  .dark .login-light .text-slate-700 {
+    color: oklch(0.372 0.044 257.287) !important;
+  }
+
+  .dark .login-light.text-slate-950,
+  .dark .login-light .text-slate-950 {
+    color: oklch(0.129 0.042 264.695) !important;
+  }
+
+  .dark .login-light .text-muted-foreground {
+    color: var(--muted-foreground);
   }
 }

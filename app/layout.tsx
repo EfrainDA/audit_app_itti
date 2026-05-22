@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={roboto.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </body>

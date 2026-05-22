@@ -289,6 +289,19 @@ export function PlanificacionContent() {
                 Nuevo Lote
               </Button>
             )}
+            {canManageLots && (
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
+                  <DialogHeader>
+                    <DialogTitle>Crear Nuevo Lote</DialogTitle>
+                    <DialogDescription>
+                      Define el ciclo de auditoria para una unidad de negocio
+                    </DialogDescription>
+                  </DialogHeader>
+                  <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
 
           {/* Lotes Grid */}

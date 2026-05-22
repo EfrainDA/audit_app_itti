@@ -149,7 +149,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
         <p className="text-sm text-muted-foreground">
           Selecciona los auditores que participarán en este lote
         </p>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
           {auditoresDisponibles.map((auditor) => (
             <div
               key={auditor.id}
@@ -159,8 +159,24 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
               <Checkbox
                 id={auditor.id}
                 checked={auditores.includes(auditor.id)}
+                onClick={(event) => event.stopPropagation()}
                 onCheckedChange={() => toggleAuditor(auditor.id)}
               />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-sm font-semibold text-primary">
+                {auditor.avatar ? (
+                  <img src={auditor.avatar} alt={auditor.name} className="h-full w-full object-cover" />
+                ) : (
+                  <span>
+                    {auditor.name
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0])
+                      .join("")
+                      .toUpperCase()}
+                  </span>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <label htmlFor={auditor.id} className="block truncate text-sm font-medium cursor-pointer">
                   {auditor.name}

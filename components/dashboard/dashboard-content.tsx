@@ -257,14 +257,6 @@ const toneCardStyles: Record<StatCard["tone"], string> = {
   neutral: "border-border/70 bg-muted/55 hover:border-muted-foreground/30",
 }
 
-const toneAccentStyles: Record<StatCard["tone"], string> = {
-  primary: "bg-primary",
-  success: "bg-success",
-  warning: "bg-warning",
-  danger: "bg-destructive",
-  neutral: "bg-muted-foreground",
-}
-
 const toneBadgeStyles: Record<StatCard["tone"], string> = {
   primary: "border-primary/22 bg-primary/10 text-primary",
   success: "border-success/24 bg-success/10 text-success",
@@ -441,12 +433,11 @@ function buildAnalystVerticalSummaries(
 
 function KpiCard({ stat }: { stat: StatCard }) {
   return (
-    <Card className={cn("h-full overflow-hidden border-border/70 bg-card py-0 shadow-[var(--material-shadow-soft)] transition-colors hover:border-primary/25", toneCardStyles[stat.tone])}>
-      <CardContent className="relative flex min-h-[6.25rem] items-center justify-between gap-3 p-4">
-        <div className={cn("absolute inset-x-0 top-0 h-1 opacity-90", toneAccentStyles[stat.tone])} />
+    <Card className={cn("overflow-hidden border py-0 shadow-[var(--material-shadow-soft)] transition-colors hover:border-primary/25", toneCardStyles[stat.tone])}>
+      <CardContent className="flex min-h-[6.25rem] items-center justify-between gap-3 p-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
-          <div className="mt-1.5 flex flex-wrap items-end gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{stat.title}</p>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
             <p className="text-2xl font-semibold leading-none tracking-tight">{stat.value}</p>
             <Badge variant="outline" className={cn("mb-1 text-[11px] font-semibold", toneBadgeStyles[stat.tone])}>
               {stat.delta}
@@ -585,30 +576,26 @@ function AnalystProgressPanel({ counts, className }: { counts: CountMetrics; cla
   const semaphore = getSemaphore(counts.progressPct)
 
   return (
-    <Card className={cn("overflow-hidden border border-cyan-500/25 bg-card py-0 shadow-[var(--material-shadow-soft)]", className)}>
-      <CardContent className="relative flex h-full flex-col justify-between gap-4 p-4 sm:p-5">
-        <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500/80" />
+    <Card className={cn("overflow-hidden border py-0", semaphore.border, className)}>
+      <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso del lote asignado</p>
-            <div className="mt-1.5 flex items-end gap-3">
-              <p className={cn("text-4xl font-semibold leading-none tracking-tight", semaphore.text)}>{counts.progressPct}%</p>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Progreso del lote asignado</p>
+            <p className={cn("mt-2 text-5xl font-semibold leading-none tracking-tight", semaphore.text)}>{counts.progressPct}%</p>
           </div>
-          <RealisticIcon icon={Gauge} tone={semaphore.tone} size="lg" />
+          <RealisticIcon icon={Gauge} tone={semaphore.tone} size="xl" />
         </div>
 
-        <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-          <div className={cn("h-full rounded-full transition-all", semaphore.bg)} style={{ width: `${counts.progressPct}%` }} />
+        <div className="mt-5 h-3 overflow-hidden rounded-full bg-muted">
+          <div className={cn("h-full rounded-full", semaphore.bg)} style={{ width: `${counts.progressPct}%` }} />
         </div>
-
-        <div className="grid grid-cols-3 gap-2">
+        <div className="mt-5 grid grid-cols-3 gap-3">
           {[
             { label: "Iniciadas", value: counts.started, className: "border-primary/25 bg-background text-primary" },
             { label: "Terminadas", value: counts.completed, className: "border-success/25 bg-background text-success" },
             { label: "Pendientes", value: counts.pending, className: "border-destructive/25 bg-background text-destructive" },
           ].map((item) => (
-            <div key={item.label} className={cn("rounded-lg border bg-secondary/35 p-2.5 text-center", item.className)}>
+            <div key={item.label} className={cn("rounded-lg border p-3 text-center", item.className)}>
               <p className="text-xl font-semibold leading-none">{item.value}</p>
               <p className="mt-1 text-[11px] font-medium text-muted-foreground">{item.label}</p>
             </div>
@@ -631,18 +618,17 @@ function AnalystUnitScore({
   const semaphore = getSemaphore(score)
 
   return (
-    <Card className="gap-0 overflow-hidden border border-border/70 bg-card py-0 shadow-[var(--material-shadow-soft)]">
-      <div className="h-1 bg-primary/80" />
-      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
+    <Card className="gap-0 overflow-hidden border border-primary/25 bg-primary/10 py-0 shadow-[var(--material-shadow-soft)]">
+      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
         <div className="flex min-w-0 flex-col justify-center">
           <CardTitle className="text-sm font-semibold">Calificacion General lograda</CardTitle>
           <p className="text-xs text-muted-foreground">Unidad asignada: {unitName}</p>
         </div>
-        <div className={cn("flex min-w-20 items-center justify-center rounded-lg border bg-background px-3 py-1.5", semaphore.border)}>
-          <p className={cn("text-xl font-semibold leading-none tracking-tight", semaphore.text)}>{score}%</p>
+        <div className={cn("flex min-w-16 items-center justify-center rounded-md border bg-background px-2.5 py-1.5", semaphore.border)}>
+          <p className={cn("text-lg font-semibold leading-none tracking-tight", semaphore.text)}>{score}%</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2.5 p-4 pt-0">
+      <CardContent className="space-y-2 p-4 pt-0">
         {verticals.map((vertical) => {
           const verticalSemaphore = getSemaphore(vertical.averageScore ?? 0)
           const contributionProgress =
@@ -651,7 +637,7 @@ function AnalystUnitScore({
               : 0
 
           return (
-            <div key={vertical.id} className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+            <div key={vertical.id} className="rounded-md border border-border/60 bg-secondary/30 p-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{vertical.name}</p>
@@ -666,7 +652,7 @@ function AnalystUnitScore({
                   </p>
                 </div>
               </div>
-              <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className={cn("h-full rounded-full", verticalSemaphore.bg)} style={{ width: `${contributionProgress}%` }} />
               </div>
             </div>
@@ -683,42 +669,42 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
       <table className="w-full min-w-[760px]">
         <thead>
           <tr className="border-b border-border">
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Control</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Vertical</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Unidad</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
-            <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Accion</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Control</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Vertical</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Estado</th>
+            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Accion</th>
           </tr>
         </thead>
         <tbody>
           {controls.map((control) => (
             <tr key={control.id} className="border-b border-border transition-colors hover:bg-muted/50">
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <div>
                   <span className="font-mono text-sm font-semibold">{control.identificador || control.id}</span>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {control.proceso || "Sin proceso"}{control.subproceso ? ` / ${control.subproceso}` : ""}
                   </p>
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm">{control.verticalNombre}</td>
-              <td className="px-4 py-3 text-sm">
+              <td className="px-3 py-2.5 text-sm">{control.verticalNombre}</td>
+              <td className="px-3 py-2.5 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-border/60 bg-muted/40">
+                  <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-border/60 bg-muted/40">
                     {control.unidadLogo ? (
-                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={28} height={28} className="object-contain" />
+                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={24} height={24} className="object-contain" />
                     ) : (
-                      <Building2 className="h-4 w-4 text-primary" />
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
                     )}
                   </div>
                   <span>{control.unidadNombre}</span>
                 </div>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
               </td>
-              <td className="px-4 py-3 text-right">
-                <Button size="sm" asChild>
+              <td className="px-3 py-2.5 text-right">
+                <Button size="sm" className="h-8" asChild>
                   <Link href={`/evaluaciones/${control.id}`}>
                     <Play className="mr-1 h-4 w-4" />
                     Evaluar
@@ -1471,7 +1457,7 @@ export function DashboardContent() {
     const assignedUnitName = metrics.analystAssignedUnit?.nombre || "Unidad asignada"
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {!isAuditor && !isSupervisor && (
           <Tabs value={dashboardView} onValueChange={(value) => setActiveView(value as DashboardView)} className="w-full">
             <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:w-fit sm:grid-cols-3 sm:overflow-visible">
@@ -1491,26 +1477,24 @@ export function DashboardContent() {
           </Tabs>
         )}
 
-        <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
+        <section className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
           <AnalystProgressPanel counts={metrics.analystAssignedLoteCounts} />
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <Card className="overflow-hidden border-primary/25 bg-card py-0 shadow-[var(--material-shadow-soft)]">
-              <div className="h-1 bg-primary/80" />
-              <CardContent className="flex min-h-[7rem] items-center justify-between gap-4 p-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <Card className="overflow-hidden border-primary/25 bg-primary/10 py-0 shadow-[var(--material-shadow-soft)]">
+              <CardContent className="flex min-h-[6.25rem] items-center justify-between gap-4 p-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ciclo Activo</p>
-                  <p className="mt-1.5 text-xs text-muted-foreground">{metrics.activeCycleYear}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{metrics.activeCycleYear}</p>
                 </div>
                 <p className="text-3xl font-semibold leading-none text-primary">{String(metrics.activeCycle.bimestre).padStart(2, "0")}</p>
               </CardContent>
             </Card>
-            <Card className="overflow-hidden border-warning/25 bg-card py-0 shadow-[var(--material-shadow-soft)]">
-              <div className="h-1 bg-warning/80" />
-              <CardContent className="flex min-h-[7rem] items-center justify-between gap-4 p-4">
+            <Card className="overflow-hidden border-warning/30 bg-warning/10 py-0 shadow-[var(--material-shadow-soft)]">
+              <CardContent className="flex min-h-[6.25rem] items-center justify-between gap-4 p-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cierre del ciclo</p>
-                  <p className="mt-1.5 text-xs text-muted-foreground">dias restantes</p>
+                  <p className="mt-1 text-xs text-muted-foreground">dias restantes</p>
                 </div>
                 <p className="text-3xl font-semibold leading-none text-warning">{metrics.daysToCycleClose}</p>
               </CardContent>
@@ -1518,8 +1502,8 @@ export function DashboardContent() {
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <section className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)]">
+          <div className="grid gap-2 sm:grid-cols-3 xl:self-start">
             {activeDashboard.cards.map((stat) => (
               <KpiCard key={stat.title} stat={stat} />
             ))}
@@ -1532,16 +1516,15 @@ export function DashboardContent() {
         </section>
 
         <Card className="border-border/70 bg-card py-0">
-          <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <CardHeader className="flex flex-col items-start justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center">
             <div className="min-w-0">
               <CardTitle className="text-base font-semibold">Auditorias en curso y pendientes</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Controles asignados como analista con accion directa de evaluacion.</p>
             </div>
             <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {assignedUnitName}
             </Badge>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 pt-0">
             <AnalystAssignedTable controls={metrics.analystOpenControls} />
           </CardContent>
         </Card>
