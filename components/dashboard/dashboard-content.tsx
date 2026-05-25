@@ -602,55 +602,36 @@ function AnalystUnitScore({
   lotes: AnalystLoteScore[]
 }) {
   return (
-    <Card className="gap-0 overflow-hidden border border-border/70 bg-card py-0 shadow-none hover:shadow-none">
-      <CardHeader className="px-4 py-3">
-        <CardTitle className="text-base font-semibold">Calificación Lograda por Unidad de Negocio</CardTitle>
+    <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">Calificación de unidades del ciclo</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 px-4 pb-4 pt-0">
+      <CardContent className="space-y-3">
         {lotes.map((lote) => {
           const loteSemaphore = getSemaphore(lote.score)
 
           return (
-            <div key={lote.id} className="rounded-lg border border-border/70 bg-background p-3">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div key={lote.id} className="rounded-lg border border-border/60 bg-background p-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{lote.unitName}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {lote.modelName} / {lote.counts.total} controles
-                  </p>
+                  <p className="font-semibold">{lote.unitName}</p>
+                  <p className="text-xs text-muted-foreground">{lote.modelName}</p>
                 </div>
-                <p className={cn("text-2xl font-semibold leading-none tracking-tight", loteSemaphore.text)}>{lote.score}%</p>
+                <p className={cn("self-center text-2xl font-semibold leading-none", loteSemaphore.text)}>{lote.score}%</p>
               </div>
-              <div className="mt-3 space-y-2">
+              <div className="responsive-scroll mt-3 flex gap-2 overflow-x-auto pb-1">
                 {lote.verticals.map((vertical) => {
                   const verticalSemaphore = getSemaphore(vertical.averageScore ?? 0)
-                  const contributionProgress =
-                    vertical.achieved !== null && vertical.weight > 0
-                      ? Math.min(100, Math.round((vertical.achieved / vertical.weight) * 100))
-                      : 0
 
                   return (
-                    <div key={`${lote.id}-${vertical.id}`} className="grid gap-2 rounded-md border border-border/60 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_5rem_4.5rem] sm:items-center">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{vertical.name}</p>
-                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div className={cn("h-full rounded-full", verticalSemaphore.bg)} style={{ width: `${contributionProgress}%` }} />
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium text-muted-foreground sm:text-center">
-                        {vertical.completed}/{vertical.total}
-                      </p>
-                      <p className={cn("text-sm font-semibold sm:text-right", verticalSemaphore.text)}>
+                    <div key={vertical.id} className={cn("min-w-[9rem] flex-1 rounded-md border px-3 py-2", verticalSemaphore.border)}>
+                      <p className="truncate text-xs font-semibold text-muted-foreground">{vertical.name}</p>
+                      <p className={cn("mt-1 text-base font-semibold", verticalSemaphore.text)}>
                         {vertical.achieved !== null ? `${vertical.achieved}%` : "-"}
                       </p>
                     </div>
                   )
                 })}
-                {lote.verticals.length === 0 && (
-                  <p className="rounded-md border border-border/60 px-3 py-3 text-sm text-muted-foreground">
-                    Sin controles asignados en este lote.
-                  </p>
-                )}
               </div>
             </div>
           )
@@ -669,11 +650,18 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   return (
     <div className="responsive-scroll overflow-x-auto">
       <table className="w-full min-w-[760px]">
+        <colgroup>
+          <col style={{ width: '50%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '10%' }} />
+          <col />
+        </colgroup>
         <thead>
           <tr className="border-b border-border">
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Control</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Vertical</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad de Negocio</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Estado</th>
             <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Accion</th>
           </tr>
@@ -683,24 +671,17 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
             <tr key={control.id} className="border-b border-border transition-colors hover:bg-muted/50">
               <td className="px-3 py-2.5">
                 <div>
-                  <span className="font-mono text-sm font-semibold">{control.identificador || control.id}</span>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {control.proceso || "Sin proceso"}{control.subproceso ? ` / ${control.subproceso}` : ""}
-                  </p>
+                  <span className="text-sm font-semibold text-foreground">{control.identificador || control.id}</span>
+                  {(control.proceso || control.subproceso) && (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {[control.proceso, control.subproceso].filter(Boolean).join(" / ")}
+                    </p>
+                  )}
                 </div>
               </td>
               <td className="px-3 py-2.5 text-sm">{control.verticalNombre}</td>
               <td className="px-3 py-2.5 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-10 items-center justify-center overflow-hidden rounded border border-border/60 bg-muted/40">
-                    {control.unidadLogo ? (
-                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={40} height={24} className="h-full w-full object-contain" />
-                    ) : (
-                      <Building2 className="h-3.5 w-3.5 text-primary" />
-                    )}
-                  </div>
-                  <span>{control.unidadNombre}</span>
-                </div>
+                {control.unidadNombre}
               </td>
               <td className="px-3 py-2.5">
                 <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
@@ -920,7 +901,7 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                     Verticales, controles, puntajes y acceso directo al detalle de parametros.
                   </DialogDescription>
                 </div>
-                <span className={cn("rounded-lg border border-success/25 bg-success/10 px-4 py-2 text-5xl font-semibold leading-none tracking-tight", getSemaphore(selectedLote.unitScore).text)}>
+                <span className={cn("rounded-lg bg-transparent px-4 py-2 text-5xl font-semibold leading-none tracking-tight", getSemaphore(selectedLote.unitScore).text)}>
                   {selectedLote.unitScore}%
                 </span>
               </DialogHeader>
@@ -945,7 +926,7 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                             <div className="min-w-0">
                               <p className="truncate font-medium">{control.identificador || control.id}</p>
                               <p className="truncate text-xs text-muted-foreground">
-                                {[control.proceso, control.subproceso].filter(Boolean).join(" / ") || "Control del lote"}
+                                {[control.proceso, control.subproceso].filter(Boolean).join(" / ")}
                               </p>
                             </div>
                             <div className="flex justify-start lg:justify-center">

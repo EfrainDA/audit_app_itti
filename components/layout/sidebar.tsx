@@ -90,25 +90,25 @@ export function Sidebar() {
       <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.08)] dark:border-neutral-800">
         {!collapsed && (
           <Link href="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="relative flex h-10 w-full max-w-[260px] items-center justify-center">
+            <div className="relative flex h-[60px] w-full max-w-[280px] items-center justify-center">
               <Image
                 src="/logo1.png"
                 alt="Logo"
-                width={144}
-                height={32}
-                className="h-8 w-auto object-contain"
+                width={405}
+                height={90}
+                className="h-[60px] w-auto object-contain"
               />
             </div>
           </Link>
         )}
         {collapsed && (
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-[48px] w-[48px] items-center justify-center">
             <Image
               src="/logo1.png"
               alt="Logo"
-              width={20}
-              height={20}
-              className="h-4 w-4 object-contain"
+              width={72}
+              height={72}
+              className="h-[48px] w-[48px] object-contain"
             />
           </div>
         )}

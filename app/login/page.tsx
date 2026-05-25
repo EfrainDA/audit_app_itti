@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRight, Building2, Eye, EyeOff, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react"
+import { Building2, Eye, EyeOff, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -91,7 +91,7 @@ function LoginContent() {
     setIsGoogleSubmitting(true)
 
     try {
-      const { error: googleError } = await supabase.auth.signInWithOAuth({
+      const { data, error: googleError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: typeof window !== "undefined" ? `${window.location.origin}${next}` : undefined,
@@ -99,9 +99,15 @@ function LoginContent() {
       })
 
       if (googleError) throw googleError
+      if (data?.url && typeof window !== "undefined") {
+        window.location.href = data.url
+      }
     } catch (googleError) {
-      setIsGoogleSubmitting(false)
       setError(googleError instanceof Error ? googleError.message : "No se pudo iniciar sesion con Gmail.")
+    } finally {
+      if (typeof window !== "undefined") {
+        setIsGoogleSubmitting(false)
+      }
     }
   }
 
@@ -140,23 +146,39 @@ function LoginContent() {
   return (
     <main className="login-light flex min-h-screen items-center justify-center bg-[#f6f8fb] px-5 py-6 text-slate-950">
       <section className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.11)] lg:grid-cols-[0.9fr_1.1fr]">
-        <aside className="hidden min-h-[540px] flex-col justify-center bg-[#071733] p-8 text-white lg:flex">
-          <div>
-            <div className="inline-flex">
+        <aside className="hidden lg:flex min-h-[540px] flex-col justify-center bg-[#071733] p-8 text-white">
+          <div className="flex h-full flex-col justify-center gap-10">
+            <div className="w-full max-w-[340px] rounded-3xl bg-white/5 p-5 shadow-inner shadow-white/5">
               <Image
                 src="/logo1.png"
                 alt="Qualittyx"
-                width={270}
-                height={88}
-                className="h-auto w-56 object-contain"
+                width={405}
+                height={132}
+                className="h-auto w-full object-contain"
                 priority
               />
             </div>
-            <div className="mt-9 max-w-sm">
-              <h1 className="text-3xl font-semibold leading-tight">Gestion inteligente, acceso simple.</h1>
-              <p className="mt-4 text-sm leading-6 text-slate-300">
-                Entra al panel para coordinar auditorias, controles y evidencias con una experiencia clara y segura.
-              </p>
+            <div className="max-w-[360px] space-y-6">
+              <div className="space-y-4">
+                <h1 className="text-3xl font-semibold leading-tight">Gestion inteligente, acceso simple.</h1>
+                <p className="text-sm leading-6 text-slate-300">
+                  Entra al panel para coordinar auditorias, controles y evidencias con una experiencia clara y segura.
+                </p>
+              </div>
+              <div className="grid gap-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                  <p>Accede a datos de auditoria con velocidad y seguridad.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                  <p>Gestiona controles y evidencias desde un solo lugar.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                  <p>Interfaz limpia para equipos y clientes.</p>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
@@ -168,9 +190,9 @@ function LoginContent() {
                 <Image
                   src="/logo1.png"
                   alt="Qualittyx"
-                  width={220}
-                  height={72}
-                  className="h-auto w-40 object-contain"
+                  width={330}
+                  height={108}
+                  className="h-auto w-[250px] object-contain"
                   priority
                 />
               </div>
@@ -294,7 +316,7 @@ function LoginContent() {
               )}
 
               <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {mode === "login" ? "Ingresar" : "Crear cuenta"}
               </Button>
 
