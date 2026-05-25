@@ -78,7 +78,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
               {unidades.map((unidad) => (
                 <SelectItem key={unidad.id} value={unidad.id}>
                   <span className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-primary/20 bg-primary/10">
+                    <span className="flex h-6 w-10 items-center justify-center overflow-hidden rounded border border-primary/20 bg-primary/10">
                       {unidad.logo ? (
                         <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
                       ) : (

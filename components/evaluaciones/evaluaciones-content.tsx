@@ -112,9 +112,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
       const auditores = lote.auditores.map((id) => users.find((u) => u.id === id)).filter(Boolean)
       const loteVerticales = getLoteVerticalesCompletas(lote, loteVerticalesData, modelos).map((loteVertical) => ({
         ...loteVertical,
-        controles: canEvaluateControls
-          ? loteVertical.controles.filter((control) => control.auditorId === appUser?.id)
-          : loteVertical.controles,
+        controles: loteVertical.controles,
       }))
       const verticalResultados = loteVerticales.map((loteVertical) => {
         const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
@@ -151,6 +149,9 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
   }, [appUser?.id, canEvaluateControls, loteVerticalesData, lotes, modelos, unidades, users])
 
   const controles = lotesConDatos.flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
+  const controlesLotesAbiertos = lotesConDatos
+    .filter((lote) => lote.estado === "abierto")
+    .flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
 
   const lotesFiltrados = lotesConDatos
     .map((lote) => {
@@ -174,9 +175,9 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
 
   const stats = {
     total: controles.length,
-    pendientes: controles.filter((c) => c.estado === "pendiente").length,
-    enCurso: controles.filter((c) => c.estado === "en_curso").length,
-    terminados: controles.filter((c) => c.estado === "terminado").length,
+    pendientes: controlesLotesAbiertos.filter((c) => c.estado === "pendiente").length,
+    enCurso: controlesLotesAbiertos.filter((c) => c.estado === "en_curso").length,
+    terminados: controlesLotesAbiertos.filter((c) => c.estado === "terminado").length,
   }
 
   const exportEvaluaciones = () => {
@@ -267,10 +268,6 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
             <SelectItem value="terminado">Terminados</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="w-full sm:w-auto lg:ml-auto" onClick={exportEvaluaciones}>
-          <Download className="mr-2 h-4 w-4" />
-          Exportar
-        </Button>
       </div>
         </>
       )}
@@ -290,9 +287,9 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                 <AccordionTrigger className="px-3 py-3 hover:bg-secondary/35 hover:no-underline sm:px-4">
                   <div className="grid min-w-0 w-full grid-cols-1 gap-3 pr-2 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center md:pr-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 overflow-hidden rounded">
+                      <div className="flex h-7 w-12 items-center justify-center overflow-hidden rounded">
                         {lote.unidadLogo ? (
-                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={28} height={28} className="object-contain" />
+                          <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={48} height={28} className="h-full w-full object-contain" />
                         ) : (
                           <Building2 className="h-4 w-4 text-primary" />
                         )}
@@ -353,7 +350,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
 
       {view === "evaluaciones" && (
         <>
-      <Accordion type="multiple" defaultValue={lotesFiltrados.map((lote) => lote.id)} className="space-y-4">
+      <Accordion type="multiple" className="space-y-4">
         {lotesFiltrados.map((lote) => {
           const totalControles = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
           const terminados = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
@@ -363,14 +360,14 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               <AccordionTrigger className="px-3 py-4 hover:no-underline hover:bg-secondary/35 sm:px-5">
                 <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left lg:flex-row lg:items-center lg:justify-between lg:pr-4">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg overflow-hidden">
+                    <div className="flex h-11 w-16 shrink-0 items-center justify-center rounded-lg overflow-hidden">
                       {lote.unidadLogo ? (
                         <Image
                           src={lote.unidadLogo}
                           alt={lote.unidadNombre}
-                          width={44}
+                          width={64}
                           height={44}
-                          className="object-contain"
+                          className="h-full w-full object-contain"
                         />
                       ) : (
                         <div className="flex items-center justify-center w-full h-full rounded-lg border border-primary/20 bg-primary/10">
@@ -399,7 +396,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-5 sm:px-5">
-                <Accordion type="multiple" defaultValue={lote.loteVerticales.map((lv) => lv.id)} className="space-y-3">
+                <Accordion type="multiple" className="space-y-3">
                   {lote.loteVerticales.map((loteVertical) => {
                     const modelo = modelos.find((m) => m.id === lote.modeloControlId)
                     const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
@@ -452,26 +449,25 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                             <div className="space-y-2">
                               {loteVertical.controles.map((control) => {
                                 const auditor = control.auditorId ? users.find((u) => u.id === control.auditorId) : null
+                                const canEvaluateThisControl = canEvaluateControls && control.auditorId === appUser?.id
                                 return (
                                   <Card key={control.id} className="border-border/60 bg-card">
                                     <CardContent className="p-3">
                                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                         <div>
                                           <div className="mb-1 flex flex-wrap items-center gap-2">
-                                            <span className="font-mono text-sm font-semibold">{control.identificador}</span>
+                                            <span className="text-sm font-semibold text-foreground">{control.identificador}</span>
                                             <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
                                             {control.scoreControl !== undefined && (
                                               <span className={`text-sm font-semibold ${getScoreColor(control.scoreControl)}`}>{control.scoreControl}</span>
                                             )}
                                           </div>
-                                          <p className="text-sm text-muted-foreground">
-                                            {control.proceso || "Sin proceso"}
-                                            {control.subproceso && ` / ${control.subproceso}`}
-                                            {auditor && ` | Auditor: ${auditor.name}`}
-                                          </p>
+                                          {auditor && (
+                                            <p className="text-sm text-muted-foreground">Auditor: {auditor.name}</p>
+                                          )}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          {!canEvaluateControls || control.estado === "terminado" ? (
+                                          {!canEvaluateThisControl || control.estado === "terminado" ? (
                                             <Button variant="outline" size="sm" asChild>
                                               <Link href={`/evaluaciones/${control.id}`}>
                                                 <Eye className="mr-1 h-4 w-4" />

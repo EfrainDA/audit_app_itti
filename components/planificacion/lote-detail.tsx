@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -43,7 +42,6 @@ import {
   Trash2, 
   ChevronRight, 
   FileCheck, 
-  FileText, 
   Clock, 
   CheckCircle2,
   LayoutList 
@@ -62,6 +60,26 @@ import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
+
+const CONTROL_TAGS: NonNullable<Control["etiqueta"]>[] = [
+  "Unidad de Negocio",
+  "Producto",
+  "Proceso",
+  "Proceso de apoyo",
+]
+
+const isProcessTag = (tag: Control["etiqueta"]) => tag === "Proceso" || tag === "Proceso de apoyo"
+const isBusinessUnitTag = (tag: Control["etiqueta"]) => tag === "Unidad de Negocio"
+
+const buildBusinessUnitControlName = (recibe: string, presta: string) => {
+  if (!recibe || !presta) return ""
+  return `${recibe} - ${presta}`
+}
+
+const splitBusinessUnitControlName = (name: string) => {
+  const [recibe = "", presta = ""] = name.split(" - ")
+  return { recibe, presta }
+}
 
 interface LoteDetailProps {
   lote: Lote
@@ -110,11 +128,15 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
   const initialNewControl = {
     identificador: "",
+    etiqueta: "Unidad de Negocio" as NonNullable<Control["etiqueta"]>,
     auditorId: "",
     correspondeProceso: false,
     proceso: "",
     subprocesos: [] as string[],
     subprocesoTemp: "",
+    productosVinculados: [] as string[],
+    unidadPrestaServicio: "",
+    unidadRecibeServicio: "",
   }
 
   const [showAddControl, setShowAddControl] = useState<string | null>(null)
@@ -134,22 +156,27 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
     if (loteVerticales.length > 0) setAutoSaveStatus('saved')
   }, [loteVerticales])
 
-  const existingControlNames = useMemo(() => {
+  const controlsForCurrentUnit = useMemo(() => {
     const loteIdsForUnidad = data.lotes
       .filter((unitLot) => unitLot.unidadNegocioId === lote.unidadNegocioId)
       .map((unitLot) => unitLot.id)
 
-    const persistedNames = data.loteVerticales
+    const persistedControls = data.loteVerticales
       .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
-      .flatMap((lv) => lv.controles.map((control) => control.identificador))
+      .flatMap((lv) => lv.controles)
 
-    const localNames = loteVerticales.flatMap((lv) =>
-      lv.controles.map((control) => control.identificador)
-    )
+    const localControls = loteVerticales.flatMap((lv) => lv.controles)
 
-    const names = [...persistedNames, ...localNames]
+    return [...persistedControls, ...localControls]
+  }, [data.lotes, data.loteVerticales, lote.unidadNegocioId, loteVerticales])
+
+  const existingControlNames = useMemo(() => {
+    const names = controlsForCurrentUnit
+      .filter((control) => (control.etiqueta ?? "Unidad de Negocio") === newControl.etiqueta)
+      .map((control) => control.identificador)
+      .filter((name) => name.trim().length > 0)
     return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
-  }, [lote.unidadNegocioId, loteVerticales])
+  }, [controlsForCurrentUnit, newControl.etiqueta])
 
   const filteredControlNames = existingControlNames.filter((name) =>
     name.toLowerCase().includes(newControl.identificador.trim().toLowerCase())
@@ -159,26 +186,12 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   )
 
   const existingProcessNames = useMemo(() => {
-    const loteIdsForUnidad = data.lotes
-      .filter((unitLot) => unitLot.unidadNegocioId === lote.unidadNegocioId)
-      .map((unitLot) => unitLot.id)
-
-    const persistedNames = data.loteVerticales
-      .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
-      .flatMap((lv) =>
-        lv.controles
-          .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
-          .filter((process): process is string => Boolean(process?.trim()))
-      )
-
-    const localNames = loteVerticales.flatMap((lv) =>
-      lv.controles
-        .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
-        .filter((process): process is string => Boolean(process?.trim()))
-    )
-
-    return Array.from(new Set([...persistedNames, ...localNames])).sort((a, b) => a.localeCompare(b))
-  }, [lote.unidadNegocioId, loteVerticales])
+    const names = controlsForCurrentUnit
+      .filter((control) => (control.etiqueta ?? "Unidad de Negocio") === newControl.etiqueta)
+      .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
+      .filter((process): process is string => Boolean(process?.trim()))
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
+  }, [controlsForCurrentUnit, newControl.etiqueta])
 
   const filteredProcessNames = existingProcessNames.filter((name) =>
     name.toLowerCase().includes(newControl.proceso.trim().toLowerCase())
@@ -187,8 +200,36 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
     (name) => name.toLowerCase() === newControl.proceso.trim().toLowerCase()
   )
 
+  const productControls = useMemo(() => {
+    return loteVerticales
+      .flatMap((lv) => lv.controles)
+      .filter((control) => control.etiqueta === "Producto")
+      .map((control) => control.producto || control.identificador)
+      .filter((name): name is string => Boolean(name?.trim()))
+      .filter((name, index, items) => items.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index)
+      .sort((a, b) => a.localeCompare(b))
+  }, [loteVerticales])
+  const businessUnitOptions = data.unidades.map((unit) => unit.nombre).sort((a, b) => a.localeCompare(b))
+
+  const toggleLinkedProduct = (
+    current: string[],
+    product: string,
+    onChange: (nextProducts: string[]) => void,
+  ) => {
+    onChange(
+      current.includes(product)
+        ? current.filter((item) => item !== product)
+        : [...current, product],
+    )
+  }
+
   const handleAddControl = async (loteVerticalId: string) => {
-    const identificador = newControl.correspondeProceso ? newControl.proceso.trim() : newControl.identificador.trim()
+    const correspondeProceso = isProcessTag(newControl.etiqueta)
+    const identificador = correspondeProceso
+      ? newControl.proceso.trim()
+      : isBusinessUnitTag(newControl.etiqueta)
+        ? buildBusinessUnitControlName(newControl.unidadRecibeServicio, newControl.unidadPrestaServicio).trim()
+        : newControl.identificador.trim()
     if (!identificador) return
 
     const targetVertical = loteVerticales.find((lv) => lv.id === loteVerticalId)
@@ -201,9 +242,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
         lotId: lote.id,
         verticalId: targetVertical?.verticalId,
         identifier: identificador,
-        correspondsToProcess: newControl.correspondeProceso,
-        process: newControl.correspondeProceso ? newControl.proceso : undefined,
-        subprocesses: newControl.correspondeProceso ? newControl.subprocesos : undefined,
+        tag: newControl.etiqueta,
+        correspondsToProcess: correspondeProceso,
+        process: correspondeProceso ? newControl.proceso : undefined,
+        subprocesses: correspondeProceso ? newControl.subprocesos : undefined,
+        linkedProducts:
+          correspondeProceso && newControl.etiqueta !== "Proceso de apoyo"
+            ? newControl.productosVinculados
+            : [],
         auditorId: newControl.auditorId || undefined,
       })
       await refresh()
@@ -225,22 +271,33 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
   const openEditControl = (loteVerticalId: string, control: Control) => {
     const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
+    const controlIsProcess = isProcessTag(control.etiqueta) || Boolean(control.correspondeProceso)
+    const businessUnits = isBusinessUnitTag(control.etiqueta) ? splitBusinessUnitControlName(control.identificador) : { recibe: "", presta: "" }
 
     setEditingControl({ loteVerticalId, controlId: control.id })
     setEditControl({
       identificador: control.identificador,
+      etiqueta: control.etiqueta ?? "Unidad de Negocio",
       auditorId: control.auditorId || "",
-      correspondeProceso: Boolean(control.correspondeProceso),
-      proceso: control.correspondeProceso ? control.proceso || control.identificador : control.proceso || "",
+      correspondeProceso: controlIsProcess,
+      proceso: controlIsProcess ? control.proceso || control.identificador : control.proceso || "",
       subprocesos,
       subprocesoTemp: "",
+      productosVinculados: control.productosVinculados ?? [],
+      unidadPrestaServicio: businessUnits.presta,
+      unidadRecibeServicio: businessUnits.recibe,
     })
   }
 
   const handleUpdateControl = async () => {
     if (!editingControl) return
 
-    const identificador = editControl.correspondeProceso ? editControl.proceso.trim() : editControl.identificador.trim()
+    const correspondeProceso = isProcessTag(editControl.etiqueta)
+    const identificador = correspondeProceso
+      ? editControl.proceso.trim()
+      : isBusinessUnitTag(editControl.etiqueta)
+        ? buildBusinessUnitControlName(editControl.unidadRecibeServicio, editControl.unidadPrestaServicio).trim()
+        : editControl.identificador.trim()
     if (!identificador) return
 
     setFormError(null)
@@ -250,9 +307,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
       await updateControl({
         id: editingControl.controlId,
         identifier: identificador,
-        correspondsToProcess: editControl.correspondeProceso,
-        process: editControl.correspondeProceso ? editControl.proceso : undefined,
-        subprocesses: editControl.correspondeProceso ? editControl.subprocesos : undefined,
+        tag: editControl.etiqueta,
+        correspondsToProcess: correspondeProceso,
+        process: correspondeProceso ? editControl.proceso : undefined,
+        subprocesses: correspondeProceso ? editControl.subprocesos : undefined,
+        linkedProducts:
+          correspondeProceso && editControl.etiqueta !== "Proceso de apoyo"
+            ? editControl.productosVinculados
+            : [],
         auditorId: editControl.auditorId || undefined,
       })
       await refresh()
@@ -290,6 +352,16 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
     if (!control.subproceso) return 0
     return control.subproceso.split(",").filter((subproceso) => subproceso.trim().length > 0).length
   }
+  const getSubprocesosLabel = (control: Control) => {
+    const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
+    return subprocesos.join(", ")
+  }
+  const newControlIsProcess = isProcessTag(newControl.etiqueta)
+  const editControlIsProcess = isProcessTag(editControl.etiqueta)
+  const newControlIsBusinessUnit = isBusinessUnitTag(newControl.etiqueta)
+  const editControlIsBusinessUnit = isBusinessUnitTag(editControl.etiqueta)
+  const newControlBusinessUnitName = buildBusinessUnitControlName(newControl.unidadRecibeServicio, newControl.unidadPrestaServicio)
+  const editControlBusinessUnitName = buildBusinessUnitControlName(editControl.unidadRecibeServicio, editControl.unidadPrestaServicio)
 
   return (
     <div className="space-y-6">
@@ -380,14 +452,6 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
             const controlesTerminados = loteVertical.controles.filter((c) => c.estado === "terminado").length
             const controlesTotal = loteVertical.controles.length
-            const scorePromedio = loteVertical.controles.length > 0
-              ? Math.round(
-                  loteVertical.controles
-                    .filter((c) => c.scoreControl !== undefined)
-                    .reduce((acc, c) => acc + (c.scoreControl || 0), 0) /
-                  (loteVertical.controles.filter((c) => c.scoreControl !== undefined).length || 1)
-                )
-              : null
 
             return (
               <AccordionItem
@@ -405,7 +469,6 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                       </div>
                       <div className="text-left">
                         <p className="font-medium">{vertical.nombre}</p>
-                        <p className="text-xs text-accent">Peso asignado: {vertical.peso}%</p>
                         <p className="text-sm text-muted-foreground">
                           {vertical.parametros.length} parámetros a evaluar
                         </p>
@@ -416,14 +479,6 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                         <p className="text-sm text-muted-foreground">Controles</p>
                         <p className="font-medium">{controlesTerminados}/{controlesTotal}</p>
                       </div>
-                      {scorePromedio !== null && (
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Puntaje Promedio</p>
-                          <p className={`font-bold ${getScoreColor(scorePromedio)}`}>
-                            {scorePromedio}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -438,7 +493,8 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     ) : (
                       loteVertical.controles.map((control) => {
                         const auditor = data.users.find((u) => u.id === control.auditorId)
-                        const subprocesosCount = getSubprocesosCount(control)
+                        const subprocesosCount = control.correspondeProceso ? getSubprocesosCount(control) : 0
+                        const subprocesosLabel = control.correspondeProceso ? getSubprocesosLabel(control) : ""
                         
                         return (
                           <div 
@@ -447,9 +503,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                           >
                             <div className="flex flex-col min-w-0 flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="font-mono text-sm font-semibold text-foreground">
+                                <span className="text-sm font-semibold text-foreground">
                                   {control.identificador}
                                 </span>
+                                {control.etiqueta && (
+                                  <Badge variant="outline" className="h-5 text-[10px] font-medium">
+                                    {control.etiqueta}
+                                  </Badge>
+                                )}
                                 <Badge className={cn("text-[10px] h-5 px-1.5 uppercase font-bold", getEstadoBadgeColor(control.estado))}>
                                   {formatEstado(control.estado)}
                                 </Badge>
@@ -460,12 +521,9 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
-                                <FileText className="h-3 w-3 shrink-0" />
-                                <span>{control.proceso || "Sin proceso específico"}</span>
-                                {control.subproceso && <span className="text-border">|</span>}
-                                <span className="truncate">{control.subproceso}</span>
-                              </div>
+                              {subprocesosLabel && (
+                                <p className="text-xs text-muted-foreground">{subprocesosLabel}</p>
+                              )}
                             </div>
 
                             <div className="flex items-center justify-between sm:justify-end gap-6 sm:gap-8">
@@ -565,31 +623,98 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             <DialogTitle>Agregar Nuevo Control</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/60 px-4 py-3">
-              <div className="space-y-1">
-                <Label htmlFor="correspondeProceso" className="text-sm font-medium">
-                  Corresponde a Procesos
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Habilita la selección de proceso y la carga de subprocesos.
-                </p>
-              </div>
-              <Switch
-                id="correspondeProceso"
-                checked={newControl.correspondeProceso}
-                onCheckedChange={(checked) =>
+            <div className="space-y-2">
+              <Label htmlFor="etiqueta-control">Etiqueta</Label>
+              <Select
+                value={newControl.etiqueta}
+                onValueChange={(value) => {
+                  const etiqueta = value as NonNullable<Control["etiqueta"]>
+                  const nextIsProcess = isProcessTag(etiqueta)
                   setNewControl({
                     ...newControl,
-                    correspondeProceso: checked,
-                    identificador: checked ? newControl.proceso : newControl.identificador,
-                    proceso: checked ? newControl.proceso : "",
-                    subprocesos: checked ? newControl.subprocesos : [],
-                    subprocesoTemp: checked ? newControl.subprocesoTemp : "",
+                    etiqueta,
+                    correspondeProceso: nextIsProcess,
+                    identificador: nextIsProcess ? newControl.proceso : etiqueta === "Unidad de Negocio" ? "" : newControl.identificador,
+                    proceso: nextIsProcess ? newControl.proceso : "",
+                    subprocesos: nextIsProcess ? newControl.subprocesos : [],
+                    subprocesoTemp: nextIsProcess ? newControl.subprocesoTemp : "",
+                    productosVinculados: etiqueta === "Proceso de apoyo" || !nextIsProcess ? [] : newControl.productosVinculados,
+                    unidadPrestaServicio: etiqueta === "Unidad de Negocio" ? newControl.unidadPrestaServicio : "",
+                    unidadRecibeServicio: etiqueta === "Unidad de Negocio" ? newControl.unidadRecibeServicio : "",
                   })
-                }
-              />
+                }}
+              >
+                <SelectTrigger id="etiqueta-control" className="bg-secondary border-border">
+                  <SelectValue placeholder="Seleccionar etiqueta" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {CONTROL_TAGS.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {!newControl.correspondeProceso && (
+            {newControlIsBusinessUnit && (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="unidad-recibe-servicio">Unidad de negocio que recibe el servicio *</Label>
+                    <Select
+                      value={newControl.unidadRecibeServicio}
+                      onValueChange={(value) =>
+                        setNewControl({
+                          ...newControl,
+                          unidadRecibeServicio: value,
+                          identificador: buildBusinessUnitControlName(value, newControl.unidadPrestaServicio),
+                        })
+                      }
+                    >
+                      <SelectTrigger id="unidad-recibe-servicio" className="bg-secondary border-border">
+                        <SelectValue placeholder="Seleccionar unidad" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {businessUnitOptions.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unidad-presta-servicio">Unidad de negocio que presta servicio *</Label>
+                    <Select
+                      value={newControl.unidadPrestaServicio}
+                      onValueChange={(value) =>
+                        setNewControl({
+                          ...newControl,
+                          unidadPrestaServicio: value,
+                          identificador: buildBusinessUnitControlName(newControl.unidadRecibeServicio, value),
+                        })
+                      }
+                    >
+                      <SelectTrigger id="unidad-presta-servicio" className="bg-secondary border-border">
+                        <SelectValue placeholder="Seleccionar unidad" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {businessUnitOptions.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nombre del Control</Label>
+                  <Input value={newControlBusinessUnitName} readOnly placeholder="Se autocompleta al seleccionar las unidades" className="bg-secondary border-border" />
+                </div>
+              </>
+            )}
+            {!newControlIsProcess && !newControlIsBusinessUnit && (
             <div className="relative space-y-2">
               <Label htmlFor="identificador">Nombre del Control *</Label>
               <Input
@@ -604,7 +729,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                 }}
                 className="bg-secondary border-border"
               />
-              {isControlSuggestionsOpen && !newControl.correspondeProceso && (
+              {isControlSuggestionsOpen && !newControlIsProcess && (
                 <div
                   className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
                   onMouseDown={(event) => event.preventDefault()}
@@ -645,7 +770,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               )}
             </div>
             )}
-            {!newControl.correspondeProceso && (
+            {!newControlIsProcess && (
             <div className="space-y-2">
               <Label htmlFor="auditor">Auditor</Label>
               <Select
@@ -665,10 +790,10 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               </Select>
             </div>
             )}
-            {newControl.correspondeProceso && (
+            {newControlIsProcess && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="proceso">Proceso / Nombre del Control *</Label>
+                  <Label htmlFor="proceso">Nombre de proceso *</Label>
                   <div className="relative">
                     <Input
                       id="proceso"
@@ -769,6 +894,38 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     ))}
                   </div>
                 </div>
+                {newControl.etiqueta !== "Proceso de apoyo" && (
+                  <div className="space-y-2">
+                    <Label>Producto vinculado</Label>
+                    <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
+                      {productControls.length > 0 ? (
+                        productControls.map((product) => (
+                          <button
+                            key={product}
+                            type="button"
+                            className={cn(
+                              "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                              newControl.productosVinculados.includes(product)
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-background text-foreground hover:border-primary/40",
+                            )}
+                            onClick={() =>
+                              toggleLinkedProduct(newControl.productosVinculados, product, (nextProducts) =>
+                                setNewControl({ ...newControl, productosVinculados: nextProducts }),
+                              )
+                            }
+                          >
+                            {product}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground sm:col-span-2">
+                          No hay controles con etiqueta Producto en este lote.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="auditor-proceso">Auditor</Label>
                   <Select
@@ -797,7 +954,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             </Button>
             <Button
               onClick={() => showAddControl && handleAddControl(showAddControl)}
-              disabled={isSavingControl || (newControl.correspondeProceso ? !newControl.proceso.trim() : !newControl.identificador.trim())}
+              disabled={
+                isSavingControl ||
+                (newControlIsProcess
+                  ? !newControl.proceso.trim()
+                  : newControlIsBusinessUnit
+                    ? !newControlBusinessUnitName.trim()
+                    : !newControl.identificador.trim())
+              }
               className="bg-primary hover:bg-primary/90"
             >
               {isSavingControl ? "Guardando..." : "Agregar Control"}
@@ -820,32 +984,99 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             <DialogTitle>Editar Control</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/60 px-4 py-3">
-              <div className="space-y-1">
-                <Label htmlFor="edit-correspondeProceso" className="text-sm font-medium">
-                  Corresponde a Procesos
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Cambia entre control simple o control asociado a proceso/subprocesos.
-                </p>
-              </div>
-              <Switch
-                id="edit-correspondeProceso"
-                checked={editControl.correspondeProceso}
-                onCheckedChange={(checked) =>
+            <div className="space-y-2">
+              <Label htmlFor="edit-etiqueta-control">Etiqueta</Label>
+              <Select
+                value={editControl.etiqueta}
+                onValueChange={(value) => {
+                  const etiqueta = value as NonNullable<Control["etiqueta"]>
+                  const nextIsProcess = isProcessTag(etiqueta)
                   setEditControl({
                     ...editControl,
-                    correspondeProceso: checked,
-                    identificador: checked ? editControl.proceso || editControl.identificador : editControl.identificador,
-                    proceso: checked ? editControl.proceso || editControl.identificador : "",
-                    subprocesos: checked ? editControl.subprocesos : [],
-                    subprocesoTemp: checked ? editControl.subprocesoTemp : "",
+                    etiqueta,
+                    correspondeProceso: nextIsProcess,
+                    identificador: nextIsProcess ? editControl.proceso || editControl.identificador : etiqueta === "Unidad de Negocio" ? "" : editControl.identificador,
+                    proceso: nextIsProcess ? editControl.proceso || editControl.identificador : "",
+                    subprocesos: nextIsProcess ? editControl.subprocesos : [],
+                    subprocesoTemp: nextIsProcess ? editControl.subprocesoTemp : "",
+                    productosVinculados: etiqueta === "Proceso de apoyo" || !nextIsProcess ? [] : editControl.productosVinculados,
+                    unidadPrestaServicio: etiqueta === "Unidad de Negocio" ? editControl.unidadPrestaServicio : "",
+                    unidadRecibeServicio: etiqueta === "Unidad de Negocio" ? editControl.unidadRecibeServicio : "",
                   })
-                }
-              />
+                }}
+              >
+                <SelectTrigger id="edit-etiqueta-control" className="bg-secondary border-border">
+                  <SelectValue placeholder="Seleccionar etiqueta" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {CONTROL_TAGS.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {!editControl.correspondeProceso && (
+            {editControlIsBusinessUnit && (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-unidad-recibe-servicio">Unidad de negocio que recibe el servicio *</Label>
+                    <Select
+                      value={editControl.unidadRecibeServicio}
+                      onValueChange={(value) =>
+                        setEditControl({
+                          ...editControl,
+                          unidadRecibeServicio: value,
+                          identificador: buildBusinessUnitControlName(value, editControl.unidadPrestaServicio),
+                        })
+                      }
+                    >
+                      <SelectTrigger id="edit-unidad-recibe-servicio" className="bg-secondary border-border">
+                        <SelectValue placeholder="Seleccionar unidad" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {businessUnitOptions.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-unidad-presta-servicio">Unidad de negocio que presta servicio *</Label>
+                    <Select
+                      value={editControl.unidadPrestaServicio}
+                      onValueChange={(value) =>
+                        setEditControl({
+                          ...editControl,
+                          unidadPrestaServicio: value,
+                          identificador: buildBusinessUnitControlName(editControl.unidadRecibeServicio, value),
+                        })
+                      }
+                    >
+                      <SelectTrigger id="edit-unidad-presta-servicio" className="bg-secondary border-border">
+                        <SelectValue placeholder="Seleccionar unidad" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {businessUnitOptions.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nombre del Control</Label>
+                  <Input value={editControlBusinessUnitName} readOnly placeholder="Se autocompleta al seleccionar las unidades" className="bg-secondary border-border" />
+                </div>
+              </>
+            )}
+            {!editControlIsProcess && !editControlIsBusinessUnit && (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="edit-identificador">Nombre del Control *</Label>
@@ -877,10 +1108,10 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               </>
             )}
 
-            {editControl.correspondeProceso && (
+            {editControlIsProcess && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-proceso">Proceso / Nombre del Control *</Label>
+                  <Label htmlFor="edit-proceso">Nombre de proceso *</Label>
                   <Input
                     id="edit-proceso"
                     value={editControl.proceso}
@@ -936,6 +1167,38 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     ))}
                   </div>
                 </div>
+                {editControl.etiqueta !== "Proceso de apoyo" && (
+                  <div className="space-y-2">
+                    <Label>Producto vinculado</Label>
+                    <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
+                      {productControls.length > 0 ? (
+                        productControls.map((product) => (
+                          <button
+                            key={product}
+                            type="button"
+                            className={cn(
+                              "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                              editControl.productosVinculados.includes(product)
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-background text-foreground hover:border-primary/40",
+                            )}
+                            onClick={() =>
+                              toggleLinkedProduct(editControl.productosVinculados, product, (nextProducts) =>
+                                setEditControl({ ...editControl, productosVinculados: nextProducts }),
+                              )
+                            }
+                          >
+                            {product}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground sm:col-span-2">
+                          No hay controles con etiqueta Producto en este lote.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="edit-auditor-proceso">Auditor</Label>
                   <Select
@@ -970,7 +1233,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             </Button>
             <Button
               onClick={handleUpdateControl}
-              disabled={isSavingControl || (editControl.correspondeProceso ? !editControl.proceso.trim() : !editControl.identificador.trim())}
+              disabled={
+                isSavingControl ||
+                (editControlIsProcess
+                  ? !editControl.proceso.trim()
+                  : editControlIsBusinessUnit
+                    ? !editControlBusinessUnitName.trim()
+                    : !editControl.identificador.trim())
+              }
               className="bg-primary hover:bg-primary/90"
             >
               {isSavingControl ? "Guardando..." : "Guardar Cambios"}

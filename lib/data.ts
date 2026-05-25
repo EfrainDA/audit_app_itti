@@ -98,11 +98,13 @@ export interface Control {
   descripcion?: string
   estado: "pendiente" | "en_curso" | "terminado"
   scoreControl?: number
+  etiqueta?: "Unidad de Negocio" | "Producto" | "Proceso" | "Proceso de apoyo"
   proceso?: string
   subproceso?: string
   subprocesos?: string[]
   correspondeProceso?: boolean
   producto?: string
+  productosVinculados?: string[]
   fechaCreacion: string
   auditorId?: string
 }

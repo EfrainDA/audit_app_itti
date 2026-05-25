@@ -6,6 +6,8 @@ import { MobileNav, Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
 
+const PREFETCH_ROUTES = ["/", "/planificacion", "/evaluaciones", "/calificaciones", "/modelos", "/ajustes"]
+
 interface MainLayoutProps {
   children: React.ReactNode
   title: string
@@ -30,6 +32,14 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
       router.replace("/")
     }
   }, [isAuditorBlockedPath, isLoading, router, session])
+
+  useEffect(() => {
+    if (isLoading || !session) return
+
+    PREFETCH_ROUTES.forEach((route) => {
+      if (route !== pathname) router.prefetch(route)
+    })
+  }, [isLoading, pathname, router, session])
 
   if (isLoading || !session) {
     return (

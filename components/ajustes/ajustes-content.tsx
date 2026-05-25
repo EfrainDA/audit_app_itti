@@ -688,7 +688,7 @@ export function AjustesContent() {
                   </DialogHeader>
                   <div className="space-y-5 pt-2">
                     <div className="flex items-center gap-4 rounded-lg border border-border/70 bg-secondary/35 p-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-primary/10">
+                      <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-primary/10">
                         {unidadLogo ? (
                           <img src={unidadLogo} alt="Logo de la unidad" className="h-full w-full object-contain" />
                         ) : (
@@ -776,7 +776,7 @@ export function AjustesContent() {
                     <TableRow key={unidad.id} className="border-border">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-primary/10">
+                          <div className="flex h-8 w-14 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-primary/10">
                             {unidad.logo ? (
                               <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
                             ) : (

@@ -377,7 +377,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <h2 className="text-xl font-bold font-mono">{control.identificador}</h2>
+                  <h2 className="text-xl font-semibold tracking-tight text-foreground">{control.identificador}</h2>
                   <Badge className={getEstadoBadgeColor(control.estado)}>
                     {formatEstado(control.estado)}
                   </Badge>
@@ -481,104 +481,113 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
               <Card
                 key={parametro.id}
                 className={cn(
-                  "bg-secondary border-border transition-colors",
-                  tieneRespuesta && "border-l-4",
-                  respuesta?.valor === "cumple" && "border-l-success",
-                  respuesta?.valor === "intermedio" && "border-l-warning",
-                  respuesta?.valor === "no_cumple" && "border-l-destructive",
-                  respuesta?.valor === "na" && "border-l-muted-foreground"
+                  "overflow-hidden border-border/70 bg-card shadow-sm transition-colors",
+                  tieneRespuesta && "ring-1",
+                  respuesta?.valor === "cumple" && "ring-success/35",
+                  respuesta?.valor === "intermedio" && "ring-warning/35",
+                  respuesta?.valor === "no_cumple" && "ring-destructive/35",
+                  respuesta?.valor === "na" && "ring-muted-foreground/30"
                 )}
               >
-                <CardContent className="p-4">
-                    <div className="flex flex-col gap-3 mb-3 sm:flex-row sm:items-start sm:justify-between">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
                     <div className="flex min-w-0 items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                        <span className="text-primary text-sm font-medium">{index + 1}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <h5 className="font-medium">{parametro.nombre}</h5>
-                        {parametro.descripcion && (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {parametro.descripcion}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="shrink-0">{parametro.puntosBase} pts</Badge>
-                  </div>
-
-                  {/* Preguntas guía */}
-                  {parametro.preguntas.length > 0 && (
-                    <div className="mb-4 p-3 bg-muted/50 rounded-lg space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Criterios de evaluación:</p>
-                      {parametro.preguntas.map((pregunta) => (
-                        <p key={pregunta.id} className="text-sm flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          {pregunta.texto}
-                          {pregunta.evidenciaObligatoria && (
-                            <Badge variant="outline" className="text-xs shrink-0">Evidencia req.</Badge>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/12">
+                          <span className="text-sm font-semibold text-primary">{index + 1}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h5 className="text-base font-semibold leading-6 text-foreground">{parametro.nombre}</h5>
+                            <Badge variant="outline" className="h-6 shrink-0 px-2 text-[11px] font-semibold">{parametro.puntosBase} pts</Badge>
+                          </div>
+                          {parametro.descripcion && (
+                            <div className="mt-3 rounded-lg bg-secondary/35 px-3 py-2.5">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Descripción</p>
+                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                {parametro.descripcion}
+                              </p>
+                            </div>
                           )}
-                        </p>
-                      ))}
-                    </div>
-                  )}
+                          {parametro.preguntas.length > 0 && (
+                            <div className="mt-3 rounded-lg bg-secondary/25 p-3">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Criterios de evaluación</p>
+                              <div className="space-y-2">
+                                {parametro.preguntas.map((pregunta) => (
+                                  <p key={pregunta.id} className="flex items-start gap-2 text-sm leading-6 text-foreground">
+                                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                    <span className="min-w-0">{pregunta.texto}</span>
+                                    {pregunta.evidenciaObligatoria && (
+                                      <Badge variant="outline" className="shrink-0 text-xs">Evidencia req.</Badge>
+                                    )}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                  {/* Botones de Respuesta */}
-                  <div className="flex flex-wrap gap-2 mb-4">
+                    {/* Botones de Respuesta */}
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                     <Button
                       size="sm"
                       variant={respuesta?.valor === "cumple" ? "default" : "outline"}
-                      className={cn(
-                        respuesta?.valor === "cumple" && "bg-success hover:bg-success/90 text-success-foreground"
-                      )}
                       onClick={() => handleSetRespuesta(parametro.id, "cumple")}
                       disabled={!canEditEvaluation}
+                      className={cn(
+                        "h-8 justify-center text-xs",
+                        respuesta?.valor === "cumple" && "bg-success hover:bg-success/90 text-success-foreground"
+                      )}
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Cumple (100%)
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Cumple
                     </Button>
                     {parametro.permiteIntermedio && (
                       <Button
                         size="sm"
                         variant={respuesta?.valor === "intermedio" ? "default" : "outline"}
-                        className={cn(
-                          respuesta?.valor === "intermedio" && "bg-warning hover:bg-warning/90 text-warning-foreground"
-                        )}
                         onClick={() => handleSetRespuesta(parametro.id, "intermedio")}
                         disabled={!canEditEvaluation}
+                        className={cn(
+                          "h-8 justify-center text-xs",
+                          respuesta?.valor === "intermedio" && "bg-warning hover:bg-warning/90 text-warning-foreground"
+                        )}
                       >
-                        <MinusCircle className="h-4 w-4" />
-                        Intermedio (50%)
+                        <MinusCircle className="h-3.5 w-3.5" />
+                        Intermedio
                       </Button>
                     )}
                     <Button
                       size="sm"
                       variant={respuesta?.valor === "no_cumple" ? "default" : "outline"}
-                      className={cn(
-                        respuesta?.valor === "no_cumple" && "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                      )}
                       onClick={() => handleSetRespuesta(parametro.id, "no_cumple")}
                       disabled={!canEditEvaluation}
+                      className={cn(
+                        "h-8 justify-center text-xs",
+                        respuesta?.valor === "no_cumple" && "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                      )}
                     >
-                      <XCircle className="h-4 w-4" />
-                      No Cumple (0%)
+                      <XCircle className="h-3.5 w-3.5" />
+                      No cumple
                     </Button>
                     <Button
                       size="sm"
                       variant={respuesta?.valor === "na" ? "default" : "outline"}
-                      className={cn(
-                        respuesta?.valor === "na" && "bg-muted text-muted-foreground"
-                      )}
                       onClick={() => handleSetRespuesta(parametro.id, "na")}
                       disabled={!canEditEvaluation}
+                      className={cn(
+                        "h-8 justify-center text-xs",
+                        respuesta?.valor === "na" && "bg-muted text-muted-foreground"
+                      )}
                     >
-                      <AlertCircle className="h-4 w-4 mr-1" />
+                      <AlertCircle className="h-3.5 w-3.5" />
                       N/A
                     </Button>
+                    </div>
                   </div>
 
                   {/* Comentario y Evidencia */}
-                  <div className="space-y-3">
+                  <div className="mt-4 space-y-3">
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">

@@ -197,17 +197,13 @@ export function Sidebar() {
               <p className="truncate text-xs capitalize text-muted-foreground">{userRole}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {appUser?.role === "auditor" && (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link href="/ajustes">
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Preferencias
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <DropdownMenuItem asChild>
+              <Link href="/ajustes">
+                <Settings2 className="h-4 w-4 mr-2" />
+                Preferencias
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar sesion

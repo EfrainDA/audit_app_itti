@@ -152,11 +152,13 @@ type DbControl = {
   description: string | null
   status: Control["estado"] | "en_replica" | "terminada"
   control_score: number | null
+  tag: Control["etiqueta"] | null
   process: string | null
   subprocess: string | null
   subprocesses: string[] | null
   corresponds_to_process: boolean
   product: string | null
+  linked_products: string[] | null
   auditor_id: string | null
   created_at: string
 }
@@ -232,8 +234,8 @@ function normalizeAuditStatus(status: DbAudit["status"]): Auditoria["estado"] {
   return status
 }
 
-export async function fetchAppData(): Promise<AppData> {
-  const currentProfile = await getCurrentProfile()
+export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status">): Promise<AppData> {
+  const currentProfile = profile ?? await getCurrentProfile()
   const [
     usersResult,
     unitsResult,
@@ -273,12 +275,16 @@ export async function fetchAppData(): Promise<AppData> {
       .select(`
         id,lot_id,vertical_id,
         controls(
-          id,lot_vertical_id,identifier,description,status,control_score,process,subprocess,
-          subprocesses,corresponds_to_process,product,auditor_id,created_at
+        id,lot_vertical_id,identifier,description,status,control_score,process,subprocess,
+          subprocesses,corresponds_to_process,product,tag,linked_products,auditor_id,created_at
         )
       `),
     supabase.from("audits").select("id,lot_id,control_id,audit_date,status,total_score,auditor_id").order("audit_date", { ascending: false }),
-    supabase.from("notifications").select("id,user_id,title,message,type,read,created_at").order("created_at", { ascending: false }),
+    supabase
+      .from("notifications")
+      .select("id,user_id,title,message,type,read,created_at")
+      .eq("user_id", currentProfile.id)
+      .order("created_at", { ascending: false }),
   ])
 
   const firstError = [
@@ -362,11 +368,13 @@ export async function fetchAppData(): Promise<AppData> {
         descripcion: control.description ?? undefined,
         estado: normalizeControlStatus(control.status),
         scoreControl: control.control_score ?? undefined,
+        etiqueta: control.tag ?? undefined,
         proceso: control.process ?? undefined,
         subproceso: control.subprocess ?? undefined,
         subprocesos: control.subprocesses ?? undefined,
         correspondeProceso: control.corresponds_to_process,
         producto: control.product ?? undefined,
+        productosVinculados: control.linked_products ?? undefined,
         fechaCreacion: control.created_at,
         auditorId: control.auditor_id ?? undefined,
       })),
@@ -426,7 +434,7 @@ export async function fetchAppData(): Promise<AppData> {
     lotes: appData.lotes.filter((lot) => assignedLotIds.has(lot.id)),
     loteVerticales: assignedLoteVerticales,
     auditorias: appData.auditorias.filter((audit) => audit.auditorId === currentProfile.id),
-    notificaciones: appData.notificaciones.filter((notification) => notification.usuarioId === currentProfile.id),
+    notificaciones: appData.notificaciones,
   }
 }
 
@@ -602,14 +610,29 @@ async function assertCanReadControl(controlId: string) {
 
   const { data, error } = await supabase
     .from("controls")
-    .select("auditor_id")
+    .select("auditor_id,lot_verticals(lot_id)")
     .eq("id", controlId)
     .maybeSingle()
 
   if (error) throw error
-  if (!data || data.auditor_id !== profile.id) {
+  const lotVerticalRelation = data?.lot_verticals as unknown as { lot_id?: string } | { lot_id?: string }[] | null
+  const lotId = Array.isArray(lotVerticalRelation)
+    ? lotVerticalRelation[0]?.lot_id
+    : lotVerticalRelation?.lot_id
+
+  if (!data || !lotId) {
     throw new Error("No tienes permiso para ver este control.")
   }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("lot_auditors")
+    .select("lot_id")
+    .eq("lot_id", lotId)
+    .eq("auditor_id", profile.id)
+    .maybeSingle()
+
+  if (assignmentError) throw assignmentError
+  if (!assignment) throw new Error("No tienes permiso para ver este control.")
 
   return profile
 }
@@ -983,14 +1006,60 @@ export async function addLotAuditor(lotId: string, auditorId: string) {
   if (error) throw error
 }
 
+async function notifySupervisorsAboutReassignment(input: {
+  lotId?: string
+  controlName: string
+  fromAuditorId: string
+  toAuditorId: string
+  actorId: string
+}) {
+  const { data: usersData, error: usersError } = await supabase
+    .from("users")
+    .select("id,name,role,status")
+    .in("role", ["supervisor", "admin"])
+    .eq("status", "activo")
+
+  if (usersError) throw usersError
+
+  const recipients = (usersData ?? []).filter((user) => user.id !== input.actorId)
+  if (!recipients.length) return
+
+  const actor = (usersData ?? []).find((user) => user.id === input.actorId)
+  const { data: auditorData, error: auditorError } = await supabase
+    .from("users")
+    .select("id,name")
+    .in("id", [input.fromAuditorId, input.toAuditorId, input.actorId])
+
+  if (auditorError) throw auditorError
+
+  const usersById = new Map((auditorData ?? []).map((user) => [user.id, user.name]))
+  const actorName = usersById.get(input.actorId) ?? actor?.name ?? "Un auditor"
+  const fromName = usersById.get(input.fromAuditorId) ?? "auditor anterior"
+  const toName = usersById.get(input.toAuditorId) ?? "nuevo auditor"
+
+  const { error } = await supabase.from("notifications").insert(
+    recipients.map((recipient) => ({
+      user_id: recipient.id,
+      title: "Reasignacion de control",
+      message: `${actorName} reasigno "${input.controlName}" de ${fromName} a ${toName}.`,
+      type: "asignacion",
+      read: false,
+    })),
+  )
+
+  if (error) throw error
+}
+
 export async function createControl(input: {
   lotVerticalId: string
   lotId?: string
   verticalId?: string
   identifier: string
+  tag?: Control["etiqueta"]
   correspondsToProcess: boolean
   process?: string
   subprocesses?: string[]
+  linkedProducts?: string[]
   auditorId?: string
 }) {
   let lotVerticalId = input.lotVerticalId
@@ -1021,10 +1090,13 @@ export async function createControl(input: {
     lot_vertical_id: lotVerticalId,
     identifier: input.identifier.trim(),
     status: "pendiente",
+    tag: input.tag ?? null,
     corresponds_to_process: input.correspondsToProcess,
     process: input.process?.trim() || null,
     subprocess: input.subprocesses?.length ? input.subprocesses.join(", ") : null,
     subprocesses: input.subprocesses ?? [],
+    product: input.tag === "Producto" ? input.identifier.trim() : null,
+    linked_products: input.linkedProducts ?? [],
     auditor_id: input.auditorId || null,
   })
 
@@ -1034,25 +1106,56 @@ export async function createControl(input: {
 export async function updateControl(input: {
   id: string
   identifier: string
+  tag?: Control["etiqueta"]
   correspondsToProcess: boolean
   process?: string
   subprocesses?: string[]
+  linkedProducts?: string[]
   auditorId?: string
 }) {
-  await assertCanManageExistingControl(input.id)
+  const profile = await assertCanManageExistingControl(input.id)
+  const { data: previousControl, error: previousControlError } = await supabase
+    .from("controls")
+    .select("identifier,auditor_id,lot_verticals(lot_id)")
+    .eq("id", input.id)
+    .maybeSingle()
+
+  if (previousControlError) throw previousControlError
+
   const { error } = await supabase
     .from("controls")
     .update({
       identifier: input.identifier.trim(),
+      tag: input.tag ?? null,
       corresponds_to_process: input.correspondsToProcess,
       process: input.process?.trim() || null,
       subprocess: input.subprocesses?.length ? input.subprocesses.join(", ") : null,
       subprocesses: input.subprocesses ?? [],
+      product: input.tag === "Producto" ? input.identifier.trim() : null,
+      linked_products: input.linkedProducts ?? [],
       auditor_id: input.auditorId || null,
     })
     .eq("id", input.id)
 
   if (error) throw error
+
+  if (
+    profile.role === "auditor" &&
+    previousControl?.auditor_id &&
+    input.auditorId &&
+    previousControl.auditor_id !== input.auditorId
+  ) {
+    const lotId = Array.isArray(previousControl.lot_verticals)
+      ? previousControl.lot_verticals[0]?.lot_id
+      : (previousControl.lot_verticals as { lot_id?: string } | null)?.lot_id
+    await notifySupervisorsAboutReassignment({
+      lotId,
+      controlName: previousControl.identifier ?? input.identifier,
+      fromAuditorId: previousControl.auditor_id,
+      toAuditorId: input.auditorId,
+      actorId: profile.id,
+    })
+  }
 }
 
 export async function deleteControl(id: string) {

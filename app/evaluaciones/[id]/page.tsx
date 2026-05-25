@@ -9,7 +9,7 @@ export default async function EvaluacionDetailPage({
   const { id } = await params
 
   return (
-    <MainLayout title="Evaluación de Control" subtitle={id}>
+    <MainLayout title="Evaluación de control">
       <EvaluacionDetail controlId={id} />
     </MainLayout>
   )

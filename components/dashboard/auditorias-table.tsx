@@ -120,11 +120,11 @@ export function AuditoriasTable() {
               </td>
               <td className="py-3 px-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 overflow-hidden rounded">
+                  <div className="flex h-6 w-10 items-center justify-center overflow-hidden rounded">
                     {control.unidadLogo ? (
-                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={24} height={24} className="object-contain" />
+                      <Image src={control.unidadLogo} alt={control.unidadNombre} width={40} height={24} className="h-full w-full object-contain" />
                     ) : (
-                      <div className="h-6 w-6 flex items-center justify-center bg-muted rounded">
+                      <div className="flex h-full w-full items-center justify-center rounded bg-muted">
                         <span className="text-xs">U</span>
                       </div>
                     )}

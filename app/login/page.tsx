@@ -243,20 +243,7 @@ function LoginContent() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="password">Contrasena</Label>
-                  {mode === "login" && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="h-auto px-0 py-0 text-xs font-semibold"
-                      disabled={isResettingPassword}
-                      onClick={handlePasswordReset}
-                    >
-                      {isResettingPassword ? "Enviando..." : "Olvidaste tu contrasena?"}
-                    </Button>
-                  )}
-                </div>
+                <Label htmlFor="password">Contrasena</Label>
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -280,6 +267,19 @@ function LoginContent() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
+                {mode === "login" && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto px-0 py-0 text-xs font-semibold"
+                      disabled={isResettingPassword}
+                      onClick={handlePasswordReset}
+                    >
+                      {isResettingPassword ? "Enviando..." : "Olvidaste tu contrasena?"}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {error && (
