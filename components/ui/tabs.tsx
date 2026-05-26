@@ -26,7 +26,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'bg-card text-muted-foreground inline-flex min-h-9 max-w-full items-center justify-start overflow-x-auto rounded-lg border border-border/70 p-[3px] shadow-[0_8px_18px_oklch(0.30_0.032_252_/_0.045)] sm:w-fit sm:justify-center',
+        'bg-card text-muted-foreground inline-flex min-h-9 max-w-full items-center justify-start overflow-x-auto rounded-lg border border-border/70 p-[3px] shadow-none sm:w-fit sm:justify-center',
         className,
       )}
       {...props}
@@ -42,7 +42,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:border-primary/30 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:text-foreground dark:data-[state=active]:border-primary/35 dark:data-[state=active]:bg-primary/14 text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-semibold whitespace-nowrap transition-[color,box-shadow,border-color,background,transform] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-[0_6px_16px_oklch(0.30_0.032_252_/_0.055)] data-[state=active]:[&_svg]:text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:border-primary/30 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:text-foreground dark:data-[state=active]:border-primary/35 dark:data-[state=active]:bg-primary/14 text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-semibold whitespace-nowrap transition-[color,border-color,background] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-none data-[state=active]:[&_svg]:text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

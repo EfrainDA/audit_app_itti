@@ -282,7 +282,7 @@ export function AjustesContent() {
       )
       await refresh()
     } catch (submitError) {
-      setThresholdError(getErrorMessage(submitError, "No se pudieron guardar los umbrales."))
+      setThresholdError(getErrorMessage(submitError, "No se pudieron guardar los cambios."))
     } finally {
       setIsSavingThresholds(false)
     }
@@ -494,7 +494,7 @@ export function AjustesContent() {
             <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base">Unidades de Negocio</CardTitle>
-                <CardDescription>Administra las unidades y el ecosistema al que pertenecen</CardDescription>
+                <CardDescription>Administra las unidades de negocioy el ecosistema al que pertenecen</CardDescription>
               </div>
               <Dialog
                 open={isUnidadOpen}
@@ -513,7 +513,7 @@ export function AjustesContent() {
                   <DialogHeader>
                     <DialogTitle>{editingUnidad ? "Editar Unidad de Negocio" : "Nueva Unidad de Negocio"}</DialogTitle>
                     <DialogDescription>
-                      Carga los datos de la unidad y su imagen para verla luego en planificación y lotes.
+                      Carga los datos de la unidad y su logo
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-5 pt-2">
@@ -527,7 +527,7 @@ export function AjustesContent() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <Label htmlFor="unidad-logo" className="text-sm font-medium">
-                          Foto o logo de la unidad
+                          Logo de la unidad
                         </Label>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Se usará como identificador visual en planificación y lotes.
@@ -564,7 +564,7 @@ export function AjustesContent() {
                         value={unidadEcosistema}
                         disabled={!canCreateUnits}
                         onChange={(event) => setUnidadEcosistema(event.target.value)}
-                        placeholder="Ej. Financiero, Pagos, Seguros"
+                        placeholder="Ej. Financiero, Tecnológico, etc."
                         className="bg-secondary border-border"
                       />
                     </div>

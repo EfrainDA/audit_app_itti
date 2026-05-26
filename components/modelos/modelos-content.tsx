@@ -106,7 +106,7 @@ export function ModelosContent() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className="h-24 gap-0 border-success/15 bg-card/88 py-0 backdrop-blur-xl dark:border-success/25 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="success" size="md" />
             <div>
@@ -115,7 +115,7 @@ export function ModelosContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-primary/15 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/25 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="primary" size="md" />
             <div>
@@ -124,7 +124,7 @@ export function ModelosContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="h-24 gap-0 border-border/70 bg-card/88 py-0 backdrop-blur-xl dark:border-primary/18 dark:bg-card/86">
+        <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={Archive} tone="neutral" size="md" />
             <div>

@@ -34,11 +34,9 @@ import {
   ClipboardCheck,
   Clock,
   Crown,
-  FileCheck,
   Gauge,
   Layers,
   LineChart,
-  PieChart,
   Play,
   ShieldAlert,
   ShieldCheck,
@@ -80,7 +78,6 @@ import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ProgressChart, type ProgressChartDatum } from "./progress-chart"
 import { ScoreByVerticalChart, type ScoreByVerticalDatum } from "./score-by-vertical-chart"
-import { AuditoriasTable } from "./auditorias-table"
 
 type DashboardView = "analista" | "supervisor" | "ceo"
 
@@ -165,8 +162,22 @@ type AnalystLoteScore = {
 type SupervisorVerticalScore = {
   id: string
   name: string
+  weight: number
+  total: number
+  completed: number
   performancePct: number | null
   achieved: number | null
+  parameterStats: {
+    id: string
+    name: string
+    total: number
+    cumple: number
+    intermedio: number
+    noCumple: number
+    na: number
+    noResponse: number
+    noCumplePct: number
+  }[]
   controls: {
     id: string
     identificador?: string
@@ -192,6 +203,7 @@ type SupervisorLoteSummary = {
     verticalName: string
     parametro: string
     count: number
+    total: number
   }[]
 }
 
@@ -201,39 +213,6 @@ type SupervisorAnalystSummary = {
   assigned: number
   advance: number
   pending: number
-}
-
-const roleCopy: Record<DashboardView, {
-  label: string
-  icon: LucideIcon
-  headline: string
-  description: string
-  marker: string
-}> = {
-  analista: {
-    label: "Analista CC",
-    icon: UserCheck,
-    headline: "Centro de ejecucion para cerrar auditorias con precision.",
-    description:
-      "Enfocado en controles asignados, proximas acciones, calidad de evidencia y avance personal dentro del ciclo activo.",
-    marker: "Ejecucion personal",
-  },
-  supervisor: {
-    label: "Supervisor",
-    icon: ShieldCheck,
-    headline: "Seguimiento operativo del ciclo.",
-    description:
-      "Seguimiento de equipos, lotes abiertos, bloqueos y desempeno consolidado por vertical.",
-    marker: "Seguimiento operativo",
-  },
-  ceo: {
-    label: "CEO",
-    icon: Crown,
-    headline: "Vision ejecutiva del riesgo, cobertura y desempeno.",
-    description:
-      "Una vista de alto nivel para entender si el ciclo protege al negocio y donde conviene intervenir primero.",
-    marker: "Decision estrategica",
-  },
 }
 
 const roleDesign: Record<DashboardView, {
@@ -595,7 +574,7 @@ function AnalystProgressPanel({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proceso asignado</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Progreso de Controles del Ciclos</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {loteCount} {loteCount === 1 ? "lote activo" : "lotes activos"} / {counts.total} controles
             </p>
@@ -619,7 +598,7 @@ function AnalystUnitScore({
   return (
     <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Calificación de unidades del ciclo</CardTitle>
+        <CardTitle className="text-base font-semibold">Calificación de Unidades de Negocio</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {lotes.map((lote) => {
@@ -666,45 +645,40 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
     <div>
       <Table className="min-w-[760px] table-fixed">
         <colgroup>
-          <col style={{ width: "42%" }} />
-          <col style={{ width: "18%" }} />
-          <col style={{ width: "18%" }} />
+          <col style={{ width: "32%" }} />
+          <col style={{ width: "19%" }} />
+          <col style={{ width: "19%" }} />
           <col style={{ width: "12%" }} />
-          <col style={{ width: "10%" }} />
+          <col style={{ width: "12%" }} />
         </colgroup>
         <TableHeader>
           <TableRow className="border-border">
-            <TableHead>Control</TableHead>
+            <TableHead className="pl-5">Control Asignado</TableHead>
             <TableHead>Vertical</TableHead>
             <TableHead>Unidad de Negocio</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="text-right">Accion</TableHead>
+            <TableHead className="text-left">Acción</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {controls.map((control) => (
             <TableRow key={control.id} className="border-border">
-              <TableCell>
-                <div>
-                  <span className="text-sm font-semibold text-foreground">{control.identificador || control.id}</span>
-                  {(control.proceso || control.subproceso) && (
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {[control.proceso, control.subproceso].filter(Boolean).join(" / ")}
-                    </p>
-                  )}
+              <TableCell className="max-w-0 pl-5 pr-4 align-top">
+                <div className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-foreground">{control.identificador || control.id}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-sm">{control.verticalNombre}</TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="truncate pr-4 text-sm align-top">{control.verticalNombre}</TableCell>
+              <TableCell className="truncate pr-4 text-sm align-top">
                 {control.unidadNombre}
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
               </TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" className="h-8" asChild>
+              <TableCell className="text-left align-top">
+                <Button size="sm" className="h-6 rounded-md px-2 text-xs" asChild>
                   <Link href={`/evaluaciones/${control.id}`}>
-                    <Play className="mr-1 h-4 w-4" />
+                    <Play className="mr-1 h-3.5 w-3.5" />
                     Evaluar
                   </Link>
                 </Button>
@@ -716,7 +690,7 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
 
       {controls.length === 0 && (
         <div className="py-10 text-center text-sm text-muted-foreground">
-          No hay auditorias en curso o pendientes asignadas para este analista.
+          No hay controles en curso o pendientes asignados
         </div>
       )}
     </div>
@@ -738,7 +712,7 @@ function SupervisorCycleProgress({
         { label: "Pendientes", value: counts.pending, className: "text-destructive" },
       ]
     : [
-        { label: "Total auditorias", value: counts.total, className: "text-primary" },
+        { label: "Total de Controles", value: counts.total, className: "text-primary" },
         { label: "Terminadas", value: counts.completed, className: "text-success" },
         { label: "En curso", value: counts.inCourse, className: "text-primary" },
         { label: "Pendientes", value: counts.pending, className: "text-destructive" },
@@ -855,6 +829,133 @@ function SupervisorAnalystAssignments({ analysts }: { analysts: SupervisorAnalys
   )
 }
 
+function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) {
+  const totalNoCumple = lote.nonCompliance.reduce((sum, item) => sum + item.count, 0)
+  const answeredParameters = lote.verticalScores.reduce(
+    (sum, vertical) => sum + vertical.parameterStats.reduce((paramSum, parametro) => paramSum + parametro.total, 0),
+    0,
+  )
+  const totalParameters = lote.verticalScores.reduce((sum, vertical) => sum + vertical.parameterStats.length, 0)
+  const criticalParameters = lote.verticalScores
+    .flatMap((vertical) =>
+      vertical.parameterStats
+        .filter((parametro) => parametro.noCumple > 0)
+        .map((parametro) => ({ ...parametro, verticalName: vertical.name })),
+    )
+    .sort((a, b) => b.noCumple - a.noCumple || b.total - a.total)
+    .slice(0, 6)
+
+  return (
+    <>
+      <DialogHeader className="pr-10 text-left">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <DialogTitle>Radiografia del lote</DialogTitle>
+            <DialogDescription className="mt-0">
+              {lote.unidadNombre} | {lote.modeloNombre}
+            </DialogDescription>
+          </div>
+          <span className={cn("text-4xl font-semibold leading-none tracking-tight", getSemaphore(lote.unitScore).text)}>
+            {lote.unitScore}%
+          </span>
+        </div>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-4">
+          {[
+            { label: "Controles", value: lote.counts.total },
+            { label: "Avance", value: `${lote.progressPct}%` },
+            { label: "Parametros evaluados", value: answeredParameters },
+            { label: "No cumple", value: totalNoCumple, danger: totalNoCumple > 0 },
+          ].map((metric) => (
+            <div key={metric.label} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{metric.label}</p>
+              <p className={cn("mt-1 text-xl font-semibold", metric.danger && "text-destructive")}>{metric.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">Verticales</p>
+            <p className="text-xs text-muted-foreground">{lote.verticalScores.length} verticales | {totalParameters} parametros</p>
+          </div>
+          <div className="space-y-2">
+            {lote.verticalScores.map((vertical) => {
+              const verticalNoCumple = vertical.parameterStats.reduce((sum, parametro) => sum + parametro.noCumple, 0)
+              const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
+
+              return (
+                <div key={`${lote.id}-${vertical.id}-radiography`} className="rounded-md border border-border/70 bg-background p-3">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_7rem_6rem] md:items-center">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold">{vertical.name}</p>
+                        <Badge variant="outline" className="h-5 px-2 text-[10px]">{vertical.weight}% peso</Badge>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className={cn("h-full rounded-full", verticalNoCumple ? "bg-destructive" : "bg-success")} style={{ width: `${Math.min(100, vertical.completed ? (vertical.completed / Math.max(1, vertical.total)) * 100 : 0)}%` }} />
+                      </div>
+                    </div>
+                    <p className={cn("text-sm font-semibold md:text-right", verticalSemaphore.text)}>
+                      {vertical.performancePct !== null ? `${vertical.performancePct}%` : "Sin score"}
+                    </p>
+                    <p className={cn("text-sm font-semibold md:text-right", verticalNoCumple ? "text-destructive" : "text-success")}>
+                      {verticalNoCumple} NC
+                    </p>
+                  </div>
+
+                  <div className="mt-3 space-y-1.5">
+                    {vertical.parameterStats
+                      .filter((parametro) => parametro.total > 0 || parametro.noResponse > 0)
+                      .sort((a, b) => b.noCumple - a.noCumple || b.noCumplePct - a.noCumplePct)
+                      .slice(0, 5)
+                      .map((parametro) => (
+                        <div key={parametro.id} className="grid gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_repeat(5,4.25rem)] md:items-center">
+                          <p className="truncate text-sm font-medium">{parametro.name}</p>
+                          <span className="text-success">C {parametro.cumple}</span>
+                          <span className="text-warning">I {parametro.intermedio}</span>
+                          <span className="font-semibold text-destructive">NC {parametro.noCumple}</span>
+                          <span className="text-muted-foreground">NA {parametro.na}</span>
+                          <span className="text-muted-foreground">S/R {parametro.noResponse}</span>
+                        </div>
+                      ))}
+                    {vertical.parameterStats.every((parametro) => parametro.total === 0) && (
+                      <p className="rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                        Sin respuestas registradas en esta vertical.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Parametros criticos</p>
+          {criticalParameters.length > 0 ? (
+            <div className="space-y-1.5">
+              {criticalParameters.map((parametro) => (
+                <div key={`${parametro.verticalName}-${parametro.id}`} className="grid gap-2 rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm md:grid-cols-[minmax(0,1fr)_minmax(8rem,0.35fr)_5rem] md:items-center">
+                  <p className="truncate font-medium">{parametro.name}</p>
+                  <p className="truncate text-muted-foreground">{parametro.verticalName}</p>
+                  <p className="font-semibold text-destructive md:text-right">{parametro.noCumple}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+              Sin parametros con respuesta no cumple en este lote.
+            </p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null)
   const selectedLote = lotes.find((lote) => lote.id === selectedLoteId)
@@ -906,72 +1007,8 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
         })}
       </CardContent>
       <Dialog open={Boolean(selectedLote)} onOpenChange={(open) => !open && setSelectedLoteId(null)}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
-          {selectedLote && (
-            <>
-              <DialogHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0 pr-10 text-left">
-                <div className="space-y-1">
-                  <DialogTitle>Detalle de {selectedLote.unidadNombre}</DialogTitle>
-                  <DialogDescription className="mt-0">
-                    Verticales, controles, puntajes y acceso directo al detalle de parametros.
-                  </DialogDescription>
-                </div>
-                <span className={cn("rounded-lg bg-transparent px-4 py-2 text-5xl font-semibold leading-none tracking-tight", getSemaphore(selectedLote.unitScore).text)}>
-                  {selectedLote.unitScore}%
-                </span>
-              </DialogHeader>
-              <div className="space-y-3">
-                {selectedLote.verticalScores.map((vertical) => {
-                  const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
-
-                  return (
-                    <div key={`${selectedLote.id}-${vertical.id}-dialog`} className="rounded-lg border border-border/60 bg-card p-3">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold">{vertical.name}</p>
-                        <span className={cn("text-sm font-semibold", verticalSemaphore.text)}>
-                          {vertical.achieved !== null ? `${vertical.achieved}% logrado` : "Sin puntaje"}
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {vertical.controls.map((control) => (
-                          <div
-                            key={control.id}
-                            className="grid gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm lg:grid-cols-[minmax(0,1fr)_112px_96px_auto] lg:items-center"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate font-medium">{control.identificador || control.id}</p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {[control.proceso, control.subproceso].filter(Boolean).join(" / ")}
-                              </p>
-                            </div>
-                            <div className="flex justify-start lg:justify-center">
-                              <Badge className={cn(getEstadoBadgeColor(control.estado), "min-w-24 justify-center shadow-none")}>
-                                {formatEstado(control.estado)}
-                              </Badge>
-                            </div>
-                            <span className="text-left font-semibold lg:text-right">
-                              {control.scoreControl !== undefined ? `${control.scoreControl} pts` : "Sin puntaje"}
-                            </span>
-                            <Button asChild variant="outline" size="sm" className="h-8 w-fit bg-background shadow-none">
-                              <Link href={`/evaluaciones/${control.id}`}>
-                                <ArrowUpRight className="h-3.5 w-3.5" />
-                                Ver control
-                              </Link>
-                            </Button>
-                          </div>
-                        ))}
-                        {vertical.controls.length === 0 && (
-                          <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-                            Sin controles registrados en esta vertical.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
+        <DialogContent className="max-h-[86vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:w-[90vw] lg:w-[64rem]">
+          {selectedLote && <LotRadiographyDialogContent lote={selectedLote} />}
         </DialogContent>
       </Dialog>
     </Card>
@@ -979,6 +1016,9 @@ function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
 }
 
 function SupervisorNonCompliance({ lotes }: { lotes: SupervisorLoteSummary[] }) {
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null)
+  const selectedLote = lotes.find((lote) => lote.id === selectedLoteId)
+
   return (
     <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
       <CardHeader className="pb-2">
@@ -990,9 +1030,19 @@ function SupervisorNonCompliance({ lotes }: { lotes: SupervisorLoteSummary[] }) 
           <div key={lote.id} className="rounded-lg border border-border/60 bg-background p-3">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="font-semibold">{lote.unidadNombre}</p>
-              <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
-                {lote.nonCompliance.reduce((sum, item) => sum + item.count, 0)} no cumple
-              </Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                  {lote.nonCompliance.reduce((sum, item) => sum + item.count, 0)} no cumple
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-primary shadow-none hover:bg-primary/8 hover:text-primary"
+                  onClick={() => setSelectedLoteId(lote.id)}
+                >
+                  Ver detalle
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               {lote.nonCompliance.map((item) => (
@@ -1011,6 +1061,11 @@ function SupervisorNonCompliance({ lotes }: { lotes: SupervisorLoteSummary[] }) 
           </div>
         ))}
       </CardContent>
+      <Dialog open={Boolean(selectedLote)} onOpenChange={(open) => !open && setSelectedLoteId(null)}>
+        <DialogContent className="max-h-[86vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:w-[90vw] lg:w-[64rem]">
+          {selectedLote && <LotRadiographyDialogContent lote={selectedLote} />}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -1071,6 +1126,7 @@ export function DashboardContent() {
   const lotes = appData.lotes
   const loteVerticales = appData.loteVerticales
   const auditorias = appData.auditorias
+  const respuestas = appData.respuestas
 
   useEffect(() => {
     if (isAuditor) setActiveView("analista")
@@ -1190,16 +1246,41 @@ export function DashboardContent() {
       const counts = getCounts(loteControls)
       const verticalScores = modelo?.verticales.map((vertical) => {
         const verticalControls = loteControls.filter((control) => control.verticalId === vertical.id)
+        const verticalControlIds = new Set(verticalControls.map((control) => control.id))
         const scored = verticalControls.filter((control) => control.scoreControl !== undefined)
         const averageScore = scored.length
           ? Math.round(scored.reduce((sum, control) => sum + (control.scoreControl ?? 0), 0) / scored.length)
           : null
+        const parameterStats = vertical.parametros.map((parametro) => {
+          const parameterAnswers = respuestas.filter((answer) =>
+            verticalControlIds.has(answer.controlId) && answer.parametroId === parametro.id
+          )
+          const total = parameterAnswers.length
+          const noResponse = Math.max(0, verticalControls.length - total)
+          const noCumple = parameterAnswers.filter((answer) => answer.valor === "no_cumple").length
+
+          return {
+            id: parametro.id,
+            name: parametro.nombre,
+            total,
+            cumple: parameterAnswers.filter((answer) => answer.valor === "cumple").length,
+            intermedio: parameterAnswers.filter((answer) => answer.valor === "intermedio").length,
+            noCumple,
+            na: parameterAnswers.filter((answer) => answer.valor === "na").length,
+            noResponse,
+            noCumplePct: verticalControls.length ? Math.round((noCumple / verticalControls.length) * 100) : 0,
+          }
+        })
 
         return {
           id: vertical.id,
           name: vertical.nombre,
+          weight: vertical.peso,
+          total: verticalControls.length,
+          completed: verticalControls.filter((control) => control.estado === "terminado" || control.estado === "terminada").length,
           performancePct: averageScore,
           achieved: averageScore !== null ? Number(((averageScore * vertical.peso) / 100).toFixed(1)) : null,
+          parameterStats,
           controls: verticalControls.map((control) => ({
             id: control.id,
             identificador: control.identificador,
@@ -1215,24 +1296,19 @@ export function DashboardContent() {
           .reduce((sum, vertical) => sum + (vertical.achieved ?? 0), 0)
           .toFixed(1),
       )
-      const nonCompliance = (modelo?.verticales.flatMap((vertical) => {
-        const verticalControls = loteControls.filter((control) => control.verticalId === vertical.id)
-        const signals = verticalControls.filter((control) =>
-          control.estado === "pendiente" ||
-          control.estado === "en_replica" ||
-          (control.scoreControl !== undefined && control.scoreControl < 71)
-        ).length
-
-        if (!signals) return []
-
-        return vertical.parametros.map((parametro, index) => ({
-          id: `${lote.id}-${vertical.id}-${parametro.id}`,
-          verticalName: vertical.nombre,
-          parametro: parametro.nombre,
-          count: Math.max(1, signals - index),
-        }))
-      }) ?? [])
-        .sort((a, b) => b.count - a.count)
+      const nonCompliance = verticalScores
+        .flatMap((vertical) =>
+          vertical.parameterStats
+            .filter((parametro) => parametro.noCumple > 0)
+            .map((parametro) => ({
+              id: `${lote.id}-${vertical.id}-${parametro.id}`,
+              verticalName: vertical.name,
+              parametro: parametro.name,
+              count: parametro.noCumple,
+              total: parametro.total,
+            })),
+        )
+        .sort((a, b) => b.count - a.count || b.total - a.total)
         .slice(0, 3)
 
       return {
@@ -1267,7 +1343,7 @@ export function DashboardContent() {
       activeCycleYear: activeCycle.fechaInicio.slice(0, 4),
       progressLabel: `${globalCounts.started}/${globalCounts.total || 0}`,
     }
-  }, [appUser?.id, auditorias, ciclos, isAuditor, loteVerticales, lotes, modelos, unidades, users])
+  }, [appUser?.id, auditorias, ciclos, isAuditor, loteVerticales, lotes, modelos, respuestas, unidades, users])
 
   const roleDashboards = useMemo<Record<DashboardView, RoleDashboard>>(() => {
     const supervisorCounts = metrics.globalCounts
@@ -1539,7 +1615,7 @@ export function DashboardContent() {
         </section>
 
         <Card className="border-border/70 bg-card py-0 shadow-none hover:shadow-none">
-          <CardHeader className="px-4 py-3">
+          <CardHeader className="px-4 pb-1 pt-3">
             <div className="min-w-0">
               <CardTitle className="text-base font-semibold">Seguimiento de Controles</CardTitle>
             </div>

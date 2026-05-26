@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Download, Eye, MoreHorizontal } from "lucide-react"
+import { Eye, MoreHorizontal } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,6 @@ import {
 } from "@/lib/data"
 import Link from "next/link"
 import { useAppData } from "@/hooks/use-app-data"
-import { downloadCsv } from "@/lib/export"
 
 export function AuditoriasTable() {
   const { data } = useAppData()
@@ -63,23 +62,9 @@ export function AuditoriasTable() {
       })
     })
 
-    // Ordenar por fecha de creación (más recientes primero) y tomar los primeros 5
-    return controles.slice(0, 5)
+    // Ordenar por fecha de creación (más recientes primero) y tomar los primeros 10
+    return controles.slice(0, 10)
   }, [data])
-
-  const exportControl = (control: (typeof controlesRecientes)[number]) => {
-    downloadCsv(`control-${control.id}.csv`, [
-      {
-        control: control.identificador,
-        vertical: control.verticalNombre,
-        unidad: control.unidadNombre,
-        auditor: control.auditorNombre,
-        estado: control.estado,
-        score: control.scoreControl ?? "",
-        ciclo: control.ciclo,
-      },
-    ])
-  }
 
   return (
     <div className="responsive-scroll overflow-x-auto">
@@ -168,14 +153,6 @@ export function AuditoriasTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           Ver detalle
                         </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportControl(control)}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar Excel
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportControl(control)}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Generar reporte
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

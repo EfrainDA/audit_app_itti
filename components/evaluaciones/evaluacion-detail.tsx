@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Save,
   Send,
-  Download,
   FileText,
   ChevronDown,
   Paperclip,
@@ -43,7 +42,6 @@ import {
   sendControlToReplica,
   type EvaluationAnswerInput,
 } from "@/lib/supabase-data"
-import { downloadCsv } from "@/lib/export"
 import { getErrorMessage } from "@/lib/error-message"
 
 interface EvaluacionDetailProps {
@@ -380,29 +378,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     }
   }
 
-  const handleExportEvaluation = () => {
-    downloadCsv(
-      `evaluacion-${controlId}.csv`,
-      vertical.parametros.map((parametro) => {
-        const respuesta = {
-          ...createEmptyRespuesta(parametro.id),
-          ...respuestas[parametro.id],
-        }
-
-        return {
-          control: currentControl.identificador,
-          vertical: vertical.nombre,
-          parametro: parametro.nombre,
-          respuesta: respuesta.valor ?? "",
-          comentario: respuesta.comentario,
-          personasAuditadas: respuesta.personasAuditadas.filter(Boolean).join("; "),
-          cargos: respuesta.cargos.filter(Boolean).join("; "),
-          puntosBase: parametro.puntosBase,
-        }
-      }),
-    )
-  }
-
   const totalParametros = vertical.parametros.length
   const parametroIds = new Set(vertical.parametros.map((parametro) => parametro.id))
   const respuestasDeLaVertical = Object.values(respuestas).filter((respuesta) => parametroIds.has(respuesta.parametroId))
@@ -517,10 +492,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                     {autoSaveStatus === "saving" ? "Guardando..." : "Guardado automático"}
                   </div>
                 )}
-                <Button variant="outline" size="sm" className="flex-none" onClick={handleExportEvaluation}>
-                  <Download className="h-4 w-4" />
-                  Exportar
-                </Button>
                 {canEditEvaluation && control.estado !== "terminado" && (
                   <Button size="sm" className="flex-none bg-warning text-warning-foreground hover:bg-warning/90" onClick={handleSendToReplica} disabled={isSubmitting}>
                     <Send className="h-4 w-4" />
@@ -594,7 +565,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
               <Card
                 key={parametro.id}
                 className={cn(
-                  "overflow-hidden bg-card shadow-sm transition-colors",
+                  "overflow-hidden bg-card shadow-none transition-colors",
                   "border border-border/70",
                   tieneRespuesta && "ring-1",
                   respuesta?.valor === "cumple" && "border-success/60 ring-success/35",
@@ -831,7 +802,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         </div>
                       </div>
 
-                      <div className="grid w-full gap-2 rounded-lg border border-border/60 bg-secondary/20 p-2 shadow-sm sm:w-36 lg:w-full">
+                      <div className="grid w-full gap-2 rounded-lg border border-border/60 bg-secondary/20 p-2 shadow-none sm:w-36 lg:w-full">
                         <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Resultado</p>
                         <Button
                           size="sm"

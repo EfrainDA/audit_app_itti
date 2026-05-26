@@ -17,6 +17,7 @@ import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-data"
 import { formatEstado } from "@/lib/data"
+import type { Notificacion } from "@/lib/data"
 
 function normalizeSearch(value: unknown) {
   return String(value ?? "")
@@ -28,6 +29,16 @@ function normalizeSearch(value: unknown) {
 
 function matchesSearch(search: string, ...values: unknown[]) {
   return values.some((value) => normalizeSearch(value).includes(search))
+}
+
+function getNotificationHref(notification: Notificacion) {
+  const title = normalizeSearch(notification.titulo)
+  const message = normalizeSearch(notification.mensaje)
+
+  if (title.includes("auditor termino")) return "/"
+  if (title.includes("lote") || message.includes("lote")) return "/planificacion"
+  if (title.includes("control") || title.includes("reasignacion") || message.includes("control")) return "/evaluaciones"
+  return "/"
 }
 
 interface HeaderProps {
@@ -133,9 +144,11 @@ export function Header({ title, subtitle }: HeaderProps) {
     return [...pageResults, ...controlResults, ...lotResults, ...unitResults, ...modelResults, ...userResults].slice(0, 8)
   }, [appUser?.role, data.loteVerticales, data.lotes, data.modelos, data.unidades, data.users, normalizedSearch])
 
-  const handleMarkNotificationRead = async (id: string) => {
-    await markNotificationRead(id)
+  const handleNotificationClick = async (notification: Notificacion) => {
+    await markNotificationRead(notification.id)
     await refresh()
+    const href = getNotificationHref(notification)
+    if (href !== pathname) router.push(href)
   }
 
   const handleMarkAllNotificationsRead = async () => {
@@ -163,7 +176,7 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="relative flex min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-card px-3 py-2 shadow-[var(--material-shadow-soft)] sm:gap-3 sm:px-5 md:px-6 lg:h-16 lg:py-0">
+    <header className="relative flex min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-card px-3 py-2 shadow-none sm:gap-3 sm:px-5 md:px-6 lg:h-16 lg:py-0">
       <div className="min-w-0 flex-1 pr-1">
         <h1 className="truncate text-lg font-bold text-foreground sm:text-xl">{title}</h1>
         {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p>}
@@ -185,7 +198,7 @@ export function Header({ title, subtitle }: HeaderProps) {
             className="w-48 border-border/80 bg-card pl-9 lg:w-72"
           />
           {isSearchOpen && searchTerm.trim() && (
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--material-shadow)]">
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-none">
               {searchResults.length > 0 ? (
                 <div className="max-h-96 overflow-y-auto py-1">
                   {searchResults.map((result, index) => (
@@ -235,7 +248,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               <DropdownMenuItem
                 key={notification.id}
                 className="flex flex-col items-start gap-1 py-3 cursor-pointer"
-                onClick={() => handleMarkNotificationRead(notification.id)}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-center gap-2 w-full">
                   {!notification.leida && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}

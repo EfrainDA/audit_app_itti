@@ -358,7 +358,7 @@ export function PlanificacionContent() {
             {filteredLotes.map((lote) => (
               <Card
                 key={lote.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm transition-colors hover:border-primary/50 cursor-pointer"
+                className="min-w-0 overflow-hidden rounded-xl border border-border/50 bg-card shadow-none transition-colors hover:border-primary/50 cursor-pointer"
                 onClick={() => setSelectedLote(lote)}
               >
                 <CardContent className="px-3 py-2 sm:px-5">

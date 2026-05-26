@@ -14,6 +14,7 @@ const emptyData: AppData = {
   lotes: [],
   loteVerticales: [],
   auditorias: [],
+  respuestas: [],
   answeredControlIds: [],
   notificaciones: [],
 }

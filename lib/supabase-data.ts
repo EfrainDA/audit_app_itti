@@ -11,6 +11,7 @@ import type {
   Notificacion,
   Parametro,
   Pregunta,
+  Respuesta,
   Umbral,
   UnidadNegocio,
   User,
@@ -26,6 +27,7 @@ export type AppData = {
   lotes: Lote[]
   loteVerticales: LoteVertical[]
   auditorias: Auditoria[]
+  respuestas: Respuesta[]
   answeredControlIds: string[]
   notificaciones: Notificacion[]
 }
@@ -182,6 +184,16 @@ type DbAudit = {
   auditor_id: string
 }
 
+type DbAnswer = {
+  id: string
+  control_id: string
+  parameter_id: string
+  value: Respuesta["valor"]
+  comment: string | null
+  answered_at: string
+  auditor_id: string
+}
+
 type DbNotification = {
   id: string
   user_id: string
@@ -283,10 +295,14 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
         )
       `),
     supabase.from("audits").select("id,lot_id,control_id,audit_date,status,total_score,auditor_id").order("audit_date", { ascending: false }),
-    supabase
-      .from("answers")
-      .select("control_id")
-      .eq("auditor_id", currentProfile.id),
+    currentProfile.role === "auditor"
+      ? supabase
+          .from("answers")
+          .select("id,control_id,parameter_id,value,comment,answered_at,auditor_id")
+          .eq("auditor_id", currentProfile.id)
+      : supabase
+          .from("answers")
+          .select("id,control_id,parameter_id,value,comment,answered_at,auditor_id"),
     supabase
       .from("notifications")
       .select("id,user_id,title,message,type,read,created_at")
@@ -397,7 +413,17 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       scoreTotal: audit.total_score ?? undefined,
       auditorId: audit.auditor_id,
     })),
-    answeredControlIds: ((answersResult.data ?? []) as { control_id: string }[])
+    respuestas: ((answersResult.data ?? []) as DbAnswer[]).map((answer) => ({
+      id: answer.id,
+      controlId: answer.control_id,
+      parametroId: answer.parameter_id,
+      valor: answer.value,
+      comentario: answer.comment ?? undefined,
+      evidencias: [],
+      fechaRespuesta: answer.answered_at,
+      auditorId: answer.auditor_id,
+    })),
+    answeredControlIds: ((answersResult.data ?? []) as DbAnswer[])
       .map((answer) => answer.control_id),
     notificaciones: ((notificationsResult.data ?? []) as DbNotification[]).map((notification) => ({
       id: notification.id,
@@ -419,11 +445,6 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       .filter((lot) => lot.auditores.includes(currentProfile.id))
       .map((lot) => lot.id),
   )
-  const assignedUnitIds = new Set(
-    appData.lotes
-      .filter((lot) => assignedLotIds.has(lot.id))
-      .map((lot) => lot.unidadNegocioId),
-  )
   const assignedModelIds = new Set(
     appData.lotes
       .filter((lot) => assignedLotIds.has(lot.id))
@@ -440,11 +461,12 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
 
   return {
     ...appData,
-    unidades: appData.unidades.filter((unit) => assignedUnitIds.has(unit.id)),
+    unidades: appData.unidades,
     modelos: appData.modelos.filter((model) => assignedModelIds.has(model.id)),
     lotes: appData.lotes.filter((lot) => assignedLotIds.has(lot.id)),
     loteVerticales: assignedLoteVerticales,
     auditorias: appData.auditorias.filter((audit) => audit.auditorId === currentProfile.id),
+    respuestas: appData.respuestas.filter((answer) => answer.auditorId === currentProfile.id),
     notificaciones: appData.notificaciones,
   }
 }
@@ -968,6 +990,104 @@ async function ensureCycle(year: number, bimester: number) {
   return created.id as string
 }
 
+type NotificationDraft = {
+  userId: string
+  title: string
+  message: string
+  type: Notificacion["tipo"]
+}
+
+async function createNotifications(notifications: NotificationDraft[]) {
+  if (!notifications.length) return
+
+  const { error } = await supabase.from("notifications").insert(
+    notifications.map((notification) => ({
+      user_id: notification.userId,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      read: false,
+    })),
+  )
+
+  if (error) throw error
+}
+
+async function getActiveManagers(excludeUserId?: string) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id,name,role,status")
+    .in("role", ["supervisor", "admin"])
+    .eq("status", "activo")
+
+  if (error) throw error
+  return (data ?? []).filter((user) => user.id !== excludeUserId)
+}
+
+async function getUserNames(userIds: string[]) {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)))
+  if (!uniqueIds.length) return new Map<string, string>()
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("id,name")
+    .in("id", uniqueIds)
+
+  if (error) throw error
+  return new Map((data ?? []).map((user) => [user.id as string, user.name as string]))
+}
+
+async function getLotLabel(lotId: string) {
+  const { data, error } = await supabase
+    .from("lots")
+    .select("business_units(name),control_models(name),cycles(year,bimester)")
+    .eq("id", lotId)
+    .maybeSingle()
+
+  if (error) throw error
+
+  const lot = data as {
+    business_units?: { name?: string } | { name?: string }[] | null
+    control_models?: { name?: string } | { name?: string }[] | null
+    cycles?: { year?: number; bimester?: number } | { year?: number; bimester?: number }[] | null
+  } | null
+  const unit = Array.isArray(lot?.business_units) ? lot?.business_units[0] : lot?.business_units
+  const model = Array.isArray(lot?.control_models) ? lot?.control_models[0] : lot?.control_models
+  const cycle = Array.isArray(lot?.cycles) ? lot?.cycles[0] : lot?.cycles
+  const unitName = unit?.name ?? "Unidad"
+  const cycleLabel = cycle ? `Ciclo ${cycle.bimester} - ${cycle.year}` : "ciclo activo"
+
+  return `${unitName} | ${cycleLabel}${model?.name ? ` | ${model.name}` : ""}`
+}
+
+async function notifyAuditorsAboutLot(lotId: string, auditorIds: string[]) {
+  const recipients = Array.from(new Set(auditorIds.filter(Boolean)))
+  if (!recipients.length) return
+
+  const lotLabel = await getLotLabel(lotId)
+  await createNotifications(
+    recipients.map((auditorId) => ({
+      userId: auditorId,
+      title: "Lote asignado",
+      message: `Se te ha asignado un lote, empieza a cargar tus controles. ${lotLabel}`,
+      type: "asignacion" as const,
+    })),
+  )
+}
+
+async function notifyAuditorAboutControl(auditorId: string | undefined, controlName: string) {
+  if (!auditorId) return
+
+  await createNotifications([
+    {
+      userId: auditorId,
+      title: "Control asignado",
+      message: `Se te ha asignado un control: ${controlName}. Ve a evaluaciones para trabajarlo.`,
+      type: "asignacion" as const,
+    },
+  ])
+}
+
 export async function createLot(input: {
   businessUnitId: string
   modelId: string
@@ -1018,6 +1138,8 @@ export async function createLot(input: {
     )
     if (lotVerticalsError) throw lotVerticalsError
   }
+
+  await notifyAuditorsAboutLot(lot.id as string, input.auditorIds)
 }
 
 export async function updateLotStatus(id: string, status: Lote["estado"]) {
@@ -1028,6 +1150,15 @@ export async function updateLotStatus(id: string, status: Lote["estado"]) {
 
 export async function addLotAuditor(lotId: string, auditorId: string) {
   await requirePlanningManager()
+  const { data: existingAssignment, error: existingError } = await supabase
+    .from("lot_auditors")
+    .select("lot_id")
+    .eq("lot_id", lotId)
+    .eq("auditor_id", auditorId)
+    .maybeSingle()
+
+  if (existingError) throw existingError
+
   const { error } = await supabase
     .from("lot_auditors")
     .upsert(
@@ -1039,6 +1170,7 @@ export async function addLotAuditor(lotId: string, auditorId: string) {
     )
 
   if (error) throw error
+  if (!existingAssignment) await notifyAuditorsAboutLot(lotId, [auditorId])
 }
 
 async function notifySupervisorsAboutReassignment(input: {
@@ -1048,41 +1180,22 @@ async function notifySupervisorsAboutReassignment(input: {
   toAuditorId: string
   actorId: string
 }) {
-  const { data: usersData, error: usersError } = await supabase
-    .from("users")
-    .select("id,name,role,status")
-    .in("role", ["supervisor", "admin"])
-    .eq("status", "activo")
-
-  if (usersError) throw usersError
-
-  const recipients = (usersData ?? []).filter((user) => user.id !== input.actorId)
+  const recipients = await getActiveManagers(input.actorId)
   if (!recipients.length) return
 
-  const actor = (usersData ?? []).find((user) => user.id === input.actorId)
-  const { data: auditorData, error: auditorError } = await supabase
-    .from("users")
-    .select("id,name")
-    .in("id", [input.fromAuditorId, input.toAuditorId, input.actorId])
-
-  if (auditorError) throw auditorError
-
-  const usersById = new Map((auditorData ?? []).map((user) => [user.id, user.name]))
-  const actorName = usersById.get(input.actorId) ?? actor?.name ?? "Un auditor"
+  const usersById = await getUserNames([input.fromAuditorId, input.toAuditorId, input.actorId])
+  const actorName = usersById.get(input.actorId) ?? "Un usuario"
   const fromName = usersById.get(input.fromAuditorId) ?? "auditor anterior"
   const toName = usersById.get(input.toAuditorId) ?? "nuevo auditor"
 
-  const { error } = await supabase.from("notifications").insert(
+  await createNotifications(
     recipients.map((recipient) => ({
-      user_id: recipient.id,
+      userId: recipient.id,
       title: "Reasignacion de control",
       message: `${actorName} reasigno "${input.controlName}" de ${fromName} a ${toName}.`,
-      type: "asignacion",
-      read: false,
+      type: "asignacion" as const,
     })),
   )
-
-  if (error) throw error
 }
 
 export async function createControl(input: {
@@ -1136,6 +1249,7 @@ export async function createControl(input: {
   })
 
   if (error) throw error
+  await notifyAuditorAboutControl(input.auditorId, input.identifier.trim())
 }
 
 export async function updateControl(input: {
@@ -1174,20 +1288,22 @@ export async function updateControl(input: {
 
   if (error) throw error
 
-  if (
-    profile.role === "auditor" &&
-    previousControl?.auditor_id &&
-    input.auditorId &&
-    previousControl.auditor_id !== input.auditorId
-  ) {
+  const previousAuditorId = previousControl?.auditor_id as string | null | undefined
+  const nextAuditorId = input.auditorId || undefined
+
+  if (nextAuditorId && previousAuditorId !== nextAuditorId) {
+    await notifyAuditorAboutControl(nextAuditorId, input.identifier.trim())
+  }
+
+  if (previousAuditorId && nextAuditorId && previousAuditorId !== nextAuditorId) {
     const lotId = Array.isArray(previousControl.lot_verticals)
       ? previousControl.lot_verticals[0]?.lot_id
       : (previousControl.lot_verticals as { lot_id?: string } | null)?.lot_id
     await notifySupervisorsAboutReassignment({
       lotId,
       controlName: previousControl.identifier ?? input.identifier,
-      fromAuditorId: previousControl.auditor_id,
-      toAuditorId: input.auditorId,
+      fromAuditorId: previousAuditorId,
+      toAuditorId: nextAuditorId,
       actorId: profile.id,
     })
   }
@@ -1215,6 +1331,63 @@ export async function fetchAnswersForControl(controlId: string) {
     personasAuditadas: ((answer.audited_people as string[] | null) ?? []).length ? (answer.audited_people as string[]) : [""],
     cargos: ((answer.audited_roles as string[] | null) ?? []).length ? (answer.audited_roles as string[]) : [""],
   }))
+}
+
+async function notifySupervisorsAboutCompletion(input: {
+  lotId: string
+  auditorId: string
+}) {
+  const recipients = await getActiveManagers(input.auditorId)
+  if (!recipients.length) return
+
+  const { data: controlsData, error: controlsError } = await supabase
+    .from("controls")
+    .select("id,status,auditor_id,lot_verticals!inner(lot_id)")
+    .eq("lot_verticals.lot_id", input.lotId)
+
+  if (controlsError) throw controlsError
+
+  const controls = (controlsData ?? []) as Array<{
+    id: string
+    status: Control["estado"] | "en_replica" | "terminada"
+    auditor_id: string | null
+  }>
+  const auditorControls = controls.filter((control) => control.auditor_id === input.auditorId)
+  const auditorFinished = auditorControls.length > 0 && auditorControls.every((control) => normalizeControlStatus(control.status) === "terminado")
+  const lotFinished = controls.length > 0 && controls.every((control) => normalizeControlStatus(control.status) === "terminado")
+
+  if (!auditorFinished && !lotFinished) return
+
+  const [lotLabel, usersById] = await Promise.all([
+    getLotLabel(input.lotId),
+    getUserNames([input.auditorId]),
+  ])
+  const auditorName = usersById.get(input.auditorId) ?? "Un auditor"
+  const notifications: NotificationDraft[] = []
+
+  if (auditorFinished) {
+    notifications.push(
+      ...recipients.map((recipient) => ({
+        userId: recipient.id,
+        title: "Auditor termino sus controles",
+        message: `${auditorName} ya termino todos sus controles asignados en ${lotLabel}.`,
+        type: "cierre" as const,
+      })),
+    )
+  }
+
+  if (lotFinished) {
+    notifications.push(
+      ...recipients.map((recipient) => ({
+        userId: recipient.id,
+        title: "Lote completo",
+        message: `El lote ${lotLabel} ya tiene todos sus controles completos.`,
+        type: "cierre" as const,
+      })),
+    )
+  }
+
+  await createNotifications(notifications)
 }
 
 export async function saveEvaluationDraft(controlId: string, answers: EvaluationAnswerInput[]) {
@@ -1248,6 +1421,14 @@ export async function finalizeEvaluation(input: {
 }) {
   const profile = await assertCanEvaluateControl(input.controlId)
   const auditorId = profile.id
+  const { data: previousControl, error: previousControlError } = await supabase
+    .from("controls")
+    .select("status")
+    .eq("id", input.controlId)
+    .maybeSingle()
+
+  if (previousControlError) throw previousControlError
+
   await saveEvaluationDraft(input.controlId, input.answers)
 
   const { error: controlError } = await supabase
@@ -1274,6 +1455,13 @@ export async function finalizeEvaluation(input: {
   )
 
   if (auditError) throw auditError
+
+  if (normalizeControlStatus(previousControl?.status as DbControl["status"]) !== "terminado") {
+    await notifySupervisorsAboutCompletion({
+      lotId: input.lotId,
+      auditorId,
+    })
+  }
 }
 
 export async function sendControlToReplica(controlId: string) {

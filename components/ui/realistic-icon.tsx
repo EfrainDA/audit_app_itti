@@ -15,21 +15,21 @@ type RealisticIconTone =
 type RealisticIconSize = "sm" | "md" | "lg" | "xl"
 
 const toneClasses: Record<RealisticIconTone, string> = {
-  primary: "realistic-icon--primary",
-  success: "realistic-icon--success",
-  warning: "realistic-icon--warning",
-  danger: "realistic-icon--danger",
-  neutral: "realistic-icon--neutral",
-  cyan: "realistic-icon--cyan",
-  blue: "realistic-icon--blue",
-  emerald: "realistic-icon--emerald",
+  primary: "flat-icon--primary",
+  success: "flat-icon--success",
+  warning: "flat-icon--warning",
+  danger: "flat-icon--danger",
+  neutral: "flat-icon--neutral",
+  cyan: "flat-icon--cyan",
+  blue: "flat-icon--blue",
+  emerald: "flat-icon--emerald",
 }
 
 const sizeClasses: Record<RealisticIconSize, string> = {
-  sm: "h-9 w-9 rounded-lg",
-  md: "h-11 w-11 rounded-xl",
-  lg: "h-12 w-12 rounded-xl",
-  xl: "h-16 w-16 rounded-2xl",
+  sm: "h-9 w-9 rounded-md",
+  md: "h-11 w-11 rounded-md",
+  lg: "h-12 w-12 rounded-md",
+  xl: "h-16 w-16 rounded-lg",
 }
 
 const iconSizeClasses: Record<RealisticIconSize, string> = {
@@ -55,8 +55,8 @@ export function RealisticIcon({
   iconClassName,
 }: RealisticIconProps) {
   return (
-    <span className={cn("realistic-icon", toneClasses[tone], sizeClasses[size], className)} aria-hidden="true">
-      <Icon className={cn("relative z-10", iconSizeClasses[size], iconClassName)} strokeWidth={1.75} />
+    <span className={cn("flat-icon", toneClasses[tone], sizeClasses[size], className)} aria-hidden="true">
+      <Icon className={cn(iconSizeClasses[size], iconClassName)} strokeWidth={1.85} />
     </span>
   )
 }

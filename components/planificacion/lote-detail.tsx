@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,10 +36,8 @@ import {
 import { 
   Plus, 
   User, 
-  Play, 
   Pencil,
   Trash2, 
-  ChevronRight, 
   FileCheck, 
   Clock, 
   CheckCircle2,
@@ -223,7 +220,39 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
     )
   }
 
+  const getControlValidationError = (control: typeof initialNewControl) => {
+    if (!control.etiqueta) return "Selecciona una etiqueta."
+    if (!control.auditorId) return "Selecciona un analista o especialista de Control de Calidad."
+
+    if (isBusinessUnitTag(control.etiqueta)) {
+      if (!control.unidadRecibeServicio) return "Selecciona la unidad de negocio que recibe el servicio."
+      if (!control.unidadPrestaServicio) return "Selecciona la unidad de negocio que presta el servicio."
+      if (!buildBusinessUnitControlName(control.unidadRecibeServicio, control.unidadPrestaServicio).trim()) {
+        return "Completa las unidades de negocio para generar el nombre del control."
+      }
+      return null
+    }
+
+    if (isProcessTag(control.etiqueta)) {
+      if (!control.proceso.trim()) return "Completa el nombre del proceso."
+      if (control.subprocesos.length === 0) return "Agrega al menos un subproceso."
+      if (control.etiqueta !== "Proceso de apoyo" && productControls.length > 0 && control.productosVinculados.length === 0) {
+        return "Selecciona al menos un producto vinculado."
+      }
+      return null
+    }
+
+    if (!control.identificador.trim()) return "Completa el nombre del control."
+    return null
+  }
+
   const handleAddControl = async (loteVerticalId: string) => {
+    const validationError = getControlValidationError(newControl)
+    if (validationError) {
+      setFormError(validationError)
+      return
+    }
+
     const correspondeProceso = isProcessTag(newControl.etiqueta)
     const identificador = correspondeProceso
       ? newControl.proceso.trim()
@@ -291,6 +320,11 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
   const handleUpdateControl = async () => {
     if (!editingControl) return
+    const validationError = getControlValidationError(editControl)
+    if (validationError) {
+      setFormError(validationError)
+      return
+    }
 
     const correspondeProceso = isProcessTag(editControl.etiqueta)
     const identificador = correspondeProceso
@@ -362,6 +396,8 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   const editControlIsBusinessUnit = isBusinessUnitTag(editControl.etiqueta)
   const newControlBusinessUnitName = buildBusinessUnitControlName(newControl.unidadRecibeServicio, newControl.unidadPrestaServicio)
   const editControlBusinessUnitName = buildBusinessUnitControlName(editControl.unidadRecibeServicio, editControl.unidadPrestaServicio)
+  const newControlValidationError = getControlValidationError(newControl)
+  const editControlValidationError = getControlValidationError(editControl)
 
   return (
     <div className="space-y-6">
@@ -398,7 +434,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           {canManageLots && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Select value={auditorToAdd} onValueChange={setAuditorToAdd}>
               <SelectTrigger className="h-9 bg-secondary border-border sm:w-64">
-                <SelectValue placeholder="Agregar auditor" />
+                <SelectValue placeholder="Agregar analista o especialista" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
                 {auditoresDisponibles.map((auditor) => (
@@ -422,7 +458,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
         <div className="flex flex-wrap gap-2">
           {auditores.length > 0 ? (
             auditores.map((auditor) => (
-              <div key={auditor.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-sm hover:border-primary/30 transition-colors">
+              <div key={auditor.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-none hover:border-primary/30 transition-colors">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                   <span className="text-primary text-[10px] font-bold uppercase">
                     {auditor.name.split(" ").map((n) => n[0]).join("")}
@@ -432,7 +468,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">Este lote todavia no tiene auditores asignados.</p>
+            <p className="text-sm text-muted-foreground">Este lote todavia no tiene analistas o especialistas asignados.</p>
           )}
         </div>
         {formError && <p className="mt-2 text-sm text-destructive">{formError}</p>}
@@ -534,7 +570,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                                   </span>
                                 </div>
                                 <span className="text-xs text-muted-foreground truncate max-w-[100px] hidden md:inline">
-                                  {auditor ? auditor.name : "Sin auditor"}
+                                  {auditor ? auditor.name : "Sin analista o especialista"}
                                 </span>
                               </div>
 
@@ -624,7 +660,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="etiqueta-control">Etiqueta</Label>
+              <Label htmlFor="etiqueta-control">Etiqueta *</Label>
               <Select
                 value={newControl.etiqueta}
                 onValueChange={(value) => {
@@ -731,7 +767,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               />
               {isControlSuggestionsOpen && !newControlIsProcess && (
                 <div
-                  className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
+                  className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-none"
                   onMouseDown={(event) => event.preventDefault()}
                 >
                   {filteredControlNames.length > 0 ? (
@@ -772,13 +808,13 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             )}
             {!newControlIsProcess && (
             <div className="space-y-2">
-              <Label htmlFor="auditor">Auditor</Label>
+                  <Label htmlFor="auditor">Analista o especialista de Control de Calidad *</Label>
               <Select
                 value={newControl.auditorId}
                 onValueChange={(value) => setNewControl({ ...newControl, auditorId: value })}
               >
                 <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Seleccionar auditor" />
+                  <SelectValue placeholder="Seleccionar analista o especialista" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {auditores.map((auditor) => (
@@ -809,7 +845,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     />
                     {isProcessSuggestionsOpen && (
                       <div
-                        className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
+                        className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-none"
                         onMouseDown={(event) => event.preventDefault()}
                       >
                         {filteredProcessNames.length > 0 ? (
@@ -849,7 +885,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="subproceso">Subprocesos</Label>
+                  <Label htmlFor="subproceso">Subprocesos *</Label>
                   <div className="flex gap-2">
                     <Input
                       id="subproceso"
@@ -896,7 +932,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                 </div>
                 {newControl.etiqueta !== "Proceso de apoyo" && (
                   <div className="space-y-2">
-                    <Label>Producto vinculado</Label>
+                    <Label>Producto vinculado *</Label>
                     <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
                       {productControls.length > 0 ? (
                         productControls.map((product) => (
@@ -927,13 +963,13 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="auditor-proceso">Auditor</Label>
+                  <Label htmlFor="auditor-proceso">Analista o especialista de Control de Calidad *</Label>
                   <Select
                     value={newControl.auditorId}
                     onValueChange={(value) => setNewControl({ ...newControl, auditorId: value })}
                   >
                     <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar auditor" />
+                      <SelectValue placeholder="Seleccionar analista o especialista" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
                       {auditores.map((auditor) => (
@@ -954,14 +990,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             </Button>
             <Button
               onClick={() => showAddControl && handleAddControl(showAddControl)}
-              disabled={
-                isSavingControl ||
-                (newControlIsProcess
-                  ? !newControl.proceso.trim()
-                  : newControlIsBusinessUnit
-                    ? !newControlBusinessUnitName.trim()
-                    : !newControl.identificador.trim())
-              }
+              disabled={isSavingControl || Boolean(newControlValidationError)}
               className="bg-primary hover:bg-primary/90"
             >
               {isSavingControl ? "Guardando..." : "Agregar Control"}
@@ -985,7 +1014,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-etiqueta-control">Etiqueta</Label>
+              <Label htmlFor="edit-etiqueta-control">Etiqueta *</Label>
               <Select
                 value={editControl.etiqueta}
                 onValueChange={(value) => {
@@ -1088,13 +1117,13 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-auditor">Auditor</Label>
+                  <Label htmlFor="edit-auditor">Analista o especialista de Control de Calidad *</Label>
                   <Select
                     value={editControl.auditorId}
                     onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
                   >
                     <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar auditor" />
+                      <SelectValue placeholder="Seleccionar analista o especialista" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
                       {auditores.map((auditor) => (
@@ -1122,7 +1151,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-subproceso">Subprocesos</Label>
+                  <Label htmlFor="edit-subproceso">Subprocesos *</Label>
                   <div className="flex gap-2">
                     <Input
                       id="edit-subproceso"
@@ -1169,7 +1198,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                 </div>
                 {editControl.etiqueta !== "Proceso de apoyo" && (
                   <div className="space-y-2">
-                    <Label>Producto vinculado</Label>
+                    <Label>Producto vinculado *</Label>
                     <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
                       {productControls.length > 0 ? (
                         productControls.map((product) => (
@@ -1200,13 +1229,13 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="edit-auditor-proceso">Auditor</Label>
+                  <Label htmlFor="edit-auditor-proceso">Analista o especialista de Control de Calidad *</Label>
                   <Select
                     value={editControl.auditorId}
                     onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
                   >
                     <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar auditor" />
+                      <SelectValue placeholder="Seleccionar analista o especialista" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
                       {auditores.map((auditor) => (
@@ -1233,14 +1262,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             </Button>
             <Button
               onClick={handleUpdateControl}
-              disabled={
-                isSavingControl ||
-                (editControlIsProcess
-                  ? !editControl.proceso.trim()
-                  : editControlIsBusinessUnit
-                    ? !editControlBusinessUnitName.trim()
-                    : !editControl.identificador.trim())
-              }
+              disabled={isSavingControl || Boolean(editControlValidationError)}
               className="bg-primary hover:bg-primary/90"
             >
               {isSavingControl ? "Guardando..." : "Guardar Cambios"}

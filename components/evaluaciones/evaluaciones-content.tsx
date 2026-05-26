@@ -31,6 +31,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   type Control,
   type Lote,
   type LoteVertical,
@@ -41,7 +49,9 @@ import {
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { downloadCsv } from "@/lib/export"
+import { downloadPptx, downloadXlsx } from "@/lib/export"
+import { fetchAnswersForControl } from "@/lib/supabase-data"
+import { getErrorMessage } from "@/lib/error-message"
 
 interface LoteConDatos extends Lote {
   unidadNombre: string
@@ -104,6 +114,11 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
   const loteVerticalesData = data.loteVerticales
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<string>("all")
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [exportLoteId, setExportLoteId] = useState("")
+  const [exportFormat, setExportFormat] = useState<"excel" | "presentation">("excel")
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
     return lotes.map((lote) => {
@@ -180,25 +195,344 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
     terminados: controlesLotesAbiertos.filter((c) => c.estado === "terminado").length,
   }
 
-  const exportEvaluaciones = () => {
-    downloadCsv(
-      "evaluaciones-controles.csv",
-      lotesConDatos.flatMap((lote) =>
-        lote.loteVerticales.flatMap((loteVertical) =>
-          loteVertical.controles.map((control) => ({
-            unidad: lote.unidadNombre,
-            modelo: lote.modeloNombre,
-            ciclo: lote.ciclo,
-            año: lote.año,
-            control: control.identificador,
-            proceso: control.proceso ?? "",
-            subproceso: control.subproceso ?? "",
-            estado: control.estado,
-            score: control.scoreControl ?? "",
-          })),
-        ),
-      ),
-    )
+  const exportSelectedLote = async () => {
+    const lote = lotesConDatos.find((item) => item.id === exportLoteId)
+    if (!lote) return
+
+    setExportError(null)
+    setIsExporting(true)
+
+    try {
+      const modelo = modelos.find((item) => item.id === lote.modeloControlId)
+      const controls = lote.loteVerticales.flatMap((loteVertical) => loteVertical.controles)
+      const answersByControl = exportFormat === "excel"
+        ? new Map(
+            await Promise.all(
+              controls.map(async (control) => [
+                control.id,
+                await fetchAnswersForControl(control.id),
+              ] as const),
+            ),
+          )
+        : new Map<string, Awaited<ReturnType<typeof fetchAnswersForControl>>>()
+      const today = new Date().toLocaleDateString("es-PY")
+      const safeName = lote.unidadNombre
+        .replace(/[^\w-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase() || "lote"
+
+      const respuestasRows = [
+        [
+          { value: "Vertical", styleId: "GreenHeaderCenter" },
+          { value: "Control", styleId: "GreenHeaderCenter" },
+          { value: "Parametro", styleId: "GreenHeaderCenter" },
+          { value: "Puntos base", styleId: "GreenHeaderCenter" },
+          { value: "Respuesta", styleId: "GreenHeaderCenter" },
+          { value: "Personas auditadas", styleId: "GreenHeaderCenter" },
+          { value: "Cargo", styleId: "GreenHeaderCenter" },
+          { value: "Comentario / hallazgo", styleId: "GreenHeaderCenter" },
+        ],
+        ...lote.loteVerticales.flatMap((loteVertical) => {
+          const vertical = modelo?.verticales.find((item) => item.id === loteVertical.verticalId)
+          return loteVertical.controles.flatMap((control) => {
+            const answers = answersByControl.get(control.id) ?? []
+            return (vertical?.parametros ?? []).map((parametro) => {
+              const answer = answers.find((item) => item.parametroId === parametro.id)
+              return [
+                { value: vertical?.nombre ?? "Vertical sin configurar", styleId: "Bordered" },
+                { value: control.identificador, styleId: "Bordered" },
+                { value: parametro.nombre, styleId: "Bordered" },
+                { value: parametro.puntosBase, styleId: "Bordered" },
+                { value: answer?.valor ? formatEstado(answer.valor) : "Sin responder", styleId: "Bordered" },
+                { value: answer?.personasAuditadas.filter(Boolean).join("\n") ?? "", styleId: "Bordered" },
+                { value: answer?.cargos.filter(Boolean).join("\n") ?? "", styleId: "Bordered" },
+                { value: answer?.comentario ?? "", styleId: "Bordered" },
+              ]
+            })
+          })
+        }),
+      ]
+      const answerLabel = (value?: string) => value ? formatEstado(value) : "Sin responder"
+      const getAuditorName = (control: Control) =>
+        control.auditorId ? users.find((user) => user.id === control.auditorId)?.name ?? "Sin asignar" : "Sin asignar"
+      const getVerticalForControl = (control: Control) => {
+        const loteVertical = lote.loteVerticales.find((item) => item.id === control.loteVerticalId)
+        return modelo?.verticales.find((vertical) => vertical.id === loteVertical?.verticalId)
+      }
+      const getAnswerComment = (control: Control) => {
+        const vertical = getVerticalForControl(control)
+        const answers = answersByControl.get(control.id) ?? []
+        return (vertical?.parametros ?? [])
+          .map((parametro, index) => {
+            const answer = answers.find((item) => item.parametroId === parametro.id)
+            return answer?.comentario?.trim() ? `- Parametro ${index + 1}: ${answer.comentario.trim()}` : ""
+          })
+          .filter(Boolean)
+          .join("\n")
+      }
+      const getAnswerPeople = (control: Control) => {
+        const answers = answersByControl.get(control.id) ?? []
+        return Array.from(new Set(answers.flatMap((answer) => answer.personasAuditadas).filter(Boolean))).join("\n")
+      }
+      const getAnswerRoles = (control: Control) => {
+        const answers = answersByControl.get(control.id) ?? []
+        return Array.from(new Set(answers.flatMap((answer) => answer.cargos).filter(Boolean))).join("\n")
+      }
+      const buildEvaluationSheet = (
+        sheetName: string,
+        sheetControls: Control[],
+        baseHeaders: string[],
+        getBaseValues: (control: Control) => string[],
+      ) => {
+        const maxParams = Math.max(1, ...sheetControls.map((control) => getVerticalForControl(control)?.parametros.length ?? 0))
+        const parameterHeader = Array.from({ length: maxParams }, (_, index) => ({ value: `Parametro ${index + 1}`, styleId: "BlueHeaderCenter" }))
+        const parameterNames = Array.from({ length: maxParams }, (_, index) => {
+          const parametro = sheetControls
+            .map((control) => getVerticalForControl(control)?.parametros[index])
+            .find(Boolean)
+          return { value: parametro?.nombre ?? "", styleId: "BlueHeaderCenter" }
+        })
+        const weightingHeader = [
+          { value: "", styleId: "GrayHeader" },
+          { value: "PONDERACION DE LOS PARAMETROS DE CALIDAD", styleId: "GreenHeaderCenter", mergeAcross: maxParams - 1 },
+        ]
+        const weightingNames = [
+          { value: "", styleId: "GrayHeader" },
+          ...parameterNames.map((cell) => ({ ...cell, styleId: "GreenHeaderCenter" })),
+        ]
+        const rows = [
+          [
+            ...baseHeaders.map((header) => ({ value: header, styleId: "DarkHeaderCenter" })),
+            ...parameterHeader,
+            { value: "ANALISTA DE CALIDAD", styleId: "DarkHeaderCenter" },
+            { value: "FECHA DE CONTROL", styleId: "DarkHeaderCenter" },
+            { value: "COMENTARIOS", styleId: "DarkHeaderCenter" },
+            ...weightingHeader,
+          ],
+          [
+            ...baseHeaders.map(() => ({ value: "", styleId: "DarkHeaderCenter" })),
+            ...parameterNames,
+            { value: "", styleId: "DarkHeaderCenter" },
+            { value: "", styleId: "DarkHeaderCenter" },
+            { value: "", styleId: "DarkHeaderCenter" },
+            ...weightingNames,
+          ],
+          ...(sheetControls.length ? sheetControls.map((control) => {
+            const vertical = getVerticalForControl(control)
+            const answers = answersByControl.get(control.id) ?? []
+            const parameterValues = Array.from({ length: maxParams }, (_, index) => {
+              const parametro = vertical?.parametros[index]
+              const answer = parametro ? answers.find((item) => item.parametroId === parametro.id) : undefined
+              return { value: answerLabel(answer?.valor), styleId: "Bordered" }
+            })
+            const weightingValues = Array.from({ length: maxParams }, (_, index) => {
+              const parametro = vertical?.parametros[index]
+              const answer = parametro ? answers.find((item) => item.parametroId === parametro.id) : undefined
+              const value = !parametro || answer?.valor === "na"
+                ? "No aplica"
+                : answer?.valor === "cumple"
+                  ? parametro.puntosBase
+                  : answer?.valor === "intermedio"
+                    ? parametro.puntosBase / 2
+                    : 0
+              return { value, styleId: "Bordered" }
+            })
+
+            return [
+              ...getBaseValues(control).map((value) => ({ value, styleId: "Bordered" })),
+              ...parameterValues,
+              { value: getAuditorName(control), styleId: "Bordered" },
+              { value: today, styleId: "Bordered" },
+              { value: getAnswerComment(control), styleId: "Comment" },
+              { value: "", styleId: "GrayHeader" },
+              ...weightingValues,
+            ]
+          }) : [[
+            { value: "Sin controles para esta hoja", styleId: "Bordered", mergeAcross: baseHeaders.length + (maxParams * 2) + 3 },
+          ]]),
+        ]
+
+        return {
+          name: sheetName,
+          rows,
+          columns: [
+            ...baseHeaders.map(() => 150),
+            ...Array.from({ length: maxParams }, () => 210),
+            150,
+            130,
+            520,
+            36,
+            ...Array.from({ length: maxParams }, () => 130),
+          ],
+        }
+      }
+      const unidadControls = controls.filter((control) => control.etiqueta === "Unidad de Negocio")
+      const productoControls = controls.filter((control) => control.etiqueta === "Producto" || Boolean(control.producto || control.productosVinculados?.length))
+      const procesoControls = controls.filter((control) => control.etiqueta === "Proceso" || control.etiqueta === "Proceso de apoyo" || Boolean(control.proceso))
+      const adherenciaControls = procesoControls.filter((control) => {
+        const vertical = getVerticalForControl(control)
+        return vertical?.parametros.some((parametro) => parametro.nombre.toLowerCase().includes("adherencia"))
+      })
+      const evidenceRows = [
+        [{ value: "EVIDENCIAS / HALLAZGOS", styleId: "DarkHeader", mergeAcross: 0 }],
+        ...(controls.flatMap((control) => {
+          const vertical = getVerticalForControl(control)
+          const answers = answersByControl.get(control.id) ?? []
+          return (vertical?.parametros ?? []).flatMap((parametro) => {
+            const answer = answers.find((item) => item.parametroId === parametro.id)
+            if (!answer?.comentario?.trim() || answer.valor === "cumple") return []
+            return [
+              [{ value: `Vertical ${vertical?.nombre ?? ""} - Control ${control.identificador} - Parametro "${parametro.nombre}"`, styleId: "DarkHeader" }],
+              [{ value: `Descripcion: ${answer.comentario.trim()}`, styleId: "Comment" }],
+              [{ value: `Requisito Incumplido: ${answerLabel(answer.valor)}`, styleId: "Comment" }],
+              [{ value: "Evidencia: Ver adjuntos registrados en la evaluacion.", styleId: "Comment" }],
+              [{ value: "", styleId: "Bordered" }],
+            ]
+          })
+        }))
+      ]
+      const detailRows = [
+        [{ value: `${lote.unidadNombre} - Ciclo ${lote.ciclo} - ${lote.año}`, styleId: "TitleCenter", mergeAcross: 5 }],
+        ["", "", "", "", "", ""],
+        [{ value: "DETALLES DEL LOTE", styleId: "DarkHeader", mergeAcross: 5 }],
+        [{ value: "Unidad evaluada", styleId: "DetailLabel" }, { value: lote.unidadNombre, styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Modelo de control", styleId: "DetailLabel" }, { value: lote.modeloNombre, styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Ciclo", styleId: "DetailLabel" }, { value: `Ciclo ${lote.ciclo} - ${lote.año}`, styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Estado", styleId: "DetailLabel" }, { value: formatEstado(lote.estado), styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Auditores", styleId: "DetailLabel" }, { value: lote.auditoresNombres || "Sin auditores asignados", styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Fecha de exportacion", styleId: "DetailLabel" }, { value: today, styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Calificacion final", styleId: "DetailLabel" }, { value: lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-", styleId: "DetailValue", mergeAcross: 4 }],
+        ["", "", "", "", "", ""],
+        [{ value: "RESUMEN POR VERTICAL", styleId: "DarkHeader", mergeAcross: 5 }],
+        [
+          { value: "Vertical", styleId: "BlueHeaderCenter" },
+          { value: "Peso", styleId: "BlueHeaderCenter" },
+          { value: "Controles", styleId: "BlueHeaderCenter" },
+          { value: "Evaluados", styleId: "BlueHeaderCenter" },
+          { value: "Promedio logrado", styleId: "BlueHeaderCenter" },
+          { value: "Aporte final", styleId: "BlueHeaderCenter" },
+        ],
+        ...lote.verticalResultados.map((vertical) => [
+          { value: vertical.nombre, styleId: "Bordered" },
+          { value: `${vertical.peso}%`, styleId: "Bordered" },
+          { value: vertical.controlesTotal, styleId: "Bordered" },
+          { value: vertical.controlesConScore, styleId: "Bordered" },
+          { value: vertical.scorePromedio !== null ? `${vertical.scorePromedio.toFixed(1)}%` : "-", styleId: "Bordered" },
+          { value: vertical.aporte !== null ? `${vertical.aporte}%` : "-", styleId: "Bordered" },
+        ]),
+      ]
+      const excelSheets = [
+        { name: "Detalle Lote", rows: detailRows, columns: [180, 220, 160, 160, 160, 160] },
+        buildEvaluationSheet("Unidad de Negocio", unidadControls.length ? unidadControls : controls.slice(0, 1), ["UN EVALUADA", "UNIDAD DE NEGOCIO DEL QUE RECIBE ALGUN SERVICIO"], () => [lote.unidadNombre, lote.unidadNombre]),
+        buildEvaluationSheet("Producto", productoControls, ["UN EVALUADA", "PRODUCTO / SERVICIO"], (control) => [lote.unidadNombre, [control.producto, ...(control.productosVinculados ?? [])].filter(Boolean).join("\n")]),
+        buildEvaluationSheet("Proceso", procesoControls, ["UN EVALUADA", "PRODUCTO VINCULADO", "PROCESO", "TIPO"], (control) => [lote.unidadNombre, [control.producto, ...(control.productosVinculados ?? [])].filter(Boolean).join("\n"), control.proceso ?? control.identificador, control.etiqueta ?? "Proceso"]),
+        {
+          name: "Adherencia",
+          rows: [
+            [
+              { value: "UN EVALUADA", styleId: "DarkHeaderCenter" },
+              { value: "PROCESO VINCULADO", styleId: "DarkHeaderCenter" },
+              { value: "SUBPROCESO / PROCEDIMIENTO", styleId: "DarkHeaderCenter" },
+              { value: "CODIGO DEL PROCEDIMIENTO", styleId: "DarkHeaderCenter" },
+              { value: "AREA", styleId: "DarkHeaderCenter" },
+              { value: "ADHERENCIA AL PROCESO", styleId: "DarkHeaderCenter" },
+              { value: "PERSONAS AUDITADAS - CARGOS", styleId: "DarkHeaderCenter" },
+              { value: "ANALISTA DE CALIDAD", styleId: "DarkHeaderCenter" },
+              { value: "FECHA DE CONTROL", styleId: "DarkHeaderCenter" },
+              { value: "COMENTARIOS", styleId: "DarkHeaderCenter" },
+            ],
+            ...(adherenciaControls.length ? adherenciaControls : procesoControls).map((control) => [
+              { value: lote.unidadNombre, styleId: "Bordered" },
+              { value: control.proceso ?? control.identificador, styleId: "Bordered" },
+              { value: control.subprocesos?.join("\n") || control.subproceso || "", styleId: "Bordered" },
+              { value: "", styleId: "Bordered" },
+              { value: "", styleId: "Bordered" },
+              { value: formatEstado(control.estado), styleId: "Bordered" },
+              { value: [getAnswerPeople(control), getAnswerRoles(control)].filter(Boolean).join("\n"), styleId: "Bordered" },
+              { value: getAuditorName(control), styleId: "Bordered" },
+              { value: today, styleId: "Bordered" },
+              { value: getAnswerComment(control), styleId: "Comment" },
+            ]),
+          ],
+          columns: [150, 260, 320, 180, 220, 170, 330, 170, 130, 520],
+        },
+        { name: "Evidencia", rows: evidenceRows.length > 1 ? evidenceRows : [[{ value: "Sin evidencias registradas", styleId: "Bordered" }]], columns: [980] },
+      ]
+
+      if (exportFormat === "presentation") {
+        const completedControls = controls.filter((control) => control.estado === "terminado").length
+        const controlsWithScore = controls.filter((control) => control.scoreControl !== undefined)
+        const averageScore = controlsWithScore.length
+          ? Math.round(controlsWithScore.reduce((total, control) => total + (control.scoreControl ?? 0), 0) / controlsWithScore.length)
+          : null
+        const criticalControls = [...controlsWithScore]
+          .sort((first, second) => (first.scoreControl ?? 0) - (second.scoreControl ?? 0))
+          .slice(0, 5)
+
+        downloadPptx(`${safeName}-presentacion-ciclo-${lote.ciclo}-${lote.año}.pptx`, [
+          {
+            eyebrow: "Informe de evaluacion",
+            title: `${lote.unidadNombre}\nCiclo ${lote.ciclo} - ${lote.año}`,
+            subtitle: `${lote.modeloNombre} | ${lote.auditoresNombres || "Sin auditores asignados"}`,
+            metrics: [
+              { label: "Calificacion final", value: lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-" },
+              { label: "Controles evaluados", value: `${completedControls}/${controls.length}` },
+              { label: "Promedio controles", value: averageScore !== null ? `${averageScore}%` : "-" },
+              { label: "Verticales", value: lote.verticalResultados.length },
+            ],
+            bullets: [
+              `Estado del lote: ${formatEstado(lote.estado)}`,
+              `Fecha de exportacion: ${today}`,
+              `Modelo aplicado: ${lote.modeloNombre}`,
+            ],
+            footer: "Formato de informe ejecutivo de control de calidad",
+          },
+          {
+            eyebrow: "Resumen ejecutivo",
+            title: "Resultado por vertical",
+            subtitle: "Aporte ponderado de cada vertical al resultado final.",
+            table: {
+              headers: ["Vertical", "Peso", "Promedio", "Aporte"],
+              rows: lote.verticalResultados.map((vertical) => [
+                vertical.nombre,
+                `${vertical.peso}%`,
+                vertical.scorePromedio !== null ? `${vertical.scorePromedio.toFixed(1)}%` : "-",
+                vertical.aporte !== null ? `${vertical.aporte}%` : "-",
+              ]),
+            },
+            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote.año}`,
+          },
+          {
+            eyebrow: "Detalle de controles",
+            title: "Controles con menor desempeno",
+            subtitle: "Priorizacion de hallazgos y seguimientos segun score disponible.",
+            bullets: criticalControls.length
+              ? criticalControls.map((control) => `${control.identificador}: ${control.scoreControl}% - ${control.proceso ?? "Sin proceso"}`)
+              : ["No hay controles con score disponible para priorizar."],
+            table: {
+              headers: ["Estado", "Cantidad"],
+              rows: [
+                ["Pendientes", controls.filter((control) => control.estado === "pendiente").length],
+                ["En curso", controls.filter((control) => control.estado === "en_curso").length],
+                ["Terminados", completedControls],
+              ],
+            },
+            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote.año}`,
+          },
+        ])
+      } else {
+        downloadXlsx(`${safeName}-informe-ciclo-${lote.ciclo}-${lote.año}.xlsx`, [
+          ...excelSheets,
+          { name: "Respuestas", rows: respuestasRows, columns: [220, 150, 320, 100, 140, 220, 180, 420] },
+        ])
+      }
+      setIsExportOpen(false)
+    } catch (error) {
+      setExportError(getErrorMessage(error, "No se pudo exportar el lote seleccionado."))
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -268,6 +602,58 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
             <SelectItem value="terminado">Terminados</SelectItem>
           </SelectContent>
         </Select>
+        <Dialog
+          open={isExportOpen}
+          onOpenChange={(open) => {
+            setIsExportOpen(open)
+            if (!open) setExportError(null)
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full lg:ml-auto lg:w-auto">
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="!w-[calc(100vw-2rem)] !max-w-[26rem] gap-4 p-5 sm:!w-[26rem] sm:!max-w-[26rem] lg:!max-w-[26rem] lg:p-5">
+            <DialogHeader>
+              <DialogTitle>Exportar informe</DialogTitle>
+              <DialogDescription>Selecciona el lote que quieres exportar.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 pt-1">
+              <Select value={exportLoteId} onValueChange={setExportLoteId}>
+                <SelectTrigger className="w-full border-border bg-secondary/70">
+                  <SelectValue placeholder="Seleccionar lote" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lotesConDatos.map((lote) => (
+                    <SelectItem key={lote.id} value={lote.id}>
+                      {lote.unidadNombre} - Ciclo {lote.ciclo} - {lote.año}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as typeof exportFormat)}>
+                <SelectTrigger className="w-full border-border bg-secondary/70">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="excel">Excel</SelectItem>
+                  <SelectItem value="presentation">Presentacion</SelectItem>
+                </SelectContent>
+              </Select>
+              {exportError && <p className="text-sm text-destructive">{exportError}</p>}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setIsExportOpen(false)} disabled={isExporting}>
+                  Cancelar
+                </Button>
+                <Button onClick={exportSelectedLote} disabled={!exportLoteId || isExporting}>
+                  {isExporting ? "Exportando..." : "Exportar"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
         </>
       )}
@@ -356,7 +742,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
           const terminados = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
 
           return (
-            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
+            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-none">
               <AccordionTrigger className="px-3 py-4 hover:no-underline hover:bg-secondary/35 sm:px-5">
                 <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left lg:flex-row lg:items-center lg:justify-between lg:pr-4">
                   <div className="flex min-w-0 items-start gap-3">

@@ -57,7 +57,7 @@ export function ScoreByVerticalChart({ data = defaultData, height = 280 }: Score
             }}
             formatter={(value: number, name, props) => [
               `${value}% (Peso: ${props.payload?.weight ?? 0}%)`,
-              "Puntuacion",
+              "Puntuación",
             ]}
           />
           <Bar dataKey="score" radius={[0, 8, 8, 0]} barSize={26} background={{ fill: "var(--muted)", radius: 8 }}>

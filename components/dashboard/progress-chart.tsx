@@ -33,7 +33,7 @@ export function ProgressChart({
   return (
     <div className="relative w-full" style={{ height }}>
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center pb-9">
-        <div className="rounded-full border border-primary/15 bg-background px-5 py-4 text-center shadow-[0_18px_42px_oklch(0.28_0.025_252/0.12)]">
+        <div className="rounded-full border border-primary/15 bg-background px-5 py-4 text-center shadow-none">
           <p className="text-3xl font-semibold leading-none tracking-tight text-primary">{resolvedCenterValue}</p>
           <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{centerLabel}</p>
         </div>

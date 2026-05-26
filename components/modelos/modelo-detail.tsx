@@ -30,9 +30,9 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 md:gap-4">
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+        <Card className="border-border/60 bg-card">
           <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
-            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 shadow-none">
               <Layers3 className="h-6 w-6 text-primary" />
             </div>
             <div>
@@ -41,9 +41,9 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+        <Card className="border-border/60 bg-card">
           <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
-            <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+            <div className="rounded-lg border border-chart-2/20 bg-chart-2/10 p-3 shadow-none">
               <ListChecks className="h-6 w-6 text-chart-2" />
             </div>
             <div>
@@ -52,9 +52,9 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-white/70 backdrop-blur-xl">
+        <Card className="border-border/60 bg-card">
           <CardContent className="flex items-center justify-center gap-3 px-4 py-4 text-center sm:gap-4 sm:px-5">
-            <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+            <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 shadow-none">
               <CirclePercent className="h-6 w-6 text-warning" />
             </div>
             <div>
@@ -97,11 +97,11 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
             <AccordionItem
               key={vertical.id}
               value={vertical.id}
-              className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-sm"
+              className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-none"
             >
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
                 <div className="flex min-w-0 items-center gap-3 text-left">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shadow-none">
                     <span className="text-primary font-bold">{vertical.peso}%</span>
                   </div>
                   <div className="min-w-0">
@@ -118,7 +118,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
               <AccordionContent className="px-4 pb-4">
                 <div className="space-y-2 pt-1">
                   {vertical.parametros.map((parametro) => (
-                    <Card key={parametro.id} className="bg-secondary border-border shadow-sm rounded-lg">
+                    <Card key={parametro.id} className="bg-secondary border-border shadow-none rounded-lg">
                       <CardContent className="flex min-h-[76px] flex-col items-start justify-between gap-3 p-3 sm:flex-row sm:items-center sm:gap-4">
                         <div className="min-w-0 space-y-2">
                           <div>

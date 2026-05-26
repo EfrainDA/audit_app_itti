@@ -175,9 +175,9 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
       </div>
 
       <div className="space-y-3">
-        <Label>Auditores Asignados *</Label>
+        <Label>Analistas o especialistas de Control de Calidad asignados *</Label>
         <p className="text-sm text-muted-foreground">
-          Selecciona los auditores que participarán en este lote
+          Selecciona los analistas o especialistas que participarán en este lote
         </p>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
           {auditoresDisponibles.map((auditor) => (

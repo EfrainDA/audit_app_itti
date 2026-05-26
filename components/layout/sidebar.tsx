@@ -6,15 +6,15 @@ import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  Activity,
-  Award,
-  Cpu,
+  ChartColumn,
   CalendarDays,
-  ClipboardList,
+  ClipboardCheck,
   Settings2,
   ChevronLeft,
   ChevronRight,
+  House,
   LogOut,
+  SlidersHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
@@ -29,32 +29,13 @@ import {
 import { useAuth } from "@/components/auth/auth-provider"
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: Activity },
-  { name: "Modelos de Control", href: "/modelos", icon: Cpu },
+  { name: "Dashboard", href: "/", icon: House },
+  { name: "Modelos de Control", href: "/modelos", icon: SlidersHorizontal },
   { name: "Planificación", href: "/planificacion", icon: CalendarDays },
-  { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardList },
-  { name: "Calificaciones", href: "/calificaciones", icon: Award },
+  { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardCheck },
+  { name: "Calificaciones", href: "/calificaciones", icon: ChartColumn },
   { name: "Ajustes", href: "/ajustes", icon: Settings2 },
 ]
-
-function getIconTone(href: string) {
-  switch (href) {
-    case "/":
-      return "border-cyan-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.35),transparent_28%),linear-gradient(145deg,rgba(34,211,238,0.34),rgba(14,116,144,0.22))] text-cyan-100 shadow-[0_8px_18px_rgba(34,211,238,0.20)]"
-    case "/modelos":
-      return "border-sky-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(96,165,250,0.34),rgba(37,99,235,0.20))] text-sky-100 shadow-[0_8px_18px_rgba(96,165,250,0.18)]"
-    case "/planificacion":
-      return "border-indigo-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(129,140,248,0.34),rgba(79,70,229,0.20))] text-indigo-100 shadow-[0_8px_18px_rgba(129,140,248,0.18)]"
-    case "/evaluaciones":
-      return "border-emerald-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(52,211,153,0.34),rgba(5,150,105,0.20))] text-emerald-100 shadow-[0_8px_18px_rgba(52,211,153,0.18)]"
-    case "/calificaciones":
-      return "border-amber-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(251,191,36,0.34),rgba(217,119,6,0.20))] text-amber-100 shadow-[0_8px_18px_rgba(251,191,36,0.18)]"
-    case "/ajustes":
-      return "border-violet-300/35 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(145deg,rgba(167,139,250,0.34),rgba(124,58,237,0.20))] text-violet-100 shadow-[0_8px_18px_rgba(167,139,250,0.18)]"
-    default:
-      return "border-white/16 bg-white/8 text-white/85"
-  }
-}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -82,11 +63,11 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative hidden flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-[18px_0_42px_rgba(0,0,0,0.22)] transition-all duration-300 dark:border-neutral-800 dark:bg-[#050505] dark:shadow-[18px_0_42px_rgba(0,0,0,0.42)] lg:flex",
+        "relative hidden flex-col overflow-hidden border-r border-[#19315f] bg-[#061126] shadow-none transition-all duration-300 dark:border-neutral-800 dark:bg-[#050505] lg:flex",
         collapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.08)] dark:border-neutral-800">
+      <div className="relative z-10 flex h-16 items-center justify-center border-b border-white/10 px-4 shadow-none dark:border-neutral-800">
         {!collapsed && (
           <Link href="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <div className="relative flex h-[60px] w-full max-w-[280px] items-center justify-center">
@@ -118,7 +99,7 @@ export function Sidebar() {
           className={cn(
             "absolute text-white/80 hover:bg-white/10 hover:text-white",
             collapsed
-              ? "right-1/2 h-9 w-9 translate-x-1/2 rounded-xl border border-white/14 bg-[#06122d] dark:border-neutral-700 dark:bg-neutral-950"
+              ? "right-1/2 h-9 w-9 translate-x-1/2 rounded-md border border-white/14 bg-[#06122d] dark:border-neutral-700 dark:bg-neutral-950"
               : "right-4"
           )}
         >
@@ -137,23 +118,23 @@ export function Sidebar() {
                 "group relative flex items-center rounded-lg text-sm font-semibold transition-all duration-200",
                 collapsed ? "justify-center px-0 py-1.5" : "gap-3 px-3 py-2.5",
                 isActive
-                  ? cn("text-white", !collapsed && "border border-white/16 bg-white/12 shadow-[0_12px_26px_rgba(0,0,0,0.20)]")
+                  ? cn("text-white", !collapsed && "border border-white/16 bg-white/12 shadow-none")
                   : cn("text-white/68 hover:text-white", !collapsed && "hover:border-white/12 hover:bg-white/9")
               )}
               title={collapsed ? item.name : undefined}
             >
               <span
                 className={cn(
-                  "flex shrink-0 items-center justify-center rounded-xl border transition-all duration-200",
+                  "flex shrink-0 items-center justify-center rounded-md border transition-all duration-200",
                   collapsed ? "h-10 w-10" : "h-9 w-9",
                   isActive
-                    ? getIconTone(item.href)
-                    : cn("opacity-80 grayscale-[0.25] group-hover:opacity-100 group-hover:grayscale-0", getIconTone(item.href))
+                    ? "border-cyan-300/40 bg-transparent text-cyan-100"
+                    : "border-white/14 bg-transparent text-white/72 group-hover:border-white/24 group-hover:text-white"
                 )}
               >
                 <item.icon
                   className={cn(
-                    "h-[18px] w-[18px] shrink-0 text-current drop-shadow-[0_2px_3px_rgba(0,0,0,0.30)]"
+                    "h-[18px] w-[18px] shrink-0 text-current"
                   )}
                   strokeWidth={1.8}
                 />
@@ -170,12 +151,12 @@ export function Sidebar() {
             <button
               type="button"
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] transition-colors hover:bg-white/10",
+                "flex w-full items-center gap-3 rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-left shadow-none transition-colors hover:bg-white/10",
                 collapsed && "justify-center border-transparent bg-transparent px-1"
               )}
               title={collapsed ? userName : undefined}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 shadow-[0_8px_18px_rgba(56,189,248,0.18)]">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-300/20 bg-transparent shadow-none">
                 {appUser?.avatar ? (
                   <img src={appUser.avatar} alt={userName} className="h-full w-full rounded-full object-cover" />
                 ) : (
@@ -220,7 +201,7 @@ export function MobileNav() {
     : navigation
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(0,0,0,0.24)] dark:border-neutral-800 dark:bg-[#050505]/98 dark:shadow-[0_-16px_36px_rgba(0,0,0,0.44)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#061126]/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-none dark:border-neutral-800 dark:bg-[#050505]/98 lg:hidden">
       <div className="responsive-scroll grid auto-cols-[minmax(4.75rem,1fr)] grid-flow-col gap-1 overflow-x-auto pb-1 sm:grid-flow-row sm:grid-cols-6 sm:overflow-visible sm:pb-0">
         {visibleNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
@@ -237,7 +218,7 @@ export function MobileNav() {
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-lg border",
-                  isActive ? getIconTone(item.href) : "border-white/10 bg-white/5"
+                  isActive ? "border-cyan-300/40 bg-transparent text-cyan-100" : "border-white/10 bg-transparent text-white/72"
                 )}
               >
                 <item.icon className="h-4 w-4" strokeWidth={1.8} />

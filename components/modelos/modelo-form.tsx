@@ -248,7 +248,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
 
         <div className="space-y-4">
           {verticales.map((vertical, index) => (
-            <Card key={vertical.id} className="bg-card border-border shadow-sm rounded-xl">
+            <Card key={vertical.id} className="bg-card border-border shadow-none rounded-xl">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start gap-3 mb-1">
                   <GripVertical className="hidden h-5 w-5 text-muted-foreground mt-2 cursor-grab sm:block" />

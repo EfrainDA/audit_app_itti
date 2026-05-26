@@ -35,6 +35,26 @@ type ExcelSheet = {
   columns?: number[]
 }
 
+type PresentationMetric = {
+  label: string
+  value: string | number
+}
+
+type PresentationTable = {
+  headers: string[]
+  rows: Array<Array<string | number>>
+}
+
+type PresentationSlide = {
+  eyebrow?: string
+  title: string
+  subtitle?: string
+  metrics?: PresentationMetric[]
+  bullets?: string[]
+  table?: PresentationTable
+  footer?: string
+}
+
 const excelStyleIds = {
   Header: 1,
   Vertical: 2,
@@ -43,6 +63,14 @@ const excelStyleIds = {
   GreenHeader: 5,
   GreenHeaderCenter: 6,
   Bordered: 7,
+  DarkHeader: 8,
+  DarkHeaderCenter: 9,
+  BlueHeader: 10,
+  BlueHeaderCenter: 11,
+  GrayHeader: 12,
+  DetailLabel: 13,
+  DetailValue: 14,
+  Comment: 15,
 } as const
 
 function escapeXml(value: unknown) {
@@ -56,54 +84,6 @@ function escapeXml(value: unknown) {
 
 function sanitizeSheetName(name: string) {
   return name.replace(/[:\\/?*\[\]]/g, " ").trim().slice(0, 31) || "Hoja"
-}
-
-export function downloadExcel(filename: string, sheets: ExcelSheet[]) {
-  const getCellValue = (cell: ExcelCell) =>
-    typeof cell === "object" && cell !== null && "value" in cell ? cell.value : cell
-  const getCellStyle = (cell: ExcelCell, rowIndex: number) => {
-    if (typeof cell === "object" && cell !== null && "value" in cell && cell.styleId) {
-      return ` ss:StyleID="${escapeXml(cell.styleId)}"`
-    }
-    return rowIndex === 0 ? ' ss:StyleID="Header"' : String(getCellValue(cell)).startsWith("Vertical:") ? ' ss:StyleID="Vertical"' : ""
-  }
-  const getCellMerge = (cell: ExcelCell) =>
-    typeof cell === "object" && cell !== null && "value" in cell && cell.mergeAcross ? ` ss:MergeAcross="${cell.mergeAcross}"` : ""
-
-  const workbook = `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:o="urn:schemas-microsoft-com:office:office"
-  xmlns:x="urn:schemas-microsoft-com:office:excel"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Styles>
-    <Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#EAF2FF" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-    <Style ss:ID="Vertical"><Font ss:Bold="1"/><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/></Style>
-    <Style ss:ID="TitleCenter"><Alignment ss:Horizontal="Center"/><Font ss:Bold="1" ss:Size="14"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-    <Style ss:ID="SectionTitle"><Alignment ss:Horizontal="Center"/><Font ss:Bold="1"/><Interior ss:Color="#F2F2F2" ss:Pattern="Solid"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-    <Style ss:ID="GreenHeader"><Font ss:Bold="1"/><Interior ss:Color="#93C47D" ss:Pattern="Solid"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-    <Style ss:ID="GreenHeaderCenter"><Alignment ss:Horizontal="Center"/><Font ss:Bold="1"/><Interior ss:Color="#93C47D" ss:Pattern="Solid"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-    <Style ss:ID="Bordered"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>
-  </Styles>
-  ${sheets.map((sheet) => `
-  <Worksheet ss:Name="${escapeXml(sanitizeSheetName(sheet.name))}">
-    <Table>
-      ${(sheet.columns ?? []).map((width) => `<Column ss:Width="${width}"/>`).join("")}
-      ${sheet.rows.map((row, rowIndex) => `
-      <Row>${row.map((cell) => {
-        const value = getCellValue(cell)
-        const style = getCellStyle(cell, rowIndex)
-        const merge = getCellMerge(cell)
-        const isNumber = typeof value === "number" && Number.isFinite(value)
-        const type = isNumber ? "Number" : "String"
-        return `<Cell${style}${merge}><Data ss:Type="${type}">${escapeXml(value)}</Data></Cell>`
-      }).join("")}</Row>`).join("")}
-    </Table>
-  </Worksheet>`).join("")}
-</Workbook>`
-
-  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8;" })
-  triggerDownload(filename, blob)
 }
 
 export function downloadXlsx(filename: string, sheets: ExcelSheet[]) {
@@ -144,6 +124,64 @@ export function downloadXlsx(filename: string, sheets: ExcelSheet[]) {
   }
 
   const blob = new Blob([createZip(files)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+  triggerDownload(filename, blob)
+}
+
+export function downloadPptx(filename: string, slides: PresentationSlide[]) {
+  const slideOverrides = slides.map((_, index) =>
+    `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
+  ).join("")
+  const slideRelationships = slides.map((_, index) =>
+    `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`,
+  ).join("")
+  const slideIds = slides.map((_, index) =>
+    `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`,
+  ).join("")
+
+  const files: Record<string, string> = {
+    "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  ${slideOverrides}
+</Types>`,
+    "_rels/.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>`,
+    "ppt/presentation.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>
+  <p:sldIdLst>${slideIds}</p:sldIdLst>
+  <p:sldSz cx="12192000" cy="6858000" type="wide"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
+</p:presentation>`,
+    "ppt/_rels/presentation.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+  ${slideRelationships}
+</Relationships>`,
+    "ppt/slideMasters/slideMaster1.xml": getPptxSlideMasterXml(),
+    "ppt/slideMasters/_rels/slideMaster1.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
+</Relationships>`,
+    "ppt/slideLayouts/slideLayout1.xml": getPptxSlideLayoutXml(),
+    "ppt/slideLayouts/_rels/slideLayout1.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+</Relationships>`,
+    "ppt/theme/theme1.xml": getPptxThemeXml(),
+    ...Object.fromEntries(slides.map((slide, index) => [`ppt/slides/slide${index + 1}.xml`, getPptxSlideXml(slide, index + 1)])),
+    ...Object.fromEntries(slides.map((_, index) => [`ppt/slides/_rels/slide${index + 1}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>`])),
+  }
+
+  const blob = new Blob([createZip(files)], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" })
   triggerDownload(filename, blob)
 }
 
@@ -214,23 +252,29 @@ function getXlsxSheetXml(sheet: ExcelSheet) {
 function getXlsxStylesXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="3">
+  <fonts count="5">
     <font><sz val="11"/><name val="Calibri"/></font>
     <font><b/><sz val="11"/><name val="Calibri"/></font>
     <font><b/><sz val="14"/><name val="Calibri"/></font>
+    <font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="10"/><color rgb="FF000000"/><name val="Calibri"/></font>
   </fonts>
-  <fills count="4">
+  <fills count="8">
     <fill><patternFill patternType="none"/></fill>
     <fill><patternFill patternType="gray125"/></fill>
     <fill><patternFill patternType="solid"><fgColor rgb="FFEAF2FF"/><bgColor indexed="64"/></patternFill></fill>
     <fill><patternFill patternType="solid"><fgColor rgb="FF93C47D"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF073763"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF9FC5E8"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill>
   </fills>
   <borders count="2">
     <border><left/><right/><top/><bottom/><diagonal/></border>
     <border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border>
   </borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="8">
+  <cellXfs count="16">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
@@ -239,9 +283,150 @@ function getXlsxStylesXml() {
     <xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
     <xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="1" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`
+}
+
+function pptxEmu(value: number) {
+  return Math.round(value)
+}
+
+function pptxTextBox(id: number, x: number, y: number, w: number, h: number, text: string, options: { size?: number; color?: string; bold?: boolean; align?: "l" | "ctr" | "r" } = {}) {
+  const paragraphs = String(text || "").split("\n").map((line) => `
+        <a:p>
+          <a:pPr algn="${options.align ?? "l"}"/>
+          <a:r>
+            <a:rPr lang="es-PY" sz="${(options.size ?? 18) * 100}"${options.bold ? ' b="1"' : ""}>
+              <a:solidFill><a:srgbClr val="${options.color ?? "1F2937"}"/></a:solidFill>
+            </a:rPr>
+            <a:t>${escapeXml(line)}</a:t>
+          </a:r>
+          <a:endParaRPr lang="es-PY" sz="${(options.size ?? 18) * 100}"/>
+        </a:p>`).join("")
+
+  return `
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="${pptxEmu(x)}" y="${pptxEmu(y)}"/><a:ext cx="${pptxEmu(w)}" cy="${pptxEmu(h)}"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" anchor="t"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          ${paragraphs}
+        </p:txBody>
+      </p:sp>`
+}
+
+function pptxRect(id: number, x: number, y: number, w: number, h: number, fill: string, line = fill) {
+  return `
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="${pptxEmu(x)}" y="${pptxEmu(y)}"/><a:ext cx="${pptxEmu(w)}" cy="${pptxEmu(h)}"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>
+          <a:ln><a:solidFill><a:srgbClr val="${line}"/></a:solidFill></a:ln>
+        </p:spPr>
+      </p:sp>`
+}
+
+function getPptxSlideXml(slide: PresentationSlide, slideNumber: number) {
+  const shapes: string[] = []
+  let id = 2
+  shapes.push(pptxRect(id++, 0, 0, 12192000, 6858000, "F7F9FC"))
+  shapes.push(pptxRect(id++, 0, 0, 12192000, 650000, "0F172A"))
+  shapes.push(pptxRect(id++, 0, 650000, 12192000, 65000, "16A34A"))
+  if (slide.eyebrow) shapes.push(pptxTextBox(id++, 540000, 185000, 7600000, 240000, slide.eyebrow.toUpperCase(), { size: 9, color: "BBF7D0", bold: true }))
+  shapes.push(pptxTextBox(id++, 540000, 760000, 7600000, 700000, slide.title, { size: 28, color: "111827", bold: true }))
+  if (slide.subtitle) shapes.push(pptxTextBox(id++, 540000, 1450000, 7800000, 360000, slide.subtitle, { size: 13, color: "64748B" }))
+
+  if (slide.metrics?.length) {
+    const cardWidth = Math.floor(10400000 / Math.min(slide.metrics.length, 4))
+    slide.metrics.slice(0, 4).forEach((metric, index) => {
+      const x = 540000 + index * (cardWidth + 120000)
+      shapes.push(pptxRect(id++, x, 2050000, cardWidth, 880000, "FFFFFF", "D7DEE8"))
+      shapes.push(pptxTextBox(id++, x + 180000, 2210000, cardWidth - 360000, 260000, String(metric.label), { size: 10, color: "64748B", bold: true }))
+      shapes.push(pptxTextBox(id++, x + 180000, 2500000, cardWidth - 360000, 360000, String(metric.value), { size: 22, color: "0F172A", bold: true }))
+    })
+  }
+
+  if (slide.bullets?.length) {
+    const bulletText = slide.bullets.slice(0, 8).map((item) => `- ${item}`).join("\n")
+    shapes.push(pptxTextBox(id++, 700000, 3200000, 4700000, 2500000, bulletText, { size: 14, color: "1F2937" }))
+  }
+
+  if (slide.table) {
+    const tableX = slide.bullets?.length ? 5700000 : 700000
+    const tableY = 3200000
+    const tableW = slide.bullets?.length ? 5800000 : 10800000
+    const cols = slide.table.headers.length
+    const colW = Math.floor(tableW / cols)
+    const rowH = 360000
+    slide.table.headers.forEach((header, index) => {
+      shapes.push(pptxRect(id++, tableX + index * colW, tableY, colW, rowH, "16A34A", "15803D"))
+      shapes.push(pptxTextBox(id++, tableX + index * colW + 65000, tableY + 70000, colW - 130000, rowH - 80000, header, { size: 9, color: "FFFFFF", bold: true, align: "ctr" }))
+    })
+    slide.table.rows.slice(0, 6).forEach((row, rowIndex) => {
+      row.slice(0, cols).forEach((cell, colIndex) => {
+        const y = tableY + rowH + rowIndex * rowH
+        shapes.push(pptxRect(id++, tableX + colIndex * colW, y, colW, rowH, rowIndex % 2 === 0 ? "FFFFFF" : "F1F5F9", "D7DEE8"))
+        shapes.push(pptxTextBox(id++, tableX + colIndex * colW + 65000, y + 70000, colW - 130000, rowH - 80000, String(cell), { size: 9, color: "1F2937" }))
+      })
+    })
+  }
+
+  shapes.push(pptxTextBox(id++, 540000, 6420000, 6500000, 250000, slide.footer ?? `Informe de evaluaciones | ${slideNumber}`, { size: 9, color: "64748B" }))
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      ${shapes.join("")}
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>`
+}
+
+function getPptxSlideMasterXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
+</p:sldMaster>`
+}
+
+function getPptxSlideLayoutXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1">
+  <p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sldLayout>`
+}
+
+function getPptxThemeXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Audit Report">
+  <a:themeElements>
+    <a:clrScheme name="Audit"><a:dk1><a:srgbClr val="0F172A"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F2937"/></a:dk2><a:lt2><a:srgbClr val="F7F9FC"/></a:lt2><a:accent1><a:srgbClr val="16A34A"/></a:accent1><a:accent2><a:srgbClr val="0EA5E9"/></a:accent2><a:accent3><a:srgbClr val="F59E0B"/></a:accent3><a:accent4><a:srgbClr val="EF4444"/></a:accent4><a:accent5><a:srgbClr val="64748B"/></a:accent5><a:accent6><a:srgbClr val="94A3B8"/></a:accent6><a:hlink><a:srgbClr val="0EA5E9"/></a:hlink><a:folHlink><a:srgbClr val="64748B"/></a:folHlink></a:clrScheme>
+    <a:fontScheme name="Audit"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme>
+    <a:fmtScheme name="Audit"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
+  </a:themeElements>
+</a:theme>`
 }
 
 function createZip(files: Record<string, string>) {
