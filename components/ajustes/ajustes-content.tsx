@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, type ChangeEvent } from "react"
-import { useTheme } from "next-themes"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,6 @@ import {
   Building2,
   Calendar,
   Gauge,
-  History,
   Plus,
   ImagePlus,
   Search,
@@ -22,12 +20,6 @@ import {
   Trash2,
   Download,
   Shield,
-  Camera,
-  KeyRound,
-  Moon,
-  Palette,
-  Save,
-  Sun,
 } from "lucide-react"
 import {
   Table,
@@ -69,8 +61,8 @@ import {
   deleteBusinessUnit,
   updateBusinessUnit,
   updateThresholds,
-  updateOwnProfile,
   updateUserProfile,
+  updateCycle,
 } from "@/lib/supabase-data"
 import { downloadCsv } from "@/lib/export"
 import { getErrorMessage } from "@/lib/error-message"
@@ -78,19 +70,19 @@ import { supabase } from "@/lib/supabase"
 
 export function AjustesContent() {
   const { data, error: dataError, refresh } = useAppData()
-  const { appUser, refreshProfile } = useAuth()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { appUser } = useAuth()
   const isAuditor = appUser?.role === "auditor"
   const isAdmin = appUser?.role === "admin"
   const canManageSettings = appUser?.role === "admin" || appUser?.role === "supervisor"
   const canManageUsers = isAdmin
   const canCreateUnits = canManageSettings
-  const canModifyUnits = isAdmin
+  const canModifyUnits = canManageSettings
+  const canDeleteUnits = isAdmin
   const users = data.users
   const unidades = data.unidades
   const ciclos = data.ciclos
   const umbrales = data.umbrales
-  const [activeTab, setActiveTab] = useState("usuarios")
+  const [activeTab, setActiveTab] = useState(isAdmin ? "usuarios" : "unidades")
   const [searchTerm, setSearchTerm] = useState("")
   const [isUnidadOpen, setIsUnidadOpen] = useState(false)
   const [editingUnidad, setEditingUnidad] = useState<UnidadNegocio | null>(null)
@@ -107,27 +99,20 @@ export function AjustesContent() {
   const [isSavingUser, setIsSavingUser] = useState(false)
   const [newCycleYear, setNewCycleYear] = useState("2026")
   const [newCycleBimester, setNewCycleBimester] = useState("1")
+  const [isCycleOpen, setIsCycleOpen] = useState(false)
+  const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
   const [cycleError, setCycleError] = useState<string | null>(null)
   const [isSavingCycle, setIsSavingCycle] = useState(false)
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, { min: number; max: number }>>({})
   const [thresholdError, setThresholdError] = useState<string | null>(null)
   const [isSavingThresholds, setIsSavingThresholds] = useState(false)
-  const [profileName, setProfileName] = useState(appUser?.name ?? "")
-  const [profileCompany, setProfileCompany] = useState(appUser?.company ?? "")
-  const [profileAvatar, setProfileAvatar] = useState(appUser?.avatar ?? "")
-  const [profileCurrentPassword, setProfileCurrentPassword] = useState("")
-  const [profilePassword, setProfilePassword] = useState("")
-  const [profilePasswordConfirm, setProfilePasswordConfirm] = useState("")
-  const [profileError, setProfileError] = useState<string | null>(null)
-  const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const currentTab = activeTab
 
   useEffect(() => {
-    setProfileName(appUser?.name ?? "")
-    setProfileCompany(appUser?.company ?? "")
-    setProfileAvatar(appUser?.avatar ?? "")
-  }, [appUser?.avatar, appUser?.company, appUser?.name])
+    if (!isAdmin && activeTab === "usuarios") {
+      setActiveTab("unidades")
+    }
+  }, [activeTab, isAdmin])
 
   useEffect(() => {
     const channel = supabase
@@ -165,86 +150,6 @@ export function AjustesContent() {
       }
     }
     reader.readAsDataURL(file)
-  }
-
-  const handleProfileAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setProfileAvatar(reader.result)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleSaveProfile = async () => {
-    setProfileError(null)
-    setProfileSuccess(null)
-
-    if (!profileName.trim()) {
-      setProfileError("El nombre no puede quedar vacio.")
-      return
-    }
-
-    if ((profilePassword || profilePasswordConfirm || profileCurrentPassword) && !profileCurrentPassword) {
-      setProfileError("Ingresa tu contrasena actual para cambiarla.")
-      return
-    }
-
-    if ((profilePassword || profilePasswordConfirm || profileCurrentPassword) && !profilePassword) {
-      setProfileError("Ingresa la nueva contrasena.")
-      return
-    }
-
-    if ((profilePassword || profilePasswordConfirm) && profilePassword !== profilePasswordConfirm) {
-      setProfileError("Las contrasenas no coinciden.")
-      return
-    }
-
-    if (profilePassword && profilePassword.length < 6) {
-      setProfileError("La contrasena debe tener al menos 6 caracteres.")
-      return
-    }
-
-    setIsSavingProfile(true)
-    try {
-      await updateOwnProfile({
-        name: profileName,
-        company: profileCompany,
-        avatar: profileAvatar || null,
-      })
-
-      if (profilePassword) {
-        const email = appUser?.email
-        if (!email) throw new Error("No se pudo validar el correo de tu sesion.")
-
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password: profileCurrentPassword,
-        })
-
-        if (signInError) {
-          throw new Error("La contrasena actual no es correcta.")
-        }
-
-        const { error } = await supabase.auth.updateUser({ password: profilePassword })
-        if (error) throw error
-        setProfileCurrentPassword("")
-        setProfilePassword("")
-        setProfilePasswordConfirm("")
-      }
-
-      await refreshProfile()
-      await refresh()
-      setProfileSuccess("Datos actualizados correctamente.")
-    } catch (submitError) {
-      setProfileError(getErrorMessage(submitError, "No se pudieron guardar tus datos."))
-    } finally {
-      setIsSavingProfile(false)
-    }
   }
 
   const openEditUnidad = (unidad: UnidadNegocio) => {
@@ -322,15 +227,42 @@ export function AjustesContent() {
     await refresh()
   }
 
-  const handleCreateCycle = async () => {
+  const resetCycleForm = () => {
+    setEditingCycleId(null)
+    setNewCycleYear("2026")
+    setNewCycleBimester("1")
+    setCycleError(null)
+  }
+
+  const openCreateCycle = () => {
+    resetCycleForm()
+    setIsCycleOpen(true)
+  }
+
+  const openEditCycle = (cycle: typeof ciclos[number]) => {
+    setEditingCycleId(cycle.id)
+    setNewCycleYear(String(cycle.año))
+    setNewCycleBimester(String(cycle.bimestre))
+    setCycleError(null)
+    setIsCycleOpen(true)
+  }
+
+  const handleSaveCycle = async () => {
     setCycleError(null)
     setIsSavingCycle(true)
 
     try {
-      await createCycle({ year: Number(newCycleYear), bimester: Number(newCycleBimester) })
+      const input = { year: Number(newCycleYear), bimester: Number(newCycleBimester) }
+      if (editingCycleId) {
+        await updateCycle(editingCycleId, input)
+      } else {
+        await createCycle(input)
+      }
       await refresh()
+      setEditingCycleId(null)
+      setIsCycleOpen(false)
     } catch (submitError) {
-      setCycleError(getErrorMessage(submitError, "No se pudo crear el ciclo."))
+      setCycleError(getErrorMessage(submitError, "No se pudo guardar el ciclo."))
     } finally {
       setIsSavingCycle(false)
     }
@@ -370,115 +302,13 @@ export function AjustesContent() {
   }
 
   if (isAuditor) {
-    const isDark = resolvedTheme === "dark"
-    const initials = profileName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase() || "U"
-
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-6">
-        {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-base">Perfil personal</CardTitle>
-            <CardDescription>Actualiza tus datos, foto de perfil, contrasena y preferencia visual.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/20 bg-primary/10">
-                {profileAvatar ? (
-                  <img src={profileAvatar} alt={profileName || "Perfil"} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-2xl font-bold text-primary">{initials}</span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-2">
-                <Label htmlFor="profile-avatar">Foto de perfil</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button variant="outline" asChild>
-                    <label htmlFor="profile-avatar" className="cursor-pointer">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Cambiar foto
-                    </label>
-                  </Button>
-                  {profileAvatar && (
-                    <Button variant="ghost" onClick={() => setProfileAvatar("")}>
-                      Quitar foto
-                    </Button>
-                  )}
-                </div>
-                <input id="profile-avatar" type="file" accept="image/*" className="hidden" onChange={handleProfileAvatarChange} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="profile-name">Nombre y apellido</Label>
-                <Input id="profile-name" value={profileName} onChange={(event) => setProfileName(event.target.value)} className="bg-secondary" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-email">Correo electronico</Label>
-                <Input id="profile-email" value={appUser?.email ?? ""} disabled className="bg-secondary" />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="profile-company">Empresa</Label>
-                <Input id="profile-company" value={profileCompany} onChange={(event) => setProfileCompany(event.target.value)} className="bg-secondary" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 rounded-lg border border-border/70 bg-secondary/35 p-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <KeyRound className="h-4 w-4 text-primary" />
-                  Cambiar contrasena
-                </div>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="profile-current-password">Contrasena actual</Label>
-                <Input id="profile-current-password" type="password" value={profileCurrentPassword} onChange={(event) => setProfileCurrentPassword(event.target.value)} className="bg-background" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-password">Nueva contrasena</Label>
-                <Input id="profile-password" type="password" value={profilePassword} onChange={(event) => setProfilePassword(event.target.value)} className="bg-background" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-password-confirm">Confirmar contrasena</Label>
-                <Input id="profile-password-confirm" type="password" value={profilePasswordConfirm} onChange={(event) => setProfilePasswordConfirm(event.target.value)} className="bg-background" />
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <Palette className="h-4 w-4 text-primary" />
-                Tema
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button variant={!isDark ? "default" : "outline"} onClick={() => setTheme("light")}>
-                  <Sun className="h-4 w-4 mr-2" />
-                  Claro
-                </Button>
-                <Button variant={isDark ? "default" : "outline"} onClick={() => setTheme("dark")}>
-                  <Moon className="h-4 w-4 mr-2" />
-                  Oscuro
-                </Button>
-              </div>
-            </div>
-
-            {profileError && <p className="text-sm text-destructive">{profileError}</p>}
-            {profileSuccess && <p className="text-sm text-success">{profileSuccess}</p>}
-            <div className="flex justify-end border-t border-border pt-4">
-              <Button className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleSaveProfile} disabled={isSavingProfile}>
-                <Save className="h-4 w-4 mr-2" />
-                {isSavingProfile ? "Guardando..." : "Guardar cambios"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-base">Ajustes no disponibles</CardTitle>
+          <CardDescription>Usa Preferencias para administrar tu perfil personal.</CardDescription>
+        </CardHeader>
+      </Card>
     )
   }
 
@@ -486,11 +316,13 @@ export function AjustesContent() {
     <div className="space-y-6">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid sm:grid-cols-5 sm:overflow-visible">
-          <TabsTrigger value="usuarios" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Usuarios</span>
-          </TabsTrigger>
+        <TabsList className={`responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid ${isAdmin ? "sm:grid-cols-4" : "sm:grid-cols-3"} sm:overflow-visible`}>
+          {isAdmin && (
+            <TabsTrigger value="usuarios" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Usuarios</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="unidades" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Unidades</span>
@@ -503,14 +335,11 @@ export function AjustesContent() {
             <Gauge className="h-4 w-4" />
             <span className="hidden sm:inline">Umbrales</span>
           </TabsTrigger>
-          <TabsTrigger value="auditlog" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Audit Log</span>
-          </TabsTrigger>
         </TabsList>
 
         {/* Usuarios Tab */}
-        <TabsContent value="usuarios" className="space-y-4">
+        {isAdmin && (
+          <TabsContent value="usuarios" className="space-y-4">
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div className="min-w-0">
@@ -656,7 +485,8 @@ export function AjustesContent() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+          </TabsContent>
+        )}
 
         {/* Unidades Tab */}
         <TabsContent value="unidades" className="space-y-4">
@@ -763,12 +593,12 @@ export function AjustesContent() {
               </Dialog>
             </CardHeader>
             <CardContent>
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow className="border-border">
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Ecosistema</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="w-[38%]">Nombre</TableHead>
+                    <TableHead className="w-[42%]">Ecosistema</TableHead>
+                    <TableHead className="w-[20%] text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -804,14 +634,18 @@ export function AjustesContent() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => handleDeleteUnidad(unidad.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
+                              {canDeleteUnits && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => handleDeleteUnidad(unidad.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
@@ -834,26 +668,81 @@ export function AjustesContent() {
                 <CardTitle className="text-base">Configuración de Ciclos</CardTitle>
                 <CardDescription>Define los períodos bimestrales para auditorías</CardDescription>
               </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Input className="h-9 w-full bg-secondary sm:w-24" value={newCycleYear} disabled={!canManageSettings} onChange={(event) => setNewCycleYear(event.target.value)} />
-                <Select value={newCycleBimester} onValueChange={setNewCycleBimester} disabled={!canManageSettings}>
-                  <SelectTrigger className="h-9 w-full bg-secondary sm:w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1, 2, 3, 4, 5, 6].map((bimester) => (
-                      <SelectItem key={bimester} value={String(bimester)}>Bim. {bimester}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" onClick={handleCreateCycle} disabled={!canManageSettings || isSavingCycle}>
-                <Plus className="h-4 w-4 mr-2" />
-                {isSavingCycle ? "Guardando..." : "Nuevo Ciclo"}
-              </Button>
-              </div>
+              <Dialog
+                open={isCycleOpen}
+                onOpenChange={(open) => {
+                  setIsCycleOpen(open)
+                  if (!open) resetCycleForm()
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="w-full bg-primary hover:bg-primary/90 sm:w-auto"
+                    onClick={openCreateCycle}
+                    disabled={!canManageSettings}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Ciclo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="!w-[calc(100vw-2rem)] !max-w-[22rem] gap-4 p-5 sm:!w-[22rem] sm:!max-w-[22rem] md:!max-w-[22rem] lg:!max-w-[22rem]">
+                  <DialogHeader>
+                    <DialogTitle>{editingCycleId ? "Editar ciclo" : "Nuevo ciclo"}</DialogTitle>
+                    <DialogDescription>
+                      Selecciona el año y bimestre. Las fechas se calculan automáticamente.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="cycle-year">Año</Label>
+                      <Input
+                        id="cycle-year"
+                        className="h-9 w-full bg-secondary"
+                        value={newCycleYear}
+                        disabled={!canManageSettings}
+                        onChange={(event) => setNewCycleYear(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cycle-bimester">Bimestre</Label>
+                      <Select value={newCycleBimester} onValueChange={setNewCycleBimester} disabled={!canManageSettings}>
+                        <SelectTrigger id="cycle-bimester" className="h-9 w-full bg-secondary">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            { value: "1", label: "Bim. 1 (Ene - Feb)" },
+                            { value: "2", label: "Bim. 2 (Mar - Abr)" },
+                            { value: "3", label: "Bim. 3 (May - Jun)" },
+                            { value: "4", label: "Bim. 4 (Jul - Ago)" },
+                            { value: "5", label: "Bim. 5 (Sep - Oct)" },
+                            { value: "6", label: "Bim. 6 (Nov - Dic)" },
+                          ].map((bimester) => (
+                            <SelectItem key={bimester.value} value={bimester.value}>{bimester.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {cycleError && <p className="text-sm text-destructive">{cycleError}</p>}
+                  <div className="flex flex-col-reverse gap-2 border-t border-border pt-3 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setIsCycleOpen(false)} disabled={isSavingCycle}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      className="bg-primary hover:bg-primary/90"
+                      onClick={handleSaveCycle}
+                      disabled={!canManageSettings || isSavingCycle}
+                    >
+                      {isSavingCycle ? "Guardando..." : editingCycleId ? "Guardar ciclo" : "Crear ciclo"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
-              {cycleError && <p className="mb-4 text-sm text-destructive">{cycleError}</p>}
+              {cycleError && !isCycleOpen && <p className="mb-4 text-sm text-destructive">{cycleError}</p>}
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
@@ -884,10 +773,7 @@ export function AjustesContent() {
                             variant="ghost"
                             size="icon"
                             disabled={!canManageSettings}
-                            onClick={() => {
-                              setNewCycleYear(String(ciclo.año))
-                              setNewCycleBimester(String(ciclo.bimestre))
-                            }}
+                            onClick={() => openEditCycle(ciclo)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -988,37 +874,6 @@ export function AjustesContent() {
           </Card>
         </TabsContent>
 
-        {/* Audit Log Tab */}
-        <TabsContent value="auditlog" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <div className="min-w-0">
-                <CardTitle className="text-base">Registro de Actividad</CardTitle>
-                <CardDescription>Historial de acciones realizadas en el sistema</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead>Fecha/Hora</TableHead>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Acción</TableHead>
-                    <TableHead>Entidad</TableHead>
-                    <TableHead>Detalles</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow className="border-border">
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                      No hay una tabla de auditoria configurada todavia.
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   )

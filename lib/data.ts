@@ -3,6 +3,7 @@ export interface User {
   name: string
   email: string
   company?: string
+  cargo?: string
   role: "admin" | "supervisor" | "auditor" | "auditado"
   status: "activo" | "inactivo"
   avatar?: string
@@ -179,5 +180,6 @@ export function getEstadoBadgeColor(estado: string): string {
 }
 
 export function formatEstado(estado: string): string {
+  if (estado === "deprecado") return "Dado de Baja"
   return estado.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 }

@@ -24,6 +24,7 @@ function mapProfile(row: {
   status: User["status"]
   avatar: string | null
   company: string | null
+  cargo: string | null
 }): User {
   return {
     id: row.id,
@@ -33,6 +34,7 @@ function mapProfile(row: {
     status: row.status,
     avatar: row.avatar ?? undefined,
     company: row.company ?? undefined,
+    cargo: row.cargo ?? undefined,
   }
 }
 
@@ -44,10 +46,11 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
     email.split("@")[0] ||
     "Usuario"
   const company = authUser.user_metadata?.company || authUser.user_metadata?.empresa || null
+  const cargo = authUser.user_metadata?.cargo || null
 
   const { data: existingByAuthId, error: authIdError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar,company")
+    .select("id,name,email,role,status,avatar,company,cargo")
     .eq("auth_user_id", authUser.id)
     .maybeSingle()
 
@@ -56,7 +59,7 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
 
   const { data: existingByEmail, error: emailError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar,company")
+    .select("id,name,email,role,status,avatar,company,cargo")
     .eq("email", email)
     .maybeSingle()
 
@@ -65,9 +68,9 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
   if (existingByEmail) {
     const { data: linkedProfile, error: updateError } = await supabase
       .from("users")
-      .update({ auth_user_id: authUser.id, company: company ?? existingByEmail.company })
+      .update({ auth_user_id: authUser.id, company: company ?? existingByEmail.company, cargo: cargo ?? existingByEmail.cargo })
       .eq("id", existingByEmail.id)
-      .select("id,name,email,role,status,avatar,company")
+      .select("id,name,email,role,status,avatar,company,cargo")
       .single()
 
     if (updateError) throw updateError
@@ -81,10 +84,11 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
       name: displayName,
       email,
       company,
+      cargo,
       role: "auditor",
       status: "activo",
     })
-    .select("id,name,email,role,status,avatar,company")
+    .select("id,name,email,role,status,avatar,company,cargo")
     .single()
 
   if (insertError) throw insertError

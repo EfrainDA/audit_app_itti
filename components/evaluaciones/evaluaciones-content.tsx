@@ -463,7 +463,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                                             )}
                                           </div>
                                           {auditor && (
-                                            <p className="text-sm text-muted-foreground">Auditor: {auditor.name}</p>
+                                            <p className="text-sm text-muted-foreground">{auditor.cargo || "Cargo"}: {auditor.name}</p>
                                           )}
                                         </div>
                                         <div className="flex items-center gap-2">

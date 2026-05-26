@@ -6,7 +6,7 @@ import { MobileNav, Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
 
-const PREFETCH_ROUTES = ["/", "/planificacion", "/evaluaciones", "/calificaciones", "/modelos", "/ajustes"]
+const PREFETCH_ROUTES = ["/", "/planificacion", "/evaluaciones", "/calificaciones", "/modelos", "/ajustes", "/preferencias"]
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -25,13 +25,14 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
     }
   }, [isLoading, pathname, router, session])
 
-  const isAuditorBlockedPath = appUser?.role === "auditor" && pathname.startsWith("/modelos")
+  const isAuditorBlockedPath =
+    appUser?.role === "auditor" && (pathname.startsWith("/modelos") || pathname.startsWith("/ajustes"))
 
   useEffect(() => {
     if (!isLoading && session && isAuditorBlockedPath) {
-      router.replace("/")
+      router.replace(pathname.startsWith("/ajustes") ? "/preferencias" : "/")
     }
-  }, [isAuditorBlockedPath, isLoading, router, session])
+  }, [isAuditorBlockedPath, isLoading, pathname, router, session])
 
   useEffect(() => {
     if (isLoading || !session) return

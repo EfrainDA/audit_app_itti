@@ -61,6 +61,7 @@ type DbUser = {
   name: string
   email: string
   company: string | null
+  cargo: string | null
   role: User["role"]
   status: User["status"]
   avatar: string | null
@@ -249,7 +250,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     answersResult,
     notificationsResult,
   ] = await Promise.all([
-    supabase.from("users").select("id,name,email,company,role,status,avatar").order("name"),
+    supabase.from("users").select("id,name,email,company,cargo,role,status,avatar").order("name"),
     supabase.from("business_units").select("id,name,ecosystem,code,zone,owner_name,logo_url").order("name"),
     supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester"),
     supabase.from("thresholds").select("id,name,min_value,max_value,color").order("min_value"),
@@ -316,6 +317,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       name: user.name,
       email: user.email,
       company: user.company ?? undefined,
+      cargo: user.cargo ?? undefined,
       role: user.role,
       status: user.status,
       avatar: user.avatar ?? undefined,
@@ -493,6 +495,7 @@ async function getCurrentProfile() {
       name: displayName,
       email,
       company: authUser.user_metadata?.company || authUser.user_metadata?.empresa || null,
+      cargo: authUser.user_metadata?.cargo || null,
       role: "auditor",
       status: "activo",
     })
@@ -675,7 +678,7 @@ export async function createBusinessUnit(input: { name: string; ecosystem: strin
 }
 
 export async function updateBusinessUnit(id: string, input: { name: string; ecosystem: string; logoUrl?: string | null }) {
-  await requireAdmin()
+  await requireAdminOrSupervisor()
   const { error } = await supabase
     .from("business_units")
     .update({
@@ -700,13 +703,14 @@ export async function updateUserProfile(id: string, input: { role?: User["role"]
   if (error) throw error
 }
 
-export async function updateOwnProfile(input: { name: string; company?: string; avatar?: string | null }) {
+export async function updateOwnProfile(input: { name: string; company?: string; cargo?: string; avatar?: string | null }) {
   const profile = await getCurrentProfile()
   const { error } = await supabase
     .from("users")
     .update({
       name: input.name.trim(),
       company: input.company?.trim() || null,
+      cargo: input.cargo?.trim() || null,
       avatar: input.avatar || null,
     })
     .eq("id", profile.id)
@@ -717,6 +721,22 @@ export async function updateOwnProfile(input: { name: string; company?: string; 
 export async function createCycle(input: { year: number; bimester: number }) {
   await requireAdminOrSupervisor()
   await ensureCycle(input.year, input.bimester)
+}
+
+export async function updateCycle(id: string, input: { year: number; bimester: number }) {
+  await requireAdminOrSupervisor()
+  const dates = getBimesterDates(input.year, input.bimester)
+  const { error } = await supabase
+    .from("cycles")
+    .update({
+      year: input.year,
+      bimester: input.bimester,
+      start_date: dates.startDate,
+      end_date: dates.endDate,
+    })
+    .eq("id", id)
+
+  if (error) throw error
 }
 
 export async function updateThresholds(
@@ -802,7 +822,13 @@ export async function createControlModel(input: ControlModelInput) {
 
 export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
   await requireAdminOrSupervisor()
-  const { error } = await supabase.from("control_models").update({ status }).eq("id", id)
+  const { error } = await supabase
+    .from("control_models")
+    .update({
+      status,
+      valid_until: status === "deprecado" ? new Date().toISOString().slice(0, 10) : null,
+    })
+    .eq("id", id)
   if (error) throw error
 }
 

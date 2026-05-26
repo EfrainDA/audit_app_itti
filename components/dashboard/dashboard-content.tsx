@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -655,28 +663,28 @@ function AnalystUnitScore({
 
 function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   return (
-    <div className="responsive-scroll overflow-x-auto">
-      <table className="w-full min-w-[760px]">
+    <div>
+      <Table className="min-w-[760px] table-fixed">
         <colgroup>
-          <col style={{ width: '50%' }} />
-          <col style={{ width: '20%' }} />
-          <col style={{ width: '20%' }} />
-          <col style={{ width: '10%' }} />
-          <col />
+          <col style={{ width: "42%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "10%" }} />
         </colgroup>
-        <thead>
-          <tr className="border-b border-border">
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Control</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Vertical</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad de Negocio</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Estado</th>
-            <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Accion</th>
-          </tr>
-        </thead>
-        <tbody>
+        <TableHeader>
+          <TableRow className="border-border">
+            <TableHead>Control</TableHead>
+            <TableHead>Vertical</TableHead>
+            <TableHead>Unidad de Negocio</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead className="text-right">Accion</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {controls.map((control) => (
-            <tr key={control.id} className="border-b border-border transition-colors hover:bg-muted/50">
-              <td className="px-3 py-2.5">
+            <TableRow key={control.id} className="border-border">
+              <TableCell>
                 <div>
                   <span className="text-sm font-semibold text-foreground">{control.identificador || control.id}</span>
                   {(control.proceso || control.subproceso) && (
@@ -685,26 +693,26 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
                     </p>
                   )}
                 </div>
-              </td>
-              <td className="px-3 py-2.5 text-sm">{control.verticalNombre}</td>
-              <td className="px-3 py-2.5 text-sm">
+              </TableCell>
+              <TableCell className="text-sm">{control.verticalNombre}</TableCell>
+              <TableCell className="text-sm">
                 {control.unidadNombre}
-              </td>
-              <td className="px-3 py-2.5">
+              </TableCell>
+              <TableCell>
                 <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
-              </td>
-              <td className="px-3 py-2.5 text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <Button size="sm" className="h-8" asChild>
                   <Link href={`/evaluaciones/${control.id}`}>
                     <Play className="mr-1 h-4 w-4" />
                     Evaluar
                   </Link>
                 </Button>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
 
       {controls.length === 0 && (
         <div className="py-10 text-center text-sm text-muted-foreground">

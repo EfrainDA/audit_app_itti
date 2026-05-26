@@ -65,7 +65,6 @@ export function Sidebar() {
     ? navigation.filter((item) => item.href !== "/modelos" && item.href !== "/ajustes")
     : navigation
   const userName = appUser?.name ?? "Usuario"
-  const userRole = appUser?.role ?? "sesion activa"
   const userInitials = userName
     .split(" ")
     .filter(Boolean)
@@ -186,7 +185,6 @@ export function Sidebar() {
               {!collapsed && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">{userName}</p>
-                  <p className="truncate text-xs capitalize text-white/60">{userRole}</p>
                 </div>
               )}
             </button>
@@ -194,11 +192,10 @@ export function Sidebar() {
           <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56">
             <DropdownMenuLabel>
               <p className="truncate text-sm font-semibold">{userName}</p>
-              <p className="truncate text-xs capitalize text-muted-foreground">{userRole}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/ajustes">
+              <Link href="/preferencias">
                 <Settings2 className="h-4 w-4 mr-2" />
                 Preferencias
               </Link>

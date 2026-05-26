@@ -129,7 +129,7 @@ export function ModelosContent() {
             <RealisticIcon icon={Archive} tone="neutral" size="md" />
             <div>
               <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'deprecado').length}</p>
-              <p className="text-sm text-muted-foreground">Deprecados</p>
+              <p className="text-sm text-muted-foreground">Dados de baja</p>
             </div>
           </CardContent>
         </Card>
@@ -220,7 +220,7 @@ export function ModelosContent() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "deprecado")); }} className="text-destructive">
                           <Archive className="h-4 w-4 mr-2" />
-                          Deprecar
+                          Dar de baja
                         </DropdownMenuItem>
                       </>
                     )}

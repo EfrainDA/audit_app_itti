@@ -8,11 +8,11 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div
       data-slot="table-container"
-      className="responsive-scroll relative w-full overflow-x-auto rounded-lg border border-border/55 bg-card shadow-[inset_0_1px_0_oklch(1_0_0_/_0.42),0_8px_20px_oklch(0.30_0.032_252_/_0.04)]"
+      className="relative w-full overflow-x-auto rounded-lg border border-border/55 bg-secondary/85 shadow-[inset_0_1px_0_oklch(1_0_0_/_0.42),0_8px_20px_oklch(0.30_0.032_252_/_0.04)] [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
     >
       <table
         data-slot="table"
-        className={cn('w-full min-w-[44rem] caption-bottom text-sm sm:min-w-max', className)}
+        className={cn('w-full min-w-full caption-bottom bg-card text-sm', className)}
         {...props}
       />
     </div>
@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b', className)}
+      className={cn('bg-secondary/85 [&_tr]:border-b [&_tr]:border-border/80 [&_tr]:bg-secondary/85 [&_th]:bg-secondary/85', className)}
       {...props}
     />
   )
@@ -70,7 +70,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'text-muted-foreground h-11 bg-secondary/36 px-3 text-left align-middle text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'h-11 bg-secondary/85 px-3 text-left align-middle text-xs font-bold uppercase tracking-normal text-foreground/75 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}

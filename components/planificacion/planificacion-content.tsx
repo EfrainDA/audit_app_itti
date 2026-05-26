@@ -50,7 +50,7 @@ import { LoteForm } from "./lote-form"
 import { LoteDetail } from "./lote-detail"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { downloadCsv, downloadExcel } from "@/lib/export"
+import { downloadCsv, downloadXlsx } from "@/lib/export"
 import { updateLotStatus } from "@/lib/supabase-data"
 
 export function PlanificacionContent() {
@@ -150,46 +150,72 @@ export function PlanificacionContent() {
   }
 
   const exportSingleLote = (lote: (typeof lotesConDatos)[number]) => {
-    const modelo = modelos.find((item) => item.id === lote.modeloControlId)
+    const unidad = unidades.find((item) => item.id === lote.unidadNegocioId)
     const loteVerticales = loteVerticalesData.filter((loteVertical) => loteVertical.loteId === lote.id)
-    const rows: (string | number)[][] = [
-      ["Vertical", "Tipo", "Nombre", "Proceso", "Subprocesos", "Etiqueta", "Estado", "Auditor"],
-    ]
+    const controls = loteVerticales.flatMap((loteVertical) => loteVertical.controles)
+    const getProducts = (control: (typeof controls)[number]) => {
+      const products = [
+        control.producto,
+        ...(control.productosVinculados ?? []),
+      ]
+        .map((product) => product?.trim())
+        .filter((product): product is string => Boolean(product))
 
-    loteVerticales.forEach((loteVertical) => {
-      const vertical = modelo?.verticales.find((item) => item.id === loteVertical.verticalId)
-      rows.push([`Vertical: ${vertical?.nombre ?? "Sin vertical"}`, "", "", "", "", "", "", ""])
+      return Array.from(new Set(products))
+    }
+    const alcanceProductos = Array.from(new Set(controls.flatMap(getProducts))).sort((a, b) => a.localeCompare(b))
+    const procesosRows = controls.flatMap((control) => {
+      const products = getProducts(control)
+      const linkedProducts = products.length > 1
+        ? products.map((product, index) => `${index + 1}. ${product}`).join("\n")
+        : products[0] ?? ""
+      const subprocesos = control.subprocesos?.length
+        ? control.subprocesos
+        : control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
+      const subprocessRows = subprocesos.length ? subprocesos : [control.subproceso ?? ""]
+      const proceso = control.proceso || control.identificador
 
-      if (loteVertical.controles.length === 0) {
-        rows.push(["", "Control", "Sin controles", "", "", "", "", ""])
-        rows.push(["", "", "", "", "", "", "", ""])
-        return
-      }
-
-      loteVertical.controles.forEach((control) => {
-        const auditor = control.auditorId ? users.find((user) => user.id === control.auditorId) : null
-        const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
-        const isProcess = control.correspondeProceso || control.etiqueta === "Proceso" || control.etiqueta === "Proceso de apoyo"
-
-        rows.push([
-          "",
-          isProcess ? "Proceso" : "Control",
-          control.identificador,
-          isProcess ? control.proceso || control.identificador : "",
-          subprocesos.join(", "),
-          control.etiqueta ?? "",
-          formatEstado(control.estado),
-          auditor?.name ?? "",
-        ])
-      })
-
-      rows.push(["", "", "", "", "", "", "", ""])
+      return subprocessRows.map((subproceso) => ({
+        producto: linkedProducts,
+        proceso,
+        subproceso,
+      }))
     })
+    const rows = [
+      [{ value: unidad?.nombre || lote.unidadNombre, styleId: "TitleCenter", mergeAcross: 2 }],
+      [{ value: "PRODUCTOS DEL ALCANCE", styleId: "GreenHeader", mergeAcross: 2 }],
+      ...(alcanceProductos.length
+        ? alcanceProductos.map((product, index) => [{ value: `${index + 1}. ${product}`, styleId: "Bordered", mergeAcross: 2 }])
+        : [[{ value: "Sin productos definidos", styleId: "Bordered", mergeAcross: 2 }]]),
+      ["", "", ""],
+      [{ value: "PROCESOS VINCULADOS A PRODUCTO", styleId: "SectionTitle", mergeAcross: 2 }],
+      [
+        { value: "PRODUCTO VINCULADO", styleId: "GreenHeaderCenter" },
+        { value: "PROCESO", styleId: "GreenHeaderCenter" },
+        { value: "SUBPROCESO", styleId: "GreenHeaderCenter" },
+      ],
+      ...(procesosRows.length
+        ? procesosRows.map((row) => [
+            { value: row.producto, styleId: "Bordered" },
+            { value: row.proceso, styleId: "Bordered" },
+            { value: row.subproceso, styleId: "Bordered" },
+          ])
+        : [[
+            { value: "Sin productos", styleId: "Bordered" },
+            { value: "Sin procesos vinculados", styleId: "Bordered" },
+            { value: "", styleId: "Bordered" },
+          ]]),
+    ]
+    const safeName = (unidad?.nombre || lote.unidadNombre || "lote")
+      .replace(/[^\w-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "lote"
 
-    downloadExcel(`lote-${lote.id}.xls`, [
+    downloadXlsx(`planificacion-${safeName}-ciclo-${lote.ciclo}.xlsx`, [
       {
-        name: lote.unidadNombre,
+        name: unidad?.nombre || lote.unidadNombre,
         rows,
+        columns: [280, 360, 420],
       },
     ])
   }

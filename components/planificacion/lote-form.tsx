@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -15,6 +15,19 @@ import { Building2 } from "lucide-react"
 import { useAppData } from "@/hooks/use-app-data"
 import { createLot } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
+
+const cycleLabels: Record<number, string> = {
+  1: "Ciclo 1 (Ene - Feb)",
+  2: "Ciclo 2 (Mar - Abr)",
+  3: "Ciclo 3 (May - Jun)",
+  4: "Ciclo 4 (Jul - Ago)",
+  5: "Ciclo 5 (Sep - Oct)",
+  6: "Ciclo 6 (Nov - Dic)",
+}
+
+function getCurrentBimester(date = new Date()) {
+  return Math.floor(date.getMonth() / 2) + 1
+}
 
 interface LoteFormProps {
   onClose: () => void
@@ -31,9 +44,31 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const unidades = data.unidades
+  const activeCycle = useMemo(() => {
+    const today = new Date()
+    const todayTime = today.getTime()
+    const configuredCycle = data.ciclos.find((item) => {
+      const start = new Date(`${item.fechaInicio}T00:00:00`).getTime()
+      const end = new Date(`${item.fechaFin}T23:59:59`).getTime()
+      return todayTime >= start && todayTime <= end
+    })
+
+    return configuredCycle ?? {
+      id: "current-cycle",
+      año: today.getFullYear(),
+      bimestre: getCurrentBimester(today),
+      fechaInicio: "",
+      fechaFin: "",
+    }
+  }, [data.ciclos])
 
   const auditoresDisponibles = data.users.filter((u) => u.role === "auditor" && u.status === "activo")
   const modelosPublicados = data.modelos.filter((m) => m.estado === "publicado")
+
+  useEffect(() => {
+    setAño(String(activeCycle.año))
+    setCiclo(String(activeCycle.bimestre))
+  }, [activeCycle.año, activeCycle.bimestre])
 
   const toggleAuditor = (auditorId: string) => {
     setAuditores(
@@ -98,14 +133,12 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
 
         <div className="space-y-2">
           <Label>Año *</Label>
-          <Select value={año} onValueChange={setAño}>
+          <Select value={año} onValueChange={setAño} disabled>
             <SelectTrigger className="bg-secondary border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2025">2025</SelectItem>
-              <SelectItem value="2026">2026</SelectItem>
-              <SelectItem value="2027">2027</SelectItem>
+              <SelectItem value={String(activeCycle.año)}>{activeCycle.año}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -117,12 +150,9 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
               <SelectValue placeholder="Selecciona el ciclo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Ciclo 1 (Ene - Feb)</SelectItem>
-              <SelectItem value="2">Ciclo 2 (Mar - Abr)</SelectItem>
-              <SelectItem value="3">Ciclo 3 (May - Jun)</SelectItem>
-              <SelectItem value="4">Ciclo 4 (Jul - Ago)</SelectItem>
-              <SelectItem value="5">Ciclo 5 (Sep - Oct)</SelectItem>
-              <SelectItem value="6">Ciclo 6 (Nov - Dic)</SelectItem>
+              <SelectItem value={String(activeCycle.bimestre)}>
+                {cycleLabels[activeCycle.bimestre] ?? `Ciclo ${activeCycle.bimestre}`}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

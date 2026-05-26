@@ -302,6 +302,26 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         cargos: respuesta.cargos,
       }))
 
+  const getAnsweredParamsWithoutComment = () =>
+    vertical.parametros.filter((parametro) => {
+      const respuesta = respuestas[parametro.id]
+      return respuesta?.valor !== null && respuesta?.valor !== undefined && !respuesta.comentario.trim()
+    })
+
+  const validateRequiredComments = () => {
+    const missingComments = getAnsweredParamsWithoutComment()
+    if (missingComments.length === 0) return true
+
+    const firstMissing = missingComments[0]
+    setExpandedParametroId(firstMissing.id)
+    setFormError(
+      missingComments.length === 1
+        ? `Completa el comentario / hallazgo del parámetro "${firstMissing.nombre}".`
+        : `Completa los comentarios / hallazgos obligatorios en ${missingComments.length} parámetros.`,
+    )
+    return false
+  }
+
   const toggleParametro = (parametroId: string) => {
     setExpandedParametroId((currentParametroId) => currentParametroId === parametroId ? null : parametroId)
   }
@@ -347,6 +367,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const handleSaveDraft = async () => {
     if (!canEditEvaluation) return
     setFormError(null)
+    if (!validateRequiredComments()) return
     setIsSubmitting(true)
 
     try {
@@ -429,6 +450,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const handleSendToReplica = async () => {
     if (!canEditEvaluation) return
     setFormError(null)
+    if (!validateRequiredComments()) return
     setIsSubmitting(true)
 
     try {
@@ -445,6 +467,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const handleFinalizeEvaluation = async (): Promise<boolean> => {
     if (!canEditEvaluation) return false
     setFormError(null)
+    if (!validateRequiredComments()) return false
     setIsSubmitting(true)
 
     try {
@@ -483,7 +506,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                   </p>
                   {auditor && (
                     <p>
-                      <span className="text-foreground">Auditor:</span> {auditor.name}
+                      <span className="text-foreground">{auditor.cargo || "Cargo"}:</span> {auditor.name}
                     </p>
                   )}
                 </div>
@@ -562,6 +585,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
               ...respuestas[parametro.id],
             }
             const tieneRespuesta = respuesta.valor !== null && respuesta.valor !== undefined
+            const missingRequiredComment = tieneRespuesta && !respuesta.comentario.trim()
             const expanded = expandedParametroId === parametro.id
             const valorLabel = getRespuestaValorLabel(respuesta.valor)
             const parametroEvidenceFiles = evidenceFiles[parametro.id] ?? []
@@ -725,14 +749,25 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-muted-foreground">Comentario / Hallazgo</Label>
+                          <Label className="text-xs font-semibold text-muted-foreground">
+                            Comentario / Hallazgo <span className="text-destructive">*</span>
+                          </Label>
                           <Textarea
                             placeholder="Describe el hallazgo o justificación..."
-                            className="min-h-[64px] border-border bg-background"
+                            className={cn(
+                              "min-h-[64px] border-border bg-background",
+                              missingRequiredComment && "border-destructive/70 focus-visible:ring-destructive/30"
+                            )}
                             value={respuesta.comentario}
                             onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
                             disabled={!canEditEvaluation}
                           />
+                          {missingRequiredComment && (
+                            <div className="flex items-start gap-2 rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              <span>El comentario / hallazgo es obligatorio para este parámetro.</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2 rounded-lg border border-dashed border-border/70 bg-secondary/15 p-3">

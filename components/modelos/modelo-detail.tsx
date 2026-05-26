@@ -16,6 +16,7 @@ interface ModeloDetailProps {
 }
 
 export function ModeloDetail({ modelo }: ModeloDetailProps) {
+  const isDadoDeBaja = modelo.estado === "deprecado"
   const totalParametros = modelo.verticales.reduce(
     (acc, v) => acc + v.parametros.length,
     0
@@ -67,7 +68,7 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
       {/* Metadata */}
       <Card className="bg-card border-border">
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/70">
+          <div className={`grid grid-cols-1 divide-y divide-border/70 sm:divide-y-0 sm:divide-x ${isDadoDeBaja ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <div className="p-4 text-center">
               <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Creado por</p>
               <p className="font-medium text-foreground mt-1">{modelo.creadoPor}</p>
@@ -76,16 +77,12 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
               <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Fecha de creación</p>
               <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaCreacion).toLocaleDateString('es-ES')}</p>
             </div>
-            {modelo.fechaVigenciaDesde && (
+            {isDadoDeBaja && (
               <div className="p-4 text-center">
-                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Vigencia desde</p>
-                <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaVigenciaDesde).toLocaleDateString('es-ES')}</p>
-              </div>
-            )}
-            {modelo.fechaVigenciaHasta && (
-              <div className="p-4 text-center">
-                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Vigencia hasta</p>
-                <p className="font-medium text-foreground mt-1">{new Date(modelo.fechaVigenciaHasta).toLocaleDateString('es-ES')}</p>
+                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Fecha de baja</p>
+                <p className="font-medium text-foreground mt-1">
+                  {modelo.fechaVigenciaHasta ? new Date(modelo.fechaVigenciaHasta).toLocaleDateString('es-ES') : "Sin fecha registrada"}
+                </p>
               </div>
             )}
           </div>

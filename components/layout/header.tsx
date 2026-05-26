@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Bell, Search, Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+import { useMemo, useState, type KeyboardEvent } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { Bell, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -16,6 +16,19 @@ import {
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-data"
+import { formatEstado } from "@/lib/data"
+
+function normalizeSearch(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+function matchesSearch(search: string, ...values: unknown[]) {
+  return values.some((value) => normalizeSearch(value).includes(search))
+}
 
 interface HeaderProps {
   title: string
@@ -25,15 +38,100 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   const { data, refresh } = useAppData()
   const { appUser } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const notifications = data.notificaciones
-  const [mounted, setMounted] = useState(false)
-  const { resolvedTheme, setTheme } = useTheme()
   const unreadCount = notifications.filter(n => !n.leida).length
-  const isDark = resolvedTheme === "dark"
+  const normalizedSearch = normalizeSearch(searchTerm)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const searchResults = useMemo(() => {
+    if (!normalizedSearch) return []
+
+    const canSeeSettings = appUser?.role === "admin" || appUser?.role === "supervisor"
+    const canSeeModels = appUser?.role !== "auditor"
+    const pages = [
+      { title: "Dashboard", subtitle: "Vista general del sistema", href: "/", keywords: "inicio metricas resumen" },
+      { title: "Planificacion", subtitle: "Lotes, ciclos y asignaciones", href: "/planificacion", keywords: "lotes ciclos unidades auditores" },
+      { title: "Evaluaciones", subtitle: "Evaluaciones de control", href: "/evaluaciones", keywords: "controles auditorias auditor" },
+      { title: "Calificaciones", subtitle: "Resultados y calificaciones", href: "/calificaciones", keywords: "scores resultados notas" },
+      ...(canSeeModels ? [{ title: "Modelos de Control", subtitle: "Modelos, verticales y parametros", href: "/modelos", keywords: "metodologia parametros verticales" }] : []),
+      ...(canSeeSettings ? [{ title: "Ajustes", subtitle: "Usuarios, unidades, ciclos y umbrales", href: "/ajustes", keywords: "configuracion usuarios unidades negocio" }] : []),
+      { title: "Preferencias", subtitle: "Perfil, cargo, empresa y tema", href: "/preferencias", keywords: "perfil contrasena cargo empresa" },
+    ]
+
+    const pageResults = pages
+      .filter((page) => matchesSearch(normalizedSearch, page.title, page.subtitle, page.keywords))
+      .map((page) => ({ ...page, type: "Pagina" }))
+
+    const unitResults = data.unidades
+      .filter((unit) => matchesSearch(normalizedSearch, unit.nombre, unit.ecosistema, unit.codigo, unit.zona, unit.responsable))
+      .map((unit) => ({
+        type: "Unidad",
+        title: unit.nombre,
+        subtitle: [unit.ecosistema, unit.codigo].filter(Boolean).join(" - "),
+        href: "/planificacion",
+      }))
+
+    const modelResults = canSeeModels
+      ? data.modelos
+          .filter((model) => matchesSearch(normalizedSearch, model.nombre, model.descripcion, formatEstado(model.estado)))
+          .map((model) => ({
+            type: "Modelo",
+            title: model.nombre,
+            subtitle: `${formatEstado(model.estado)} - ${model.verticales.length} verticales`,
+            href: "/modelos",
+          }))
+      : []
+
+    const lotResults = data.lotes
+      .map((lote) => {
+        const unidad = data.unidades.find((unit) => unit.id === lote.unidadNegocioId)
+        const modelo = data.modelos.find((model) => model.id === lote.modeloControlId)
+        return {
+          type: "Lote",
+          title: `${unidad?.nombre ?? "Unidad"} - Ciclo ${lote.ciclo}`,
+          subtitle: `${modelo?.nombre ?? "Modelo"} - ${formatEstado(lote.estado)}`,
+          href: "/planificacion",
+          text: [unidad?.nombre, modelo?.nombre, `ciclo ${lote.ciclo}`, String(lote.año), lote.estado],
+        }
+      })
+      .filter((result) => matchesSearch(normalizedSearch, result.title, result.subtitle, ...result.text))
+
+    const controlResults = data.loteVerticales
+      .flatMap((loteVertical) => loteVertical.controles)
+      .filter((control) =>
+        matchesSearch(
+          normalizedSearch,
+          control.identificador,
+          control.descripcion,
+          control.proceso,
+          control.subproceso,
+          control.producto,
+          formatEstado(control.estado),
+        ),
+      )
+      .map((control) => ({
+        type: "Control",
+        title: control.identificador,
+        subtitle: [control.proceso, control.subproceso, formatEstado(control.estado)].filter(Boolean).join(" - "),
+        href: `/evaluaciones/${control.id}`,
+      }))
+
+    const userResults = canSeeSettings
+      ? data.users
+          .filter((user) => matchesSearch(normalizedSearch, user.name, user.email, user.company, user.cargo, user.role))
+          .map((user) => ({
+            type: "Usuario",
+            title: user.name,
+            subtitle: [user.cargo || user.role, user.email].filter(Boolean).join(" - "),
+            href: "/ajustes",
+          }))
+      : []
+
+    return [...pageResults, ...controlResults, ...lotResults, ...unitResults, ...modelResults, ...userResults].slice(0, 8)
+  }, [appUser?.role, data.loteVerticales, data.lotes, data.modelos, data.unidades, data.users, normalizedSearch])
 
   const handleMarkNotificationRead = async (id: string) => {
     await markNotificationRead(id)
@@ -43,6 +141,25 @@ export function Header({ title, subtitle }: HeaderProps) {
   const handleMarkAllNotificationsRead = async () => {
     await markAllNotificationsRead(notifications.filter((notification) => !notification.leida).map((notification) => notification.id))
     await refresh()
+  }
+
+  const handleSelectResult = (href: string) => {
+    setSearchTerm("")
+    setIsSearchOpen(false)
+    if (href !== pathname) {
+      router.push(href)
+    }
+  }
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && searchResults[0]) {
+      event.preventDefault()
+      handleSelectResult(searchResults[0].href)
+    }
+
+    if (event.key === "Escape") {
+      setIsSearchOpen(false)
+    }
   }
 
   return (
@@ -57,22 +174,48 @@ export function Header({ title, subtitle }: HeaderProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <Input
             placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value)
+              setIsSearchOpen(true)
+            }}
+            onFocus={() => setIsSearchOpen(true)}
+            onBlur={() => window.setTimeout(() => setIsSearchOpen(false), 120)}
+            onKeyDown={handleSearchKeyDown}
             className="w-48 border-border/80 bg-card pl-9 lg:w-72"
           />
+          {isSearchOpen && searchTerm.trim() && (
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--material-shadow)]">
+              {searchResults.length > 0 ? (
+                <div className="max-h-96 overflow-y-auto py-1">
+                  {searchResults.map((result, index) => (
+                    <button
+                      key={`${result.type}-${result.href}-${result.title}-${index}`}
+                      type="button"
+                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/80 focus:bg-secondary/80 focus:outline-none"
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        handleSelectResult(result.href)
+                      }}
+                    >
+                      <span className="mt-0.5 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-normal text-muted-foreground">
+                        {result.type}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground">{result.title}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{result.subtitle}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-3 py-4 text-sm text-muted-foreground">
+                  Sin resultados para "{searchTerm.trim()}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
-
-        {appUser?.role !== "auditor" && (
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
-            title={isDark ? "Modo claro" : "Modo oscuro"}
-            className="icon-orb relative overflow-hidden border-primary/20 bg-primary/8 text-primary hover:bg-primary/12"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-          >
-            {mounted && isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
-        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
