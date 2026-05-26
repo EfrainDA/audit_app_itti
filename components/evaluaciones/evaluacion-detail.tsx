@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,8 +18,11 @@ import {
   Send,
   Download,
   FileText,
+  ChevronDown,
+  Paperclip,
   Plus,
   Trash2,
+  X,
 } from "lucide-react"
 import {
   type Control,
@@ -64,10 +68,52 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
   comentario: "",
 })
 
+const respuestaValorLabels: Record<Exclude<RespuestaValor, null>, string> = {
+  cumple: "Cumple",
+  intermedio: "Intermedio",
+  no_cumple: "No cumple",
+  na: "N/A",
+}
+
+const getRespuestaValorLabel = (valor: RespuestaValor) =>
+  valor ? respuestaValorLabels[valor] : "Sin responder"
+
+const maxEvidenceFiles = 3
+const evidenceFileAccept = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".odt",
+  ".rtf",
+  ".txt",
+  ".xls",
+  ".xlsx",
+  ".xlsm",
+  ".xlsb",
+  ".csv",
+  ".ods",
+  ".ppt",
+  ".pptx",
+  ".pps",
+  ".ppsx",
+  ".odp",
+  "image/*",
+].join(",")
+const evidenceFileExtensions = new Set(
+  evidenceFileAccept
+    .split(",")
+    .filter((item) => item.startsWith("."))
+    .map((item) => item.toLowerCase()),
+)
+
+const isAcceptedEvidenceFile = (file: File) => {
+  const extension = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`
+  return file.type.startsWith("image/") || evidenceFileExtensions.has(extension)
+}
+
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const { data, refresh } = useAppData()
   const { appUser } = useAuth()
-  // Buscar el control en los loteVerticales
   let control: Control | undefined
   let loteVertical = data.loteVerticales.find((lv) => {
     const found = lv.controles.find((c) => c.id === controlId)
@@ -85,9 +131,12 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const auditor = data.users.find((u) => u.id === control?.auditorId)
 
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
+  const [evidenceFiles, setEvidenceFiles] = useState<Record<string, File[]>>({})
+  const [expandedParametroId, setExpandedParametroId] = useState<string | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
   const canEditEvaluation = appUser?.role === "auditor" && control?.auditorId === appUser.id
 
   useEffect(() => {
@@ -112,7 +161,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       .catch((loadError) => setFormError(getErrorMessage(loadError, "No se pudieron cargar las respuestas.")))
   }, [controlId])
 
-  // Implementación de autoguardado con debounce (retraso de 1.5s)
   useEffect(() => {
     if (!canEditEvaluation) return
     if (Object.keys(respuestas).length === 0) return
@@ -254,6 +302,48 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         cargos: respuesta.cargos,
       }))
 
+  const toggleParametro = (parametroId: string) => {
+    setExpandedParametroId((currentParametroId) => currentParametroId === parametroId ? null : parametroId)
+  }
+
+  const handleEvidenceFilesChange = (parametroId: string, files: FileList | null) => {
+    if (!files) return
+
+    const selectedFiles = Array.from(files)
+    const acceptedFiles = selectedFiles.filter(isAcceptedEvidenceFile)
+
+    if (acceptedFiles.length !== selectedFiles.length) {
+      setFormError("Solo se permiten PDF, Excel, documentos, presentaciones e imágenes.")
+    }
+
+    setEvidenceFiles((prev) => {
+      const currentFiles = prev[parametroId] ?? []
+      const remainingSlots = maxEvidenceFiles - currentFiles.length
+
+      if (remainingSlots <= 0) {
+        setFormError("Solo puedes adjuntar hasta 3 archivos por parámetro.")
+        return prev
+      }
+
+      const nextFiles = acceptedFiles.slice(0, remainingSlots)
+      if (acceptedFiles.length > remainingSlots) {
+        setFormError("Solo puedes adjuntar hasta 3 archivos por parámetro.")
+      }
+
+      return {
+        ...prev,
+        [parametroId]: [...currentFiles, ...nextFiles],
+      }
+    })
+  }
+
+  const handleRemoveEvidenceFile = (parametroId: string, fileIndex: number) => {
+    setEvidenceFiles((prev) => ({
+      ...prev,
+      [parametroId]: (prev[parametroId] ?? []).filter((_, index) => index !== fileIndex),
+    }))
+  }
+
   const handleSaveDraft = async () => {
     if (!canEditEvaluation) return
     setFormError(null)
@@ -292,14 +382,26 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     )
   }
 
-  // Calcular progreso basado en parámetros de la vertical
   const totalParametros = vertical.parametros.length
   const parametroIds = new Set(vertical.parametros.map((parametro) => parametro.id))
   const respuestasDeLaVertical = Object.values(respuestas).filter((respuesta) => parametroIds.has(respuesta.parametroId))
   const respondidos = respuestasDeLaVertical.filter((r) => r.valor !== null).length
   const progreso = totalParametros > 0 ? (respondidos / totalParametros) * 100 : 0
+  const isComplete = totalParametros > 0 && respondidos === totalParametros
 
-  // Calcular score provisional
+  const handleSaveOrFinalize = async () => {
+    if (!canEditEvaluation) return
+    if (isComplete) {
+      const finalized = await handleFinalizeEvaluation()
+      if (finalized) {
+        router.push("/evaluaciones")
+      }
+      return
+    }
+
+    await handleSaveDraft()
+  }
+
   const calcularScore = () => {
     let puntosObtenidos = 0
     let puntosTotal = 0
@@ -313,7 +415,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
       } else if (resp?.valor === "intermedio") {
         puntosObtenidos += param.puntosBase * 0.5
       } else if (resp?.valor === "na") {
-        puntosTotal -= param.puntosBase // No se cuenta
+        puntosTotal -= param.puntosBase
       }
     })
 
@@ -340,8 +442,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     }
   }
 
-  const handleFinalizeEvaluation = async () => {
-    if (!canEditEvaluation) return
+  const handleFinalizeEvaluation = async (): Promise<boolean> => {
+    if (!canEditEvaluation) return false
     setFormError(null)
     setIsSubmitting(true)
 
@@ -353,8 +455,10 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         answers: getAnswersPayload(),
       })
       await refresh()
+      return true
     } catch (submitError) {
       setFormError(getErrorMessage(submitError, "No se pudo finalizar la evaluacion."))
+      return false
     } finally {
       setIsSubmitting(false)
     }
@@ -362,15 +466,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   return (
     <div className="space-y-5">
-      {/* Back Button */}
-      <Button variant="ghost" asChild>
-        <Link href="/evaluaciones">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Evaluaciones
-        </Link>
-      </Button>
-
-      {/* Header Info */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_304px]">
         <Card className="bg-card border-border py-0">
           <CardContent className="p-5">
@@ -393,24 +488,18 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                   )}
                 </div>
               </div>
-              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
+              <div className="flex w-full flex-wrap items-center gap-3 pr-2 md:w-auto md:justify-end md:pr-0">
                 {autoSaveStatus !== "idle" && (
                   <div className="flex h-8 items-center rounded-md border border-border bg-secondary/60 px-3 text-xs font-medium text-muted-foreground">
                     {autoSaveStatus === "saving" ? "Guardando..." : "Guardado automático"}
                   </div>
                 )}
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleExportEvaluation}>
+                <Button variant="outline" size="sm" className="flex-none" onClick={handleExportEvaluation}>
                   <Download className="h-4 w-4" />
                   Exportar
                 </Button>
-                {canEditEvaluation && (
-                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={handleSaveDraft} disabled={isSubmitting}>
-                    <Save className="h-4 w-4" />
-                    Guardar
-                  </Button>
-                )}
                 {canEditEvaluation && control.estado !== "terminado" && (
-                  <Button size="sm" className="flex-1 bg-warning text-warning-foreground hover:bg-warning/90 sm:flex-none" onClick={handleSendToReplica} disabled={isSubmitting}>
+                  <Button size="sm" className="flex-none bg-warning text-warning-foreground hover:bg-warning/90" onClick={handleSendToReplica} disabled={isSubmitting}>
                     <Send className="h-4 w-4" />
                     Enviar a Réplica
                   </Button>
@@ -437,14 +526,12 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         </Card>
       </div>
 
-      {/* Vertical Info */}
       {formError && (
         <Card className="border-destructive/25 bg-destructive/10">
           <CardContent className="p-3 text-sm text-destructive">{formError}</CardContent>
         </Card>
       )}
 
-      {/* Vertical Info */}
       <Card className="bg-card border-border py-0">
         <CardHeader className="px-5 py-4">
           <div className="flex items-center gap-3">
@@ -461,7 +548,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         </CardHeader>
       </Card>
 
-      {/* Parámetros a Evaluar */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -469,232 +555,313 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
             Parámetros a Evaluar ({vertical.parametros.length})
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {vertical.parametros.map((parametro, index) => {
             const respuesta = {
               ...createEmptyRespuesta(parametro.id),
               ...respuestas[parametro.id],
             }
             const tieneRespuesta = respuesta.valor !== null && respuesta.valor !== undefined
+            const expanded = expandedParametroId === parametro.id
+            const valorLabel = getRespuestaValorLabel(respuesta.valor)
+            const parametroEvidenceFiles = evidenceFiles[parametro.id] ?? []
 
             return (
               <Card
                 key={parametro.id}
                 className={cn(
-                  "overflow-hidden border-border/70 bg-card shadow-sm transition-colors",
+                  "overflow-hidden bg-card shadow-sm transition-colors",
+                  "border border-border/70",
                   tieneRespuesta && "ring-1",
-                  respuesta?.valor === "cumple" && "ring-success/35",
-                  respuesta?.valor === "intermedio" && "ring-warning/35",
-                  respuesta?.valor === "no_cumple" && "ring-destructive/35",
-                  respuesta?.valor === "na" && "ring-muted-foreground/30"
+                  respuesta?.valor === "cumple" && "border-success/60 ring-success/35",
+                  respuesta?.valor === "intermedio" && "border-warning/60 ring-warning/35",
+                  respuesta?.valor === "no_cumple" && "border-destructive/60 ring-destructive/35",
+                  respuesta?.valor === "na" && "border-muted/60 ring-muted-foreground/30"
                 )}
               >
-                <CardContent className="p-4 sm:p-5">
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/12">
-                          <span className="text-sm font-semibold text-primary">{index + 1}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h5 className="text-base font-semibold leading-6 text-foreground">{parametro.nombre}</h5>
-                            <Badge variant="outline" className="h-6 shrink-0 px-2 text-[11px] font-semibold">{parametro.puntosBase} pts</Badge>
+                <div
+                  className="flex min-h-[42px] cursor-pointer items-center justify-between gap-3 px-3 py-1.5 sm:min-h-[44px] sm:px-4"
+                  onClick={() => toggleParametro(parametro.id)}
+                  role="button"
+                  aria-expanded={expanded}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/12">
+                      <span className="text-[11px] font-semibold text-primary">{index + 1}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h5 className="truncate text-[13px] font-semibold leading-4 text-foreground sm:text-sm">{parametro.nombre}</h5>
+                        <Badge variant="outline" className="h-5 shrink-0 px-2 text-[10px] font-semibold">{parametro.puntosBase} pts</Badge>
+                      </div>
+                      <p className="mt-0.5 text-[11px] leading-3 text-muted-foreground">{valorLabel}</p>
+                    </div>
+                  </div>
+                  <ChevronDown className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                    expanded && "rotate-180"
+                  )} />
+                </div>
+
+                {expanded && (
+                  <CardContent className="animate-in fade-in-0 slide-in-from-top-2 border-t border-border/60 p-5 duration-200 sm:p-6">
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_148px] lg:items-start">
+                      <div className="space-y-4">
+                        {parametro.descripcion && (
+                          <div className="rounded-lg border border-border/50 bg-secondary/30 px-3.5 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Descripción</p>
+                            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                              {parametro.descripcion}
+                            </p>
                           </div>
-                          {parametro.descripcion && (
-                            <div className="mt-3 rounded-lg bg-secondary/35 px-3 py-2.5">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Descripción</p>
-                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                {parametro.descripcion}
+                        )}
+                        {parametro.preguntas.length > 0 && (
+                          <div className="rounded-lg border border-border/50 bg-secondary/20 p-3.5">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Criterios de evaluación</p>
+                            <div className="space-y-2">
+                              {parametro.preguntas.map((pregunta) => (
+                                <p key={pregunta.id} className="flex items-start gap-2 text-sm leading-6 text-foreground">
+                                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                  <span className="min-w-0">{pregunta.texto}</span>
+                                  {pregunta.evidenciaObligatoria && (
+                                    <Badge variant="outline" className="shrink-0 text-xs">Evidencia req.</Badge>
+                                  )}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs font-semibold text-muted-foreground">Personas auditadas</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => handleAddRespuestaListItem(parametro.id, "personasAuditadas")}
+                                disabled={!canEditEvaluation}
+                              >
+                                <Plus className="mr-1 h-3 w-3" />
+                                Agregar
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {respuesta.personasAuditadas.map((persona, personIndex) => (
+                                <div key={`persona-${parametro.id}-${personIndex}`} className="flex gap-2">
+                                  <Textarea
+                                    placeholder="Nombre de la persona auditada..."
+                                    className="min-h-[42px] border-border bg-background"
+                                    value={persona}
+                                    onChange={(e) =>
+                                      handleSetRespuestaListItem(parametro.id, "personasAuditadas", personIndex, e.target.value)
+                                    }
+                                    disabled={!canEditEvaluation}
+                                  />
+                                  {respuesta.personasAuditadas.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="mt-1 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        handleRemoveRespuestaListItem(parametro.id, "personasAuditadas", personIndex)
+                                      }
+                                      disabled={!canEditEvaluation}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs font-semibold text-muted-foreground">Cargo</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => handleAddRespuestaListItem(parametro.id, "cargos")}
+                                disabled={!canEditEvaluation}
+                              >
+                                <Plus className="mr-1 h-3 w-3" />
+                                Agregar
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {respuesta.cargos.map((cargo, cargoIndex) => (
+                                <div key={`cargo-${parametro.id}-${cargoIndex}`} className="flex gap-2">
+                                  <Textarea
+                                    placeholder="Cargo o rol..."
+                                    className="min-h-[42px] border-border bg-background"
+                                    value={cargo}
+                                    onChange={(e) =>
+                                      handleSetRespuestaListItem(parametro.id, "cargos", cargoIndex, e.target.value)
+                                    }
+                                    disabled={!canEditEvaluation}
+                                  />
+                                  {respuesta.cargos.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="mt-1 text-muted-foreground hover:text-destructive"
+                                      onClick={() => handleRemoveRespuestaListItem(parametro.id, "cargos", cargoIndex)}
+                                      disabled={!canEditEvaluation}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold text-muted-foreground">Comentario / Hallazgo</Label>
+                          <Textarea
+                            placeholder="Describe el hallazgo o justificación..."
+                            className="min-h-[64px] border-border bg-background"
+                            value={respuesta.comentario}
+                            onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
+                            disabled={!canEditEvaluation}
+                          />
+                        </div>
+
+                        <div className="space-y-2 rounded-lg border border-dashed border-border/70 bg-secondary/15 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <Label className="text-xs font-semibold text-muted-foreground">Adjuntar evidencia</Label>
+                              <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                                Máximo 3 archivos: PDF, Excel, documentos, presentaciones o imágenes.
                               </p>
                             </div>
-                          )}
-                          {parametro.preguntas.length > 0 && (
-                            <div className="mt-3 rounded-lg bg-secondary/25 p-3">
-                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Criterios de evaluación</p>
-                              <div className="space-y-2">
-                                {parametro.preguntas.map((pregunta) => (
-                                  <p key={pregunta.id} className="flex items-start gap-2 text-sm leading-6 text-foreground">
-                                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                                    <span className="min-w-0">{pregunta.texto}</span>
-                                    {pregunta.evidenciaObligatoria && (
-                                      <Badge variant="outline" className="shrink-0 text-xs">Evidencia req.</Badge>
-                                    )}
-                                  </p>
-                                ))}
-                              </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-[11px]"
+                              disabled={!canEditEvaluation || parametroEvidenceFiles.length >= maxEvidenceFiles}
+                              asChild
+                            >
+                              <label>
+                                <Paperclip className="mr-1 h-3 w-3" />
+                                Adjuntar
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  multiple
+                                  accept={evidenceFileAccept}
+                                  disabled={!canEditEvaluation || parametroEvidenceFiles.length >= maxEvidenceFiles}
+                                  onChange={(event) => {
+                                    handleEvidenceFilesChange(parametro.id, event.target.files)
+                                    event.target.value = ""
+                                  }}
+                                />
+                              </label>
+                            </Button>
+                          </div>
+                          {parametroEvidenceFiles.length > 0 && (
+                            <div className="grid gap-2">
+                              {parametroEvidenceFiles.map((file, fileIndex) => (
+                                <div
+                                  key={`${parametro.id}-${file.name}-${fileIndex}`}
+                                  className="flex min-h-8 items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs"
+                                >
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate text-foreground">{file.name}</span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleRemoveEvidenceFile(parametro.id, fileIndex)}
+                                    disabled={!canEditEvaluation}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
                       </div>
 
-                    {/* Botones de Respuesta */}
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                    <Button
-                      size="sm"
-                      variant={respuesta?.valor === "cumple" ? "default" : "outline"}
-                      onClick={() => handleSetRespuesta(parametro.id, "cumple")}
-                      disabled={!canEditEvaluation}
-                      className={cn(
-                        "h-8 justify-center text-xs",
-                        respuesta?.valor === "cumple" && "bg-success hover:bg-success/90 text-success-foreground"
-                      )}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Cumple
-                    </Button>
-                    {parametro.permiteIntermedio && (
-                      <Button
-                        size="sm"
-                        variant={respuesta?.valor === "intermedio" ? "default" : "outline"}
-                        onClick={() => handleSetRespuesta(parametro.id, "intermedio")}
-                        disabled={!canEditEvaluation}
-                        className={cn(
-                          "h-8 justify-center text-xs",
-                          respuesta?.valor === "intermedio" && "bg-warning hover:bg-warning/90 text-warning-foreground"
+                      <div className="grid w-full gap-2 rounded-lg border border-border/60 bg-secondary/20 p-2 shadow-sm sm:w-36 lg:w-full">
+                        <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Resultado</p>
+                        <Button
+                          size="sm"
+                          variant={respuesta?.valor === "cumple" ? "default" : "outline"}
+                          onClick={() => handleSetRespuesta(parametro.id, "cumple")}
+                          disabled={!canEditEvaluation}
+                          className={cn(
+                            "h-8 w-full justify-start px-3 text-left text-xs",
+                            respuesta?.valor === "cumple" && "bg-success hover:bg-success/90 text-success-foreground"
+                          )}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Cumple
+                        </Button>
+                        {parametro.permiteIntermedio && (
+                          <Button
+                            size="sm"
+                            variant={respuesta?.valor === "intermedio" ? "default" : "outline"}
+                            onClick={() => handleSetRespuesta(parametro.id, "intermedio")}
+                            disabled={!canEditEvaluation}
+                            className={cn(
+                              "h-8 w-full justify-start px-3 text-left text-xs",
+                              respuesta?.valor === "intermedio" && "bg-warning hover:bg-warning/90 text-warning-foreground"
+                            )}
+                          >
+                            <MinusCircle className="h-3.5 w-3.5" />
+                            Intermedio
+                          </Button>
                         )}
-                      >
-                        <MinusCircle className="h-3.5 w-3.5" />
-                        Intermedio
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant={respuesta?.valor === "no_cumple" ? "default" : "outline"}
-                      onClick={() => handleSetRespuesta(parametro.id, "no_cumple")}
-                      disabled={!canEditEvaluation}
-                      className={cn(
-                        "h-8 justify-center text-xs",
-                        respuesta?.valor === "no_cumple" && "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                      )}
-                    >
-                      <XCircle className="h-3.5 w-3.5" />
-                      No cumple
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={respuesta?.valor === "na" ? "default" : "outline"}
-                      onClick={() => handleSetRespuesta(parametro.id, "na")}
-                      disabled={!canEditEvaluation}
-                      className={cn(
-                        "h-8 justify-center text-xs",
-                        respuesta?.valor === "na" && "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      N/A
-                    </Button>
-                    </div>
-                  </div>
-
-                  {/* Comentario y Evidencia */}
-                  <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs text-muted-foreground">Personas auditadas</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAddRespuestaListItem(parametro.id, "personasAuditadas")}
-                            disabled={!canEditEvaluation}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Agregar
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {respuesta.personasAuditadas.map((persona, personIndex) => (
-                            <div key={`persona-${parametro.id}-${personIndex}`} className="flex gap-2">
-                              <Textarea
-                                placeholder="Nombre de la persona auditada..."
-                                className="bg-background border-border min-h-[42px]"
-                                value={persona}
-                                onChange={(e) =>
-                                  handleSetRespuestaListItem(parametro.id, "personasAuditadas", personIndex, e.target.value)
-                                }
-                                disabled={!canEditEvaluation}
-                              />
-                              {respuesta.personasAuditadas.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="mt-1 text-muted-foreground hover:text-destructive"
-                                  onClick={() =>
-                                    handleRemoveRespuestaListItem(parametro.id, "personasAuditadas", personIndex)
-                                  }
-                                  disabled={!canEditEvaluation}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs text-muted-foreground">Cargo</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAddRespuestaListItem(parametro.id, "cargos")}
-                            disabled={!canEditEvaluation}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Agregar
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {respuesta.cargos.map((cargo, cargoIndex) => (
-                            <div key={`cargo-${parametro.id}-${cargoIndex}`} className="flex gap-2">
-                              <Textarea
-                                placeholder="Cargo o rol..."
-                                className="bg-background border-border min-h-[42px]"
-                                value={cargo}
-                                onChange={(e) =>
-                                  handleSetRespuestaListItem(parametro.id, "cargos", cargoIndex, e.target.value)
-                                }
-                                disabled={!canEditEvaluation}
-                              />
-                              {respuesta.cargos.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="mt-1 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleRemoveRespuestaListItem(parametro.id, "cargos", cargoIndex)}
-                                  disabled={!canEditEvaluation}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                        <Button
+                          size="sm"
+                          variant={respuesta?.valor === "no_cumple" ? "default" : "outline"}
+                          onClick={() => handleSetRespuesta(parametro.id, "no_cumple")}
+                          disabled={!canEditEvaluation}
+                          className={cn(
+                            "h-8 w-full justify-start px-3 text-left text-xs",
+                            respuesta?.valor === "no_cumple" && "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                          )}
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          No cumple
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={respuesta?.valor === "na" ? "default" : "outline"}
+                          onClick={() => handleSetRespuesta(parametro.id, "na")}
+                          disabled={!canEditEvaluation}
+                          className={cn(
+                            "h-8 w-full justify-start px-3 text-left text-xs",
+                            respuesta?.valor === "na" && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                          )}
+                        >
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          N/A
+                        </Button>
                       </div>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Comentario / Hallazgo</Label>
-                      <Textarea
-                        placeholder="Describe el hallazgo o justificación..."
-                        className="mt-1 bg-background border-border min-h-[60px]"
-                        value={respuesta.comentario}
-                        onChange={(e) => handleSetComentario(parametro.id, e.target.value)}
-                        disabled={!canEditEvaluation}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
             )
           })}
         </CardContent>
       </Card>
 
-      {/* Acciones finales */}
       {canEditEvaluation && (
         <Card className="bg-card border-border">
           <CardContent className="p-4">
@@ -705,24 +872,29 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                   {respondidos} de {totalParametros} parámetros evaluados
                 </p>
               </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                <Button variant="outline" className="w-full sm:w-auto" onClick={handleSaveDraft} disabled={isSubmitting}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Guardar Borrador
-                </Button>
+              <div className="w-full sm:w-auto">
                 <Button
-                  className="w-full bg-primary hover:bg-primary/90 sm:w-auto"
-                  onClick={handleFinalizeEvaluation}
-                  disabled={isSubmitting || respondidos < totalParametros}
+                  className="w-full sm:w-auto"
+                  onClick={handleSaveOrFinalize}
+                  disabled={isSubmitting}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Finalizar Evaluación
+                  {isComplete ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  {isComplete ? "Finalizar" : "Guardar"}
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <div className="flex justify-start pt-1">
+        <Button variant="ghost" asChild>
+          <Link href="/evaluaciones">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a Evaluaciones
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }

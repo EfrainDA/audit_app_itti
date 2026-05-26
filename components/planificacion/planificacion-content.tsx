@@ -493,7 +493,7 @@ export function PlanificacionContent() {
         <Dialog open={!!selectedLote} onOpenChange={(open) => !open && setSelectedLote(null)}>
           <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
             <DialogHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-3 pr-9 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
               <DialogTitle className="flex flex-wrap items-center gap-2">
                 {selectedLoteConDatos?.unidadNombre} - Ciclo {selectedLote.ciclo}
@@ -505,8 +505,8 @@ export function PlanificacionContent() {
                 Año {selectedLote.año}
               </DialogDescription>
                 </div>
-                <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                  <Button variant="outline" size="sm" disabled={!selectedLoteConDatos} onClick={() => selectedLoteConDatos && exportSingleLote(selectedLoteConDatos)}>
+                <div className="flex shrink-0 flex-col items-start gap-2 sm:mr-2 sm:mt-2 sm:flex-row sm:items-center">
+                  <Button variant="outline" size="sm" className="h-8" disabled={!selectedLoteConDatos} onClick={() => selectedLoteConDatos && exportSingleLote(selectedLoteConDatos)}>
                     <Download className="h-4 w-4 mr-2" />
                     Exportar
                   </Button>

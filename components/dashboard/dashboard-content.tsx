@@ -293,10 +293,17 @@ function getActiveCycle(ciclos: Ciclo[]): Ciclo {
   }) ?? ciclos[ciclos.length - 1] ?? getVirtualCurrentCycle()
 }
 
-function getCounts(controls: ControlContext[]): CountMetrics {
+function getCounts(controls: ControlContext[], answeredControlIds: Set<string> = new Set()): CountMetrics {
   const total = controls.length
-  const pending = controls.filter((control) => control.estado === "pendiente").length
-  const inCourse = controls.filter((control) => control.estado === "en_curso" || control.estado === "en_replica").length
+  const pending = controls.filter((control) => control.estado === "pendiente" && !answeredControlIds.has(control.id)).length
+  const inCourse = controls.filter((control) => {
+    if (control.estado === "terminado" || control.estado === "terminada") return false
+    return (
+      control.estado === "en_curso" ||
+      control.estado === "en_replica" ||
+      answeredControlIds.has(control.id)
+    )
+  }).length
   const completed = controls.filter((control) => control.estado === "terminado" || control.estado === "terminada").length
   const started = total - pending
   const scored = controls.filter((control) => control.scoreControl !== undefined)
@@ -1123,12 +1130,15 @@ export function DashboardContent() {
       ? Math.round((new Set(activeLotes.map((lote) => lote.unidadNegocioId)).size / unidades.length) * 100)
       : 0
     const verticals = Array.from(verticalMap.values())
-    const globalCounts = getCounts(allControls)
-    const analystCounts = getCounts(analystControls)
+    const answeredControlIds = new Set(appData.answeredControlIds)
+    const globalCounts = getCounts(allControls, answeredControlIds)
+    const analystCounts = getCounts(analystControls, answeredControlIds)
+    const assignedLotControls = allControls.filter((control) => analystAssignedLotes.some((lote) => lote.id === control.loteId))
+    const assignedLotCounts = getCounts(assignedLotControls, answeredControlIds)
     const analystLoteScores: AnalystLoteScore[] = analystAssignedLotes.map((lote) => {
       const unidad = unidades.find((unit) => unit.id === lote.unidadNegocioId)
       const modelo = modelos.find((model) => model.id === lote.modeloControlId)
-      const loteControls = analystControls.filter((control) => control.loteId === lote.id)
+      const loteControls = allControls.filter((control) => control.loteId === lote.id)
       const loteVerticals = modelo?.verticales.map((vertical) => ({
         id: vertical.id,
         name: vertical.nombre,
@@ -1147,7 +1157,7 @@ export function DashboardContent() {
         modelName: modelo?.nombre || "Modelo de control",
         counts: getCounts(loteControls),
         score,
-        verticals: verticalScores.filter((vertical) => vertical.total > 0),
+        verticals: verticalScores,
       }
     })
     const analystOpenControls = analystControls.filter((control) => control.estado !== "terminado" && control.estado !== "terminada")
@@ -1239,6 +1249,7 @@ export function DashboardContent() {
       analystOpenControls,
       globalCounts,
       analystCounts,
+      assignedLotCounts,
       analystLoteScores,
       supervisorLoteSummaries,
       supervisorAnalystSummaries,
@@ -1489,7 +1500,7 @@ export function DashboardContent() {
         )}
 
         <section className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-          <AnalystProgressPanel counts={metrics.analystCounts} loteCount={metrics.analystLoteScores.length} />
+          <AnalystProgressPanel counts={metrics.assignedLotCounts} loteCount={metrics.analystLoteScores.length} />
 
           <Card className="overflow-hidden border border-border/70 bg-card py-0 shadow-none hover:shadow-none">
             <CardContent className="flex h-full min-h-[5.25rem] flex-col justify-center px-4 py-3">

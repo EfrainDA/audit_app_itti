@@ -26,6 +26,7 @@ export type AppData = {
   lotes: Lote[]
   loteVerticales: LoteVertical[]
   auditorias: Auditoria[]
+  answeredControlIds: string[]
   notificaciones: Notificacion[]
 }
 
@@ -245,6 +246,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     lotsResult,
     lotVerticalsResult,
     auditsResult,
+    answersResult,
     notificationsResult,
   ] = await Promise.all([
     supabase.from("users").select("id,name,email,company,role,status,avatar").order("name"),
@@ -281,6 +283,10 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       `),
     supabase.from("audits").select("id,lot_id,control_id,audit_date,status,total_score,auditor_id").order("audit_date", { ascending: false }),
     supabase
+      .from("answers")
+      .select("control_id")
+      .eq("auditor_id", currentProfile.id),
+    supabase
       .from("notifications")
       .select("id,user_id,title,message,type,read,created_at")
       .eq("user_id", currentProfile.id)
@@ -296,6 +302,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     lotsResult.error,
     lotVerticalsResult.error,
     auditsResult.error,
+    answersResult.error,
     notificationsResult.error,
   ].find(Boolean)
 
@@ -388,6 +395,8 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       scoreTotal: audit.total_score ?? undefined,
       auditorId: audit.auditor_id,
     })),
+    answeredControlIds: ((answersResult.data ?? []) as { control_id: string }[])
+      .map((answer) => answer.control_id),
     notificaciones: ((notificationsResult.data ?? []) as DbNotification[]).map((notification) => ({
       id: notification.id,
       usuarioId: notification.user_id,
