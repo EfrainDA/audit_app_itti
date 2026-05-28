@@ -42,6 +42,16 @@ interface ParametroForm {
   permiteIntermedio: boolean
 }
 
+function createEmptyParametro(id = Date.now().toString(), puntosBase = 100): ParametroForm {
+  return {
+    id,
+    nombre: "",
+    descripcion: "",
+    puntosBase,
+    permiteIntermedio: false,
+  }
+}
+
 function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
   if (!modelo) {
     return [
@@ -50,7 +60,7 @@ function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
         nombre: "",
         peso: 100,
         tipoEvaluacion: "distribuida",
-        parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+        parametros: [createEmptyParametro("1", 100)],
       },
     ]
   }
@@ -62,7 +72,7 @@ function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
         nombre: "",
         peso: 100,
         tipoEvaluacion: "distribuida",
-        parametros: [{ id: "1", nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+        parametros: [createEmptyParametro("1", 100)],
       },
     ]
   }
@@ -80,7 +90,7 @@ function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
           puntosBase: parametro.puntosBase,
           permiteIntermedio: parametro.permiteIntermedio,
         }))
-      : [{ id: `${vertical.id}-parametro`, nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+      : [createEmptyParametro(`${vertical.id}-parametro`, 100)],
   }))
 }
 
@@ -102,7 +112,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
         nombre: "",
         peso: 0,
         tipoEvaluacion: "distribuida",
-        parametros: [{ id: Date.now().toString(), nombre: "", descripcion: "", puntosBase: 100, permiteIntermedio: false }],
+        parametros: [createEmptyParametro(Date.now().toString(), 100)],
       },
     ])
   }
@@ -127,7 +137,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
               ...v,
               parametros: [
                 ...v.parametros,
-                { id: Date.now().toString(), nombre: "", descripcion: "", puntosBase: 0, permiteIntermedio: false },
+                createEmptyParametro(Date.now().toString(), 0),
               ],
             }
           : v
@@ -248,8 +258,17 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
 
         <div className="space-y-4">
           {verticales.map((vertical, index) => (
-            <Card key={vertical.id} className="bg-card border-border shadow-none rounded-xl">
-              <CardContent className="p-3 sm:p-4">
+            <Card key={vertical.id} className="relative bg-card border-border shadow-none rounded-xl">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-7 w-7 text-destructive hover:text-destructive"
+                onClick={() => removeVertical(vertical.id)}
+                disabled={verticales.length === 1}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <CardContent className="p-3 pr-11 sm:p-4 sm:pr-12">
                 <div className="flex items-start gap-3 mb-1">
                   <GripVertical className="hidden h-5 w-5 text-muted-foreground mt-2 cursor-grab sm:block" />
                   <div className="min-w-0 flex-1 space-y-5">
@@ -280,7 +299,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                           value={vertical.tipoEvaluacion}
                           onValueChange={(value) => updateVertical(vertical.id, "tipoEvaluacion", value)}
                         >
-                          <SelectTrigger className="bg-secondary border-border">
+                          <SelectTrigger className="w-full bg-secondary border-border">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -303,8 +322,9 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                         {vertical.parametros.map((parametro) => (
                           <div
                             key={parametro.id}
-                            className="grid min-h-[42px] grid-cols-1 items-center gap-2 rounded-md border border-border/70 bg-secondary px-2 py-2 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto] md:gap-1.5 md:py-1.5"
+                            className="rounded-md border border-border/70 bg-secondary p-2"
                           >
+                            <div className="grid min-h-[42px] grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto] md:gap-1.5">
                             <Input
                               value={parametro.nombre}
                               onChange={(e) => updateParametro(vertical.id, parametro.id, "nombre", e.target.value)}
@@ -350,6 +370,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                               </Button>
                             </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -364,14 +385,6 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                       </Button>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeVertical(vertical.id)}
-                    disabled={verticales.length === 1}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
                 </div>
               </CardContent>
             </Card>

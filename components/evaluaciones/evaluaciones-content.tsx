@@ -46,6 +46,7 @@ import {
   getScoreBgColor,
   getEstadoBadgeColor,
   formatEstado,
+  isCountableLote,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -121,7 +122,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
   const [exportError, setExportError] = useState<string | null>(null)
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
-    return lotes.map((lote) => {
+    return lotes.filter(isCountableLote).map((lote) => {
       const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
       const modelo = modelos.find((m) => m.id === lote.modeloControlId)
       const auditores = lote.auditores.map((id) => users.find((u) => u.id === id)).filter(Boolean)
@@ -386,7 +387,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               [{ value: `Vertical ${vertical?.nombre ?? ""} - Control ${control.identificador} - Parametro "${parametro.nombre}"`, styleId: "DarkHeader" }],
               [{ value: `Descripcion: ${answer.comentario.trim()}`, styleId: "Comment" }],
               [{ value: `Requisito Incumplido: ${answerLabel(answer.valor)}`, styleId: "Comment" }],
-              [{ value: "Evidencia: Ver adjuntos registrados en la evaluacion.", styleId: "Comment" }],
+              [{ value: `Evidencia: ${answer.evidencias?.length ? answer.evidencias.join("\n") : "Sin adjuntos registrados"}`, styleId: "Comment" }],
               [{ value: "", styleId: "Bordered" }],
             ]
           })

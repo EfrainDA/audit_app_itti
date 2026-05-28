@@ -51,15 +51,6 @@ export interface Parametro {
   descripcion?: string
   puntosBase: number
   permiteIntermedio: boolean
-  preguntas: Pregunta[]
-}
-
-export interface Pregunta {
-  id: string
-  texto: string
-  tipoRespuesta: "cumple_no_cumple" | "cumple_intermedio_no_cumple"
-  evidenciaObligatoria: boolean
-  comentarioObligatorio: boolean
 }
 
 export interface ModeloControl {
@@ -81,8 +72,12 @@ export interface Lote {
   modeloControlId: string
   año: number
   ciclo: number
-  estado: "abierto" | "cerrado"
+  estado: "abierto" | "cerrado" | "deprecado"
   auditores: string[]
+}
+
+export function isCountableLote(lote: Pick<Lote, "estado">): boolean {
+  return lote.estado === "abierto" || lote.estado === "cerrado"
 }
 
 export interface LoteVertical {

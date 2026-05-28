@@ -10,7 +10,6 @@ import type {
   ModeloControl,
   Notificacion,
   Parametro,
-  Pregunta,
   Respuesta,
   Umbral,
   UnidadNegocio,
@@ -95,15 +94,6 @@ type DbThreshold = {
   color: Umbral["color"]
 }
 
-type DbQuestion = {
-  id: string
-  text: string
-  response_type: Pregunta["tipoRespuesta"]
-  evidence_required: boolean
-  comment_required: boolean
-  sort_order: number
-}
-
 type DbParameter = {
   id: string
   name: string
@@ -111,7 +101,6 @@ type DbParameter = {
   base_points: number
   allows_intermediate: boolean
   sort_order: number
-  questions: DbQuestion[]
 }
 
 type DbVertical = {
@@ -190,8 +179,11 @@ type DbAnswer = {
   parameter_id: string
   value: Respuesta["valor"]
   comment: string | null
+  audited_people: string[] | null
+  audited_roles: string[] | null
   answered_at: string
   auditor_id: string
+  answer_evidences?: { file_name: string | null; file_url: string }[]
 }
 
 type DbNotification = {
@@ -204,16 +196,6 @@ type DbNotification = {
   created_at: string
 }
 
-function mapQuestion(question: DbQuestion): Pregunta {
-  return {
-    id: question.id,
-    texto: question.text,
-    tipoRespuesta: question.response_type,
-    evidenciaObligatoria: question.evidence_required,
-    comentarioObligatorio: question.comment_required,
-  }
-}
-
 function mapParameter(parameter: DbParameter): Parametro {
   return {
     id: parameter.id,
@@ -221,7 +203,6 @@ function mapParameter(parameter: DbParameter): Parametro {
     descripcion: parameter.description ?? undefined,
     puntosBase: Number(parameter.base_points),
     permiteIntermedio: parameter.allows_intermediate,
-    preguntas: [...(parameter.questions ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(mapQuestion),
   }
 }
 
@@ -275,8 +256,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
         verticals(
           id,name,description,weight,evaluation_mode,contains_process,sort_order,
           parameters(
-            id,name,description,base_points,allows_intermediate,sort_order,
-            questions(id,text,response_type,evidence_required,comment_required,sort_order)
+            id,name,description,base_points,allows_intermediate,sort_order
           )
         )
       `)
@@ -791,6 +771,44 @@ export async function createUserProfile(input: { name: string; email: string; ro
   if (error) throw error
 }
 
+async function insertModelVerticals(modelId: string, verticals: ControlModelInput["verticals"]) {
+  for (const [verticalIndex, vertical] of verticals.entries()) {
+    const { data: createdVertical, error: verticalError } = await supabase
+      .from("verticals")
+      .insert({
+        model_id: modelId,
+        name: vertical.name.trim(),
+        weight: vertical.weight,
+        evaluation_mode: vertical.evaluationMode,
+        contains_process: vertical.containsProcess ?? false,
+        sort_order: verticalIndex,
+      })
+      .select("id")
+      .single()
+
+    if (verticalError) throw verticalError
+
+    for (const [parameterIndex, parameter] of vertical.parameters.filter((item) => item.name.trim()).entries()) {
+      const { data: createdParameter, error: parameterError } = await supabase
+        .from("parameters")
+        .insert({
+          vertical_id: createdVertical.id,
+          name: parameter.name.trim(),
+          description: parameter.description?.trim() || null,
+          base_points: parameter.basePoints,
+          allows_intermediate: parameter.allowsIntermediate,
+          sort_order: parameterIndex,
+        })
+        .select("id")
+        .single()
+
+      if (parameterError) throw parameterError
+
+      void createdParameter
+    }
+  }
+}
+
 export async function createControlModel(input: ControlModelInput) {
   const profile = await requireAdminOrSupervisor()
   const createdBy = profile.id
@@ -808,38 +826,7 @@ export async function createControlModel(input: ControlModelInput) {
 
   if (modelError) throw modelError
 
-  for (const [verticalIndex, vertical] of input.verticals.entries()) {
-    const { data: createdVertical, error: verticalError } = await supabase
-      .from("verticals")
-      .insert({
-        model_id: model.id,
-        name: vertical.name.trim(),
-        weight: vertical.weight,
-        evaluation_mode: vertical.evaluationMode,
-        contains_process: vertical.containsProcess ?? false,
-        sort_order: verticalIndex,
-      })
-      .select("id")
-      .single()
-
-    if (verticalError) throw verticalError
-
-    const parameters = vertical.parameters
-      .filter((parameter) => parameter.name.trim())
-      .map((parameter, parameterIndex) => ({
-        vertical_id: createdVertical.id,
-        name: parameter.name.trim(),
-        description: parameter.description?.trim() || null,
-        base_points: parameter.basePoints,
-        allows_intermediate: parameter.allowsIntermediate,
-        sort_order: parameterIndex,
-      }))
-
-    if (parameters.length) {
-      const { error: parametersError } = await supabase.from("parameters").insert(parameters)
-      if (parametersError) throw parametersError
-    }
-  }
+  await insertModelVerticals(model.id, input.verticals)
 }
 
 export async function updateControlModelStatus(id: string, status: ModeloControl["estado"]) {
@@ -898,38 +885,7 @@ export async function updateControlModel(id: string, input: ControlModelInput) {
   const { error: deleteVerticalsError } = await supabase.from("verticals").delete().eq("model_id", id)
   if (deleteVerticalsError) throw deleteVerticalsError
 
-  for (const [verticalIndex, vertical] of input.verticals.entries()) {
-    const { data: createdVertical, error: verticalError } = await supabase
-      .from("verticals")
-      .insert({
-        model_id: id,
-        name: vertical.name.trim(),
-        weight: vertical.weight,
-        evaluation_mode: vertical.evaluationMode,
-        contains_process: vertical.containsProcess ?? false,
-        sort_order: verticalIndex,
-      })
-      .select("id")
-      .single()
-
-    if (verticalError) throw verticalError
-
-    const parameters = vertical.parameters
-      .filter((parameter) => parameter.name.trim())
-      .map((parameter, parameterIndex) => ({
-        vertical_id: createdVertical.id,
-        name: parameter.name.trim(),
-        description: parameter.description?.trim() || null,
-        base_points: parameter.basePoints,
-        allows_intermediate: parameter.allowsIntermediate,
-        sort_order: parameterIndex,
-      }))
-
-    if (parameters.length) {
-      const { error: parametersError } = await supabase.from("parameters").insert(parameters)
-      if (parametersError) throw parametersError
-    }
-  }
+  await insertModelVerticals(id, input.verticals)
 }
 
 export async function cloneControlModel(model: ModeloControl) {
@@ -1295,7 +1251,7 @@ export async function updateControl(input: {
     await notifyAuditorAboutControl(nextAuditorId, input.identifier.trim())
   }
 
-  if (previousAuditorId && nextAuditorId && previousAuditorId !== nextAuditorId) {
+  if (previousControl && previousAuditorId && nextAuditorId && previousAuditorId !== nextAuditorId) {
     const lotId = Array.isArray(previousControl.lot_verticals)
       ? previousControl.lot_verticals[0]?.lot_id
       : (previousControl.lot_verticals as { lot_id?: string } | null)?.lot_id
@@ -1319,7 +1275,7 @@ export async function fetchAnswersForControl(controlId: string) {
   await assertCanReadControl(controlId)
   const { data, error } = await supabase
     .from("answers")
-    .select("parameter_id,value,comment,audited_people,audited_roles")
+    .select("parameter_id,value,comment,audited_people,audited_roles,answer_evidences(file_name,file_url)")
     .eq("control_id", controlId)
 
   if (error) throw error
@@ -1330,7 +1286,53 @@ export async function fetchAnswersForControl(controlId: string) {
     comentario: (answer.comment as string | null) ?? "",
     personasAuditadas: ((answer.audited_people as string[] | null) ?? []).length ? (answer.audited_people as string[]) : [""],
     cargos: ((answer.audited_roles as string[] | null) ?? []).length ? (answer.audited_roles as string[]) : [""],
+    evidencias: ((answer.answer_evidences as DbAnswer["answer_evidences"]) ?? []).map((evidence) => evidence.file_name || evidence.file_url),
   }))
+}
+
+export async function saveAnswerEvidenceFiles(controlId: string, filesByParameter: Record<string, File[]>) {
+  await assertCanEvaluateControl(controlId)
+  const entries = Object.entries(filesByParameter).filter(([, files]) => files.length > 0)
+  if (!entries.length) return
+
+  const parameterIds = entries.map(([parameterId]) => parameterId)
+  const { data: answers, error: answersError } = await supabase
+    .from("answers")
+    .select("id,parameter_id")
+    .eq("control_id", controlId)
+    .in("parameter_id", parameterIds)
+
+  if (answersError) throw answersError
+
+  const answerIdByParameter = new Map((answers ?? []).map((answer) => [answer.parameter_id as string, answer.id as string]))
+  const evidenceRows: Array<{ answer_id: string; file_url: string; file_name: string; file_type: string | null }> = []
+
+  for (const [parameterId, files] of entries) {
+    const answerId = answerIdByParameter.get(parameterId)
+    if (!answerId) continue
+
+    for (const file of files) {
+      const safeName = file.name.replace(/[^\w.-]+/g, "-").replace(/-+/g, "-")
+      const path = `${controlId}/${answerId}/${crypto.randomUUID()}-${safeName}`
+      const { error: uploadError } = await supabase.storage
+        .from("answer-evidences")
+        .upload(path, file, { contentType: file.type || undefined, upsert: false })
+
+      if (uploadError) throw uploadError
+
+      evidenceRows.push({
+        answer_id: answerId,
+        file_url: path,
+        file_name: file.name,
+        file_type: file.type || null,
+      })
+    }
+  }
+
+  if (evidenceRows.length) {
+    const { error: evidenceError } = await supabase.from("answer_evidences").insert(evidenceRows)
+    if (evidenceError) throw evidenceError
+  }
 }
 
 async function notifySupervisorsAboutCompletion(input: {

@@ -21,10 +21,6 @@ export function ModeloDetail({ modelo }: ModeloDetailProps) {
     (acc, v) => acc + v.parametros.length,
     0
   )
-  const totalPreguntas = modelo.verticales.reduce(
-    (acc, v) => acc + v.parametros.reduce((pacc, p) => pacc + p.preguntas.length, 0),
-    0
-  )
 
   return (
     <div className="space-y-6">

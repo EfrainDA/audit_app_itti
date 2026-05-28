@@ -66,6 +66,7 @@ import {
 import {
   getEstadoBadgeColor,
   formatEstado,
+  isCountableLote,
   type Auditoria,
   type Ciclo,
   type Lote,
@@ -212,7 +213,11 @@ type SupervisorAnalystSummary = {
   name: string
   assigned: number
   advance: number
+  inCourse: number
+  completed: number
   pending: number
+  progressPct: number
+  risk: number
 }
 
 const roleDesign: Record<DashboardView, {
@@ -760,39 +765,233 @@ function SupervisorCycleMeta({ cycleLabel, daysToClose }: { cycleLabel: string; 
   )
 }
 
+function SupervisorFocusPanel({
+  lotes,
+  analysts,
+  daysToClose,
+  unassignedControls,
+}: {
+  lotes: SupervisorLoteSummary[]
+  analysts: SupervisorAnalystSummary[]
+  daysToClose: number
+  unassignedControls: number
+}) {
+  const lotWithMostPending = [...lotes].sort((a, b) => b.counts.pending - a.counts.pending || a.progressPct - b.progressPct)[0]
+  const verticalMostDelayed = lotes
+    .flatMap((lote) =>
+      lote.verticalScores.map((vertical) => ({
+        id: `${lote.id}-${vertical.id}`,
+        lote: lote.unidadNombre,
+        name: vertical.name,
+        assigned: vertical.total,
+        advance: vertical.completed,
+        pending: Math.max(0, vertical.total - vertical.completed),
+        progressPct: vertical.total ? Math.round((vertical.completed / vertical.total) * 100) : 0,
+      })),
+    )
+    .filter((vertical) => vertical.assigned > 0)
+    .sort((a, b) => b.pending - a.pending || a.progressPct - b.progressPct)[0]
+  const analystMostPending = [...analysts].sort((a, b) => b.pending - a.pending || b.assigned - a.assigned)[0]
+  const parameterMostNoCumple = lotes
+    .flatMap((lote) =>
+      lote.verticalScores.flatMap((vertical) =>
+        vertical.parameterStats.map((parametro) => ({
+          id: `${lote.id}-${vertical.id}-${parametro.id}`,
+          lote: lote.unidadNombre,
+          vertical: vertical.name,
+          name: parametro.name,
+          noCumple: parametro.noCumple,
+        })),
+      ),
+    )
+    .sort((a, b) => b.noCumple - a.noCumple)[0]
+
+  const focusItems = [
+    {
+      title: "Lote con mas pendiente",
+      value: lotWithMostPending ? lotWithMostPending.unidadNombre : "Sin lotes",
+      detail: lotWithMostPending ? `${lotWithMostPending.counts.pending} pendientes de ${lotWithMostPending.counts.total}` : "No hay controles asignados.",
+      icon: Clock,
+      tone: lotWithMostPending?.counts.pending ? "danger" : "success",
+    },
+    {
+      title: "Vertical mas atrasada",
+      value: verticalMostDelayed ? verticalMostDelayed.name : "Sin verticales",
+      detail: verticalMostDelayed ? `${verticalMostDelayed.lote} | ${verticalMostDelayed.pending} pendientes` : "No hay verticales con controles.",
+      icon: Layers,
+      tone: verticalMostDelayed?.pending ? "warning" : "success",
+    },
+    {
+      title: "Analista con mayor carga",
+      value: analystMostPending ? analystMostPending.name : "Sin analistas",
+      detail: analystMostPending ? `${analystMostPending.pending} pendientes | ${analystMostPending.progressPct}% avance` : "No hay asignaciones activas.",
+      icon: Users,
+      tone: analystMostPending?.pending ? "warning" : "success",
+    },
+    {
+      title: "Parametro mas critico",
+      value: parameterMostNoCumple?.noCumple ? parameterMostNoCumple.name : "Sin no cumple",
+      detail: parameterMostNoCumple?.noCumple ? `${parameterMostNoCumple.noCumple} no cumple | ${parameterMostNoCumple.vertical}` : "No hay respuestas no cumple.",
+      icon: ShieldAlert,
+      tone: parameterMostNoCumple?.noCumple ? "danger" : "success",
+    },
+  ] satisfies {
+    title: string
+    value: string
+    detail: string
+    icon: LucideIcon
+    tone: "success" | "warning" | "danger"
+  }[]
+
+  const alerts = [
+    {
+      label: "Controles sin analista",
+      value: unassignedControls,
+      active: unassignedControls > 0,
+    },
+    {
+      label: "Ventana critica",
+      value: daysToClose <= 15 ? `${daysToClose} dias` : "Fuera",
+      active: daysToClose <= 15,
+    },
+    {
+      label: "Lotes sin controles",
+      value: lotes.filter((lote) => lote.counts.total === 0).length,
+      active: lotes.some((lote) => lote.counts.total === 0),
+    },
+  ]
+
+  return (
+    <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">Donde mirar primero</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-2 md:grid-cols-2">
+          {focusItems.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <div key={item.title} className={cn(
+                "rounded-md border px-3 py-3",
+                item.tone === "danger" && "border-destructive/25 bg-destructive/5",
+                item.tone === "warning" && "border-warning/30 bg-warning/8",
+                item.tone === "success" && "border-success/25 bg-success/5",
+              )}>
+                <div className="flex items-start gap-2.5">
+                  <span className={cn(
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-background",
+                    item.tone === "danger" && "border-destructive/25 text-destructive",
+                    item.tone === "warning" && "border-warning/30 text-warning",
+                    item.tone === "success" && "border-success/25 text-success",
+                  )}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{item.title}</p>
+                    <p className="mt-1 truncate text-sm font-semibold leading-tight">{item.value}</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {alerts.map((alert) => (
+            <div key={alert.label} className={cn(
+              "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm",
+              alert.active ? "border-destructive/25 bg-destructive/5" : "border-border/60 bg-muted/15",
+            )}>
+              <span className="truncate text-xs font-medium text-muted-foreground">{alert.label}</span>
+              <span className={cn("shrink-0 font-semibold tabular-nums", alert.active ? "text-destructive" : "text-foreground")}>
+                {alert.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
   return (
     <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">Progreso del ciclo por lote</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {lotes.map((lote) => {
           const semaphore = getSemaphore(lote.progressPct)
           const progressCount = lote.counts.inCourse + lote.counts.completed
 
           return (
             <div key={lote.id} className="rounded-lg border border-border/60 bg-background px-4 py-4">
-              <div className="min-w-0">
-                <p className="text-base font-semibold">Unidad de Negocio: {lote.unidadNombre}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{lote.modeloNombre}</p>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad</p>
+                  <p className="mt-1 truncate text-base font-semibold leading-tight">{lote.unidadNombre}</p>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className={cn("h-full rounded-full", semaphore.bg)} style={{ width: `${lote.progressPct}%` }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[23rem]">
+                  <div className="rounded-md border border-success/20 bg-success/5 px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Avance</p>
+                    <p className={cn("mt-1 text-xl font-semibold leading-none", semaphore.text)}>{lote.progressPct}%</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-card px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Total</p>
+                    <p className="mt-1 text-lg font-semibold leading-none">{lote.counts.total}</p>
+                  </div>
+                  <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Avances</p>
+                    <p className="mt-1 text-lg font-semibold leading-none text-primary">{progressCount}</p>
+                  </div>
+                  <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Pendientes</p>
+                    <p className="mt-1 text-lg font-semibold leading-none text-destructive">{lote.counts.pending}</p>
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Avance</p>
-                  <p className={cn("mt-1 text-2xl font-semibold leading-none", semaphore.text)}>{lote.progressPct}%</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Total</p>
-                  <p className="mt-1 text-2xl font-semibold leading-none">{lote.counts.total}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Avances</p>
-                  <p className="mt-1 text-2xl font-semibold leading-none text-primary">{progressCount}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Pendientes</p>
-                  <p className="mt-1 text-2xl font-semibold leading-none text-destructive">{lote.counts.pending}</p>
+
+              <div className="mt-4 rounded-md border border-border/60 bg-muted/10 p-3">
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[38rem] grid-cols-[minmax(9rem,1fr)_repeat(5,minmax(4.5rem,5.25rem))] gap-x-3 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    <span className="text-left">Vertical</span>
+                    <span>Asignado</span>
+                    <span>Avance</span>
+                    <span>Pendiente</span>
+                    <span>Score</span>
+                    <span>No cumple</span>
+                  </div>
+                  <div className="min-w-[38rem] divide-y divide-border/50">
+                    {lote.verticalScores.map((vertical) => {
+                      const completed = vertical.completed
+                      const pending = Math.max(0, vertical.total - completed)
+                      const noCumple = vertical.parameterStats.reduce((sum, parametro) => sum + parametro.noCumple, 0)
+
+                      return (
+                        <div key={`${lote.id}-${vertical.id}-inline-progress`} className="grid grid-cols-[minmax(9rem,1fr)_repeat(5,minmax(4.5rem,5.25rem))] items-center gap-x-3 py-2.5 text-center">
+                          <p className="min-w-0 truncate text-left text-sm font-medium">{vertical.name}</p>
+                          <p className="text-sm font-semibold tabular-nums">{vertical.total}</p>
+                          <p className="text-sm font-semibold tabular-nums text-primary">{completed}</p>
+                          <p className="text-sm font-semibold tabular-nums text-destructive">{pending}</p>
+                          <p className={cn("text-sm font-semibold tabular-nums", getSemaphore(vertical.performancePct ?? 0).text)}>
+                            {vertical.performancePct ?? "-"}
+                          </p>
+                          <p className={cn("text-sm font-semibold tabular-nums", noCumple ? "text-destructive" : "text-muted-foreground")}>
+                            {noCumple}
+                          </p>
+                        </div>
+                      )
+                    })}
+                    {lote.verticalScores.length === 0 && (
+                      <p className="py-3 text-sm text-muted-foreground">Sin verticales configuradas.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -807,23 +1006,38 @@ function SupervisorAnalystAssignments({ analysts }: { analysts: SupervisorAnalys
   return (
     <Card className="h-full border-border/70 bg-card shadow-none hover:shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Analistas por asignacion</CardTitle>
+        <CardTitle className="text-base font-semibold">Carga por analista</CardTitle>
       </CardHeader>
-      <CardContent className="overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,4.25rem))] gap-x-2 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,4.75rem))] sm:gap-x-3 sm:text-[10px]">
-          <span className="text-left">Analista</span>
-          <span>Asignados</span>
-          <span>Avance</span>
-          <span>Pendientes</span>
-        </div>
-        {analysts.map((analyst) => (
-          <div key={analyst.id} className="grid grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,4.25rem))] items-center gap-x-2 border-b border-border/50 py-3 text-center last:border-b-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,4.75rem))] sm:gap-x-3">
-            <p className="whitespace-normal break-words text-left text-sm font-semibold leading-tight">{analyst.name}</p>
-            <p className="text-sm font-semibold tabular-nums">{analyst.assigned}</p>
-            <p className="text-sm font-semibold tabular-nums text-primary">{analyst.advance}</p>
-            <p className="text-sm font-semibold tabular-nums text-destructive">{analyst.pending}</p>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[40rem] grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(4.5rem,5.5rem))] gap-x-3 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            <span className="text-left">Analista</span>
+            <span>Asignados</span>
+            <span>En curso</span>
+            <span>Terminados</span>
+            <span>Pendientes</span>
+            <span>Avance</span>
           </div>
-        ))}
+          <div className="min-w-[40rem] divide-y divide-border/50">
+            {analysts.map((analyst) => (
+              <div key={analyst.id} className="grid grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(4.5rem,5.5rem))] items-center gap-x-3 py-3 text-center">
+                <p className="truncate text-left text-sm font-semibold leading-tight">{analyst.name}</p>
+                <p className="text-sm font-semibold tabular-nums">{analyst.assigned}</p>
+                <p className="text-sm font-semibold tabular-nums text-primary">{analyst.inCourse}</p>
+                <p className="text-sm font-semibold tabular-nums text-success">{analyst.completed}</p>
+                <p className="text-sm font-semibold tabular-nums text-destructive">{analyst.pending}</p>
+                <div className="text-sm font-semibold tabular-nums">
+                  <p className={cn(analyst.progressPct >= 80 ? "text-success" : analyst.progressPct >= 50 ? "text-warning" : "text-destructive")}>
+                    {analyst.progressPct}%
+                  </p>
+                </div>
+              </div>
+            ))}
+            {analysts.length === 0 && (
+              <p className="py-3 text-sm text-muted-foreground">Sin analistas configurados.</p>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
@@ -1135,7 +1349,7 @@ export function DashboardContent() {
 
   const metrics = useMemo(() => {
     const activeCycle = getActiveCycle(ciclos)
-    const activeLotes = lotes.filter((lote) => lote.ciclo === activeCycle.bimestre)
+    const activeLotes = lotes.filter((lote) => lote.ciclo === activeCycle.bimestre && isCountableLote(lote))
     const activeLoteIds = new Set(activeLotes.map((lote) => lote.id))
     const verticalMap = new Map<string, { id: string; name: string; weight: number }>()
 
@@ -1236,7 +1450,11 @@ export function DashboardContent() {
           name: auditor.name,
           assigned: counts.total,
           advance: counts.inCourse + counts.completed,
+          inCourse: counts.inCourse,
+          completed: counts.completed,
           pending: counts.pending,
+          progressPct: counts.progressPct,
+          risk: counts.risk,
         }
       })
     const supervisorLoteSummaries: SupervisorLoteSummary[] = activeLotes.map((lote) => {
@@ -1329,6 +1547,7 @@ export function DashboardContent() {
       activeCycle,
       activeLotes,
       allControls,
+      unassignedControls: allControls.filter((control) => !control.auditorId).length,
       analystControls,
       analystOpenControls,
       globalCounts,
@@ -1692,8 +1911,13 @@ export function DashboardContent() {
           />
         </section>
 
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <SupervisorLoteProgress lotes={metrics.supervisorLoteSummaries} />
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,0.72fr)]">
+          <SupervisorFocusPanel
+            lotes={metrics.supervisorLoteSummaries}
+            analysts={metrics.supervisorAnalystSummaries}
+            daysToClose={metrics.daysToCycleClose}
+            unassignedControls={metrics.unassignedControls}
+          />
           <SupervisorAnalystAssignments analysts={metrics.supervisorAnalystSummaries} />
         </section>
 
@@ -1702,6 +1926,8 @@ export function DashboardContent() {
             <InsightCard key={insight.title} insight={insight} />
           ))}
         </section>
+
+        <SupervisorLoteProgress lotes={metrics.supervisorLoteSummaries} />
 
         <div className="grid grid-cols-1 gap-5">
           <SupervisorUnitScores lotes={metrics.supervisorLoteSummaries} />

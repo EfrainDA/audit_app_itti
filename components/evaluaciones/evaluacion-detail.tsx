@@ -38,6 +38,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import {
   fetchAnswersForControl,
   finalizeEvaluation,
+  saveAnswerEvidenceFiles,
   saveEvaluationDraft,
   sendControlToReplica,
   type EvaluationAnswerInput,
@@ -370,6 +371,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
     try {
       await saveEvaluationDraft(controlId, getAnswersPayload())
+      await saveAnswerEvidenceFiles(controlId, evidenceFiles)
+      setEvidenceFiles({})
       setAutoSaveStatus("saved")
     } catch (submitError) {
       setFormError(getErrorMessage(submitError, "No se pudo guardar el borrador."))
@@ -452,6 +455,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         score: scoreCalculado,
         answers: getAnswersPayload(),
       })
+      await saveAnswerEvidenceFiles(currentControl.id, evidenceFiles)
+      setEvidenceFiles({})
       await refresh()
       return true
     } catch (submitError) {
@@ -610,23 +615,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                             </p>
                           </div>
                         )}
-                        {parametro.preguntas.length > 0 && (
-                          <div className="rounded-lg border border-border/50 bg-secondary/20 p-3.5">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Criterios de evaluación</p>
-                            <div className="space-y-2">
-                              {parametro.preguntas.map((pregunta) => (
-                                <p key={pregunta.id} className="flex items-start gap-2 text-sm leading-6 text-foreground">
-                                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                                  <span className="min-w-0">{pregunta.texto}</span>
-                                  {pregunta.evidenciaObligatoria && (
-                                    <Badge variant="outline" className="shrink-0 text-xs">Evidencia req.</Badge>
-                                  )}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">

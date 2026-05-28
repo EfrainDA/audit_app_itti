@@ -18,6 +18,8 @@ import {
   Download,
   MoreHorizontal,
   Eye,
+  RotateCcw,
+  Trash2,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -44,6 +46,7 @@ import {
 import {
   getEstadoBadgeColor,
   formatEstado,
+  isCountableLote,
   type Lote,
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
@@ -71,6 +74,8 @@ export function PlanificacionContent() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
   const unidades = data.unidades
+  const lotesComputables = lotes.filter(isCountableLote)
+  const lotesDadosDeBaja = lotes.filter((lote) => lote.estado === "deprecado")
 
   const lotesConDatos = lotes.map((lote) => {
     const unidad = unidades.find((u) => u.id === lote.unidadNegocioId)
@@ -225,6 +230,17 @@ export function PlanificacionContent() {
     await refresh()
   }
 
+  const handleDeprecateLote = async (loteId: string) => {
+    if (!window.confirm("Dar de baja este lote? Quedara fuera de metricas y evaluaciones.")) return
+    await updateLotStatus(loteId, "deprecado")
+    await refresh()
+  }
+
+  const handleReactivateLote = async (loteId: string) => {
+    await updateLotStatus(loteId, "abierto")
+    await refresh()
+  }
+
   const selectedLoteConDatos = selectedLote ? lotesConDatos.find((lote) => lote.id === selectedLote.id) : null
 
   return (
@@ -263,13 +279,13 @@ export function PlanificacionContent() {
 
         <TabsContent value="lotes" className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.length}</p>
-                  <p className="text-sm text-muted-foreground">Lotes Totales</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotesComputables.length}</p>
+                  <p className="text-sm text-muted-foreground">Activos y cerrados</p>
                 </div>
               </CardContent>
             </Card>
@@ -288,6 +304,15 @@ export function PlanificacionContent() {
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "cerrado").length}</p>
                   <p className="text-sm text-muted-foreground">Cerrados</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="h-24 gap-0 border-destructive/15 bg-card py-0 dark:border-destructive/25">
+              <CardContent className="flex h-full items-center gap-3 px-4 py-0">
+                <RealisticIcon icon={Lock} tone="danger" size="md" />
+                <div>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotesDadosDeBaja.length}</p>
+                  <p className="text-sm text-muted-foreground">Dados de baja</p>
                 </div>
               </CardContent>
             </Card>
@@ -409,6 +434,24 @@ export function PlanificacionContent() {
                                 </DropdownMenuItem>
                               </>
                             )}
+                            {canManageLots && lote.estado !== "deprecado" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeprecateLote(lote.id); }} className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Dar de baja
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {canManageLots && lote.estado === "deprecado" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-success">
+                                  <RotateCcw className="h-4 w-4 mr-2" />
+                                  Reactivar lote
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -480,7 +523,7 @@ export function PlanificacionContent() {
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 {[1, 2, 3, 4, 5, 6].map((bimestre) => {
-                  const lotesBimestre = lotes.filter((l) => l.ciclo === bimestre && l.año === 2026)
+                  const lotesBimestre = lotes.filter((l) => l.ciclo === bimestre && l.año === 2026 && isCountableLote(l))
                   const isActive = bimestre === 3
                   const isPast = bimestre < 3
 
