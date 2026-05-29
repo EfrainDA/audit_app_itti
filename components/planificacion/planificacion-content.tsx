@@ -284,8 +284,8 @@ export function PlanificacionContent() {
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotesComputables.length}</p>
-                  <p className="text-sm text-muted-foreground">Activos y cerrados</p>
+                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.length}</p>
+                  <p className="text-sm text-muted-foreground">Total de Lotes</p>
                 </div>
               </CardContent>
             </Card>

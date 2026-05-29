@@ -25,60 +25,25 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import {
-  Activity,
   AlertTriangle,
-  ArrowUpRight,
-  BarChart3,
-  Building2,
-  CheckCircle2,
-  ClipboardCheck,
   Clock,
   Crown,
-  Gauge,
   Layers,
-  LineChart,
   Play,
   ShieldAlert,
   ShieldCheck,
-  Target,
-  TrendingUp,
   UserCheck,
   Users,
   type LucideIcon,
 } from "lucide-react"
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
-import {
   getEstadoBadgeColor,
   formatEstado,
   isCountableLote,
-  type Auditoria,
   type Ciclo,
-  type Lote,
-  type LoteVertical,
-  type ModeloControl,
-  type UnidadNegocio,
-  type User,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { ProgressChart, type ProgressChartDatum } from "./progress-chart"
-import { ScoreByVerticalChart, type ScoreByVerticalDatum } from "./score-by-vertical-chart"
 
 type DashboardView = "analista" | "supervisor" | "ceo"
 
@@ -108,15 +73,11 @@ type CountMetrics = {
   risk: number
   score: number
   progressPct: number
-  completionPct: number
 }
 
 type StatCard = {
   title: string
   value: string | number
-  icon: LucideIcon
-  description: string
-  delta: string
   tone: "primary" | "success" | "warning" | "danger" | "neutral"
 }
 
@@ -130,34 +91,6 @@ type Insight = {
 
 type RoleDashboard = {
   cards: StatCard[]
-  progressData: ProgressChartDatum[]
-  scoreData: ScoreByVerticalDatum[]
-  pipelineData: { name: string; value: number; color: string }[]
-  timelineData: { name: string; avance: number; calidad: number; riesgo: number }[]
-  radarData: { dimension: string; value: number }[]
-  insights: Insight[]
-  chartTitle: string
-  chartSubtitle: string
-  radarTitle: string
-}
-
-type AnalystVerticalSummary = {
-  id: string
-  name: string
-  weight: number
-  total: number
-  completed: number
-  averageScore: number | null
-  achieved: number | null
-}
-
-type AnalystLoteScore = {
-  id: string
-  unitName: string
-  modelName: string
-  counts: CountMetrics
-  score: number
-  verticals: AnalystVerticalSummary[]
 }
 
 type SupervisorVerticalScore = {
@@ -217,7 +150,6 @@ type SupervisorAnalystSummary = {
   completed: number
   pending: number
   progressPct: number
-  risk: number
 }
 
 const roleDesign: Record<DashboardView, {
@@ -314,59 +246,7 @@ function getCounts(controls: ControlContext[], answeredControlIds: Set<string> =
     risk,
     score,
     progressPct: total ? Math.round((started / total) * 100) : 0,
-    completionPct: total ? Math.round((completed / total) * 100) : 0,
   }
-}
-
-function buildProgressData(counts: CountMetrics): ProgressChartDatum[] {
-  return [
-    { name: "Terminadas", value: counts.completed, color: "var(--success)" },
-    { name: "En Curso", value: counts.inCourse, color: "var(--primary)" },
-    { name: "Pendientes", value: counts.pending, color: "var(--warning)" },
-  ]
-}
-
-function buildPipelineData(counts: CountMetrics) {
-  return [
-    { name: "Pendiente", value: counts.pending, color: "var(--muted-foreground)" },
-    { name: "En Curso", value: counts.inCourse, color: "var(--primary)" },
-    { name: "Terminado", value: counts.completed, color: "var(--success)" },
-  ]
-}
-
-function buildTimelineData(counts: CountMetrics) {
-  return [
-    { name: "Sem 1", avance: Math.max(8, counts.progressPct - 34), calidad: Math.max(12, counts.score - 16), riesgo: Math.min(100, counts.risk * 18 + 18) },
-    { name: "Sem 2", avance: Math.max(14, counts.progressPct - 22), calidad: Math.max(18, counts.score - 10), riesgo: Math.min(100, counts.risk * 15 + 12) },
-    { name: "Sem 3", avance: Math.max(22, counts.progressPct - 10), calidad: Math.max(24, counts.score - 5), riesgo: Math.min(100, counts.risk * 12 + 8) },
-    { name: "Hoy", avance: counts.progressPct, calidad: counts.score, riesgo: Math.min(100, counts.risk * 10 + 6) },
-  ]
-}
-
-function buildRadarData(counts: CountMetrics, coveragePct: number) {
-  return [
-    { dimension: "Cobertura", value: coveragePct },
-    { dimension: "Ejecucion", value: counts.progressPct },
-    { dimension: "Cierre", value: counts.completionPct },
-    { dimension: "Calidad", value: counts.score },
-    { dimension: "Riesgo", value: Math.max(0, 100 - counts.risk * 16) },
-  ]
-}
-
-function buildScoreData(controls: ControlContext[], verticals: { id: string; name: string; weight: number }[]) {
-  return verticals.map((vertical) => {
-    const verticalControls = controls.filter((control) => control.verticalId === vertical.id)
-    const scored = verticalControls.filter((control) => control.scoreControl !== undefined)
-    const score = scored.length
-      ? Math.round(scored.reduce((sum, control) => sum + (control.scoreControl ?? 0), 0) / scored.length)
-      : 0
-
-    return {
-      name: vertical.name,
-      score,
-      weight: vertical.weight,
-    }
-  })
 }
 
 function getDaysUntil(date: string) {
@@ -380,55 +260,22 @@ function getDaysUntil(date: string) {
 function getSemaphore(progress: number) {
   if (progress >= 80) {
     return {
-      label: "Verde",
-      tone: "success" as const,
       text: "text-success",
       bg: "bg-success",
-      border: "border-success/30 bg-success/10",
     }
   }
 
   if (progress >= 50) {
     return {
-      label: "Amarillo",
-      tone: "warning" as const,
       text: "text-warning",
       bg: "bg-warning",
-      border: "border-warning/35 bg-warning/10",
     }
   }
 
   return {
-    label: "Rojo",
-    tone: "danger" as const,
     text: "text-destructive",
     bg: "bg-destructive",
-    border: "border-destructive/30 bg-destructive/10",
   }
-}
-
-function buildAnalystVerticalSummaries(
-  controls: ControlContext[],
-  verticals: { id: string; name: string; weight: number }[],
-): AnalystVerticalSummary[] {
-  return verticals.map((vertical) => {
-    const verticalControls = controls.filter((control) => control.verticalId === vertical.id)
-    const completed = verticalControls.filter((control) => control.estado === "terminado" || control.estado === "terminada").length
-    const scored = verticalControls.filter((control) => control.scoreControl !== undefined)
-    const averageScore = scored.length
-      ? Math.round(scored.reduce((sum, control) => sum + (control.scoreControl ?? 0), 0) / scored.length)
-      : null
-
-    return {
-      id: vertical.id,
-      name: vertical.name,
-      weight: vertical.weight,
-      total: verticalControls.length,
-      completed,
-      averageScore,
-      achieved: averageScore !== null ? Number(((averageScore * vertical.weight) / 100).toFixed(1)) : null,
-    }
-  })
 }
 
 function KpiCard({ stat }: { stat: StatCard }) {
@@ -442,123 +289,17 @@ function KpiCard({ stat }: { stat: StatCard }) {
   )
 }
 
-function ChartShell({
-  title,
-  subtitle,
-  icon: Icon,
-  children,
-  className,
-  showIcon = true,
-}: {
-  title: string
-  subtitle: string
-  icon: LucideIcon
-  children: React.ReactNode
-  className?: string
-  showIcon?: boolean
-}) {
-  return (
-    <Card className={cn("overflow-hidden border-border/70 bg-card shadow-none hover:shadow-none", className)}>
-      <CardHeader className="flex items-start gap-3 pb-2">
-        {showIcon && <RealisticIcon icon={Icon} tone="primary" size="md" className="shrink-0" />}
-        <div className="min-w-0 flex-1">
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  )
-}
-
-function PipelineChart({ data }: { data: RoleDashboard["pipelineData"] }) {
-  return (
-    <div className="h-[220px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 12, right: 12, left: -18, bottom: 4 }}>
-          <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" opacity={0.32} vertical={false} />
-          <XAxis dataKey="name" tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontWeight: 650 }} tickLine={false} axisLine={false} />
-          <YAxis allowDecimals={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} tickLine={false} axisLine={false} />
-          <Tooltip
-            cursor={{ fill: "var(--muted)", opacity: 0.28 }}
-            contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: "10px",
-              boxShadow: "0 18px 44px oklch(0.28 0.025 252 / 0.12)",
-            }}
-          />
-          <Bar dataKey="value" radius={[10, 10, 4, 4]} barSize={42}>
-            {data.map((entry) => (
-              <Cell key={entry.name} fill={entry.color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-function TimelineChart({ data }: { data: RoleDashboard["timelineData"] }) {
-  return (
-    <div className="h-[240px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 18, right: 16, left: -20, bottom: 0 }}>
-          <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" opacity={0.32} vertical={false} />
-          <XAxis dataKey="name" tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontWeight: 650 }} tickLine={false} axisLine={false} />
-          <YAxis domain={[0, 100]} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} tickLine={false} axisLine={false} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: "10px",
-              boxShadow: "0 18px 44px oklch(0.28 0.025 252 / 0.12)",
-            }}
-            formatter={(value: number, name: string) => [`${value}%`, name === "avance" ? "Avance" : "Calidad"]}
-          />
-          <Area type="monotone" dataKey="avance" stroke="var(--primary)" strokeWidth={3} fill="var(--primary)" fillOpacity={0.08} />
-          <Area type="monotone" dataKey="calidad" stroke="var(--success)" strokeWidth={3} fill="var(--success)" fillOpacity={0.07} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-function RadarPerformance({ data }: { data: RoleDashboard["radarData"] }) {
-  return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={data} outerRadius={92}>
-          <PolarGrid stroke="var(--border)" />
-          <PolarAngleAxis dataKey="dimension" tick={{ fill: "var(--foreground)", fontSize: 12, fontWeight: 650 }} />
-          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
-          <Radar dataKey="value" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.22} strokeWidth={3} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: "10px",
-              boxShadow: "0 18px 44px oklch(0.28 0.025 252 / 0.12)",
-            }}
-            formatter={(value: number) => [`${value}%`, "Indice"]}
-          />
-        </RadarChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
 function InsightCard({ insight }: { insight: Insight }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-background p-4">
-      <div className="flex items-start gap-3">
+    <div className="rounded-lg border border-border/70 bg-background p-3">
+      <div className="flex items-start gap-2.5">
         <RealisticIcon icon={insight.icon} tone={insight.tone} size="md" className="shrink-0" />
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{insight.title}</p>
-          <p className="mt-2 text-xl font-semibold tracking-tight">{insight.value}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight">{insight.value}</p>
         </div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">{insight.description}</p>
+      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{insight.description}</p>
     </div>
   )
 }
@@ -595,56 +336,6 @@ function AnalystProgressPanel({
   )
 }
 
-function AnalystUnitScore({
-  lotes,
-}: {
-  lotes: AnalystLoteScore[]
-}) {
-  return (
-    <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Calificación de Unidades de Negocio</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {lotes.map((lote) => {
-          const loteSemaphore = getSemaphore(lote.score)
-
-          return (
-            <div key={lote.id} className="rounded-lg border border-border/60 bg-background p-4">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold">{lote.unitName}</p>
-                  <p className="text-xs text-muted-foreground">{lote.modelName}</p>
-                </div>
-                <p className={cn("self-center text-2xl font-semibold leading-none", loteSemaphore.text)}>{lote.score}%</p>
-              </div>
-              <div className="responsive-scroll mt-3 flex gap-2 overflow-x-auto pb-1">
-                {lote.verticals.map((vertical) => {
-                  const verticalSemaphore = getSemaphore(vertical.averageScore ?? 0)
-
-                  return (
-                    <div key={vertical.id} className={cn("min-w-[9rem] flex-1 rounded-md border px-3 py-2", verticalSemaphore.border)}>
-                      <p className="truncate text-xs font-semibold text-muted-foreground">{vertical.name}</p>
-                      <p className={cn("mt-1 text-base font-semibold", verticalSemaphore.text)}>
-                        {vertical.achieved !== null ? `${vertical.achieved}%` : "-"}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-        {lotes.length === 0 && (
-          <p className="rounded-lg border border-border/70 bg-background px-4 py-6 text-center text-sm text-muted-foreground">
-            Sin lotes asignados para este ciclo.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   return (
     <div>
@@ -662,7 +353,7 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
             <TableHead>Vertical</TableHead>
             <TableHead>Unidad de Negocio</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="text-left">Acción</TableHead>
+            <TableHead className="text-left">Accion</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -791,7 +482,7 @@ function SupervisorFocusPanel({
     )
     .filter((vertical) => vertical.assigned > 0)
     .sort((a, b) => b.pending - a.pending || a.progressPct - b.progressPct)[0]
-  const analystMostPending = [...analysts].sort((a, b) => b.pending - a.pending || b.assigned - a.assigned)[0]
+  const analystMostLoaded = [...analysts].sort((a, b) => b.assigned - a.assigned || b.pending - a.pending)[0]
   const parameterMostNoCumple = lotes
     .flatMap((lote) =>
       lote.verticalScores.flatMap((vertical) =>
@@ -809,27 +500,33 @@ function SupervisorFocusPanel({
   const focusItems = [
     {
       title: "Lote con mas pendiente",
-      value: lotWithMostPending ? lotWithMostPending.unidadNombre : "Sin lotes",
-      detail: lotWithMostPending ? `${lotWithMostPending.counts.pending} pendientes de ${lotWithMostPending.counts.total}` : "No hay controles asignados.",
+      value: lotWithMostPending?.counts.pending ? lotWithMostPending.unidadNombre : "Sin pendientes",
+      detail: lotWithMostPending
+        ? `${lotWithMostPending.counts.pending} pendientes | ${lotWithMostPending.progressPct}% avance`
+        : "No hay controles asignados.",
       icon: Clock,
       tone: lotWithMostPending?.counts.pending ? "danger" : "success",
     },
     {
       title: "Vertical mas atrasada",
-      value: verticalMostDelayed ? verticalMostDelayed.name : "Sin verticales",
-      detail: verticalMostDelayed ? `${verticalMostDelayed.lote} | ${verticalMostDelayed.pending} pendientes` : "No hay verticales con controles.",
+      value: verticalMostDelayed?.pending ? verticalMostDelayed.name : "Sin atraso",
+      detail: verticalMostDelayed
+        ? `${verticalMostDelayed.pending} pendientes | ${verticalMostDelayed.progressPct}% avance`
+        : "No hay verticales con controles.",
       icon: Layers,
       tone: verticalMostDelayed?.pending ? "warning" : "success",
     },
     {
       title: "Analista con mayor carga",
-      value: analystMostPending ? analystMostPending.name : "Sin analistas",
-      detail: analystMostPending ? `${analystMostPending.pending} pendientes | ${analystMostPending.progressPct}% avance` : "No hay asignaciones activas.",
+      value: analystMostLoaded?.assigned ? analystMostLoaded.name : "Sin asignaciones",
+      detail: analystMostLoaded
+        ? `${analystMostLoaded.pending} pendientes | ${analystMostLoaded.progressPct}% avance`
+        : "No hay asignaciones activas.",
       icon: Users,
-      tone: analystMostPending?.pending ? "warning" : "success",
+      tone: analystMostLoaded?.pending ? "warning" : "success",
     },
     {
-      title: "Parametro mas critico",
+      title: "Parámetro mas crítico",
       value: parameterMostNoCumple?.noCumple ? parameterMostNoCumple.name : "Sin no cumple",
       detail: parameterMostNoCumple?.noCumple ? `${parameterMostNoCumple.noCumple} no cumple | ${parameterMostNoCumple.vertical}` : "No hay respuestas no cumple.",
       icon: ShieldAlert,
@@ -845,42 +542,37 @@ function SupervisorFocusPanel({
 
   const alerts = [
     {
-      label: "Controles sin analista",
-      value: unassignedControls,
-      active: unassignedControls > 0,
-    },
-    {
-      label: "Ventana critica",
-      value: daysToClose <= 15 ? `${daysToClose} dias` : "Fuera",
-      active: daysToClose <= 15,
-    },
-    {
       label: "Lotes sin controles",
       value: lotes.filter((lote) => lote.counts.total === 0).length,
       active: lotes.some((lote) => lote.counts.total === 0),
     },
+    {
+      label: "Controles sin analista",
+      value: unassignedControls,
+      active: unassignedControls > 0,
+    },
   ]
 
   return (
-    <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Donde mirar primero</CardTitle>
+    <Card className="h-full gap-0 border-border/70 bg-card py-0 shadow-none hover:shadow-none">
+      <CardHeader className="px-4 pb-2 pt-4 sm:px-5">
+        <CardTitle className="text-base font-semibold">De un Vistazo</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-2 md:grid-cols-2">
+      <CardContent className="space-y-3 px-4 pb-4 pt-0 sm:px-5">
+        <div className="grid gap-2">
           {focusItems.map((item) => {
             const Icon = item.icon
 
             return (
               <div key={item.title} className={cn(
-                "rounded-md border px-3 py-3",
+                "rounded-lg border px-3 py-3 transition-colors",
                 item.tone === "danger" && "border-destructive/25 bg-destructive/5",
                 item.tone === "warning" && "border-warning/30 bg-warning/8",
                 item.tone === "success" && "border-success/25 bg-success/5",
               )}>
-                <div className="flex items-start gap-2.5">
+                <div className="flex items-start gap-3">
                   <span className={cn(
-                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-background",
+                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background",
                     item.tone === "danger" && "border-destructive/25 text-destructive",
                     item.tone === "warning" && "border-warning/30 text-warning",
                     item.tone === "success" && "border-success/25 text-success",
@@ -888,9 +580,9 @@ function SupervisorFocusPanel({
                     <Icon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{item.title}</p>
-                    <p className="mt-1 truncate text-sm font-semibold leading-tight">{item.value}</p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{item.title}</p>
+                    <p className="mt-1 truncate text-[15px] font-semibold leading-tight">{item.value}</p>
+                    <p className="mt-1.5 truncate text-xs font-medium text-muted-foreground">{item.detail}</p>
                   </div>
                 </div>
               </div>
@@ -898,10 +590,10 @@ function SupervisorFocusPanel({
           })}
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           {alerts.map((alert) => (
             <div key={alert.label} className={cn(
-              "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm",
+              "flex min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm",
               alert.active ? "border-destructive/25 bg-destructive/5" : "border-border/60 bg-muted/15",
             )}>
               <span className="truncate text-xs font-medium text-muted-foreground">{alert.label}</span>
@@ -928,7 +620,7 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
           const progressCount = lote.counts.inCourse + lote.counts.completed
 
           return (
-            <div key={lote.id} className="rounded-lg border border-border/60 bg-background px-4 py-4">
+            <div key={lote.id} className="rounded-lg border border-border/60 px-4 py-4">
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidad</p>
@@ -957,14 +649,14 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-md border border-border/60 bg-muted/10 p-3">
+              <div className="mt-4 rounded-md border border-border/60 p-3">
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[38rem] grid-cols-[minmax(9rem,1fr)_repeat(5,minmax(4.5rem,5.25rem))] gap-x-3 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                     <span className="text-left">Vertical</span>
                     <span>Asignado</span>
                     <span>Avance</span>
                     <span>Pendiente</span>
-                    <span>Score</span>
+                    <span>Promedio</span>
                     <span>No cumple</span>
                   </div>
                   <div className="min-w-[38rem] divide-y divide-border/50">
@@ -1004,27 +696,25 @@ function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary[] }) {
 
 function SupervisorAnalystAssignments({ analysts }: { analysts: SupervisorAnalystSummary[] }) {
   return (
-    <Card className="h-full border-border/70 bg-card shadow-none hover:shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Carga por analista</CardTitle>
+    <Card className="h-full gap-0 border-border/70 bg-card py-0 shadow-none hover:shadow-none">
+      <CardHeader className="px-4 pb-2 pt-4 sm:px-5">
+        <CardTitle className="text-base font-semibold">Carga por Analista</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[40rem] grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(4.5rem,5.5rem))] gap-x-3 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+      <CardContent className="px-4 pb-4 pt-0 sm:px-5">
+        <div className="min-w-0">
+          <div className="grid grid-cols-[minmax(7rem,1fr)_repeat(4,minmax(3.4rem,4.75rem))] gap-x-2 border-b border-border/60 pb-2 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
             <span className="text-left">Analista</span>
-            <span>Asignados</span>
-            <span>En curso</span>
-            <span>Terminados</span>
-            <span>Pendientes</span>
+            <span>Asignado</span>
             <span>Avance</span>
+            <span>Pend.</span>
+            <span>% avance</span>
           </div>
-          <div className="min-w-[40rem] divide-y divide-border/50">
+          <div className="divide-y divide-border/50">
             {analysts.map((analyst) => (
-              <div key={analyst.id} className="grid grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(4.5rem,5.5rem))] items-center gap-x-3 py-3 text-center">
+              <div key={analyst.id} className="grid grid-cols-[minmax(7rem,1fr)_repeat(4,minmax(3.4rem,4.75rem))] items-center gap-x-2 py-2.5 text-center">
                 <p className="truncate text-left text-sm font-semibold leading-tight">{analyst.name}</p>
                 <p className="text-sm font-semibold tabular-nums">{analyst.assigned}</p>
-                <p className="text-sm font-semibold tabular-nums text-primary">{analyst.inCourse}</p>
-                <p className="text-sm font-semibold tabular-nums text-success">{analyst.completed}</p>
+                <p className="text-sm font-semibold tabular-nums text-primary">{analyst.advance}</p>
                 <p className="text-sm font-semibold tabular-nums text-destructive">{analyst.pending}</p>
                 <div className="text-sm font-semibold tabular-nums">
                   <p className={cn(analyst.progressPct >= 80 ? "text-success" : analyst.progressPct >= 50 ? "text-warning" : "text-destructive")}>
@@ -1054,17 +744,17 @@ function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) 
     .flatMap((vertical) =>
       vertical.parameterStats
         .filter((parametro) => parametro.noCumple > 0)
+        .sort((a, b) => b.noCumple - a.noCumple || b.total - a.total)
+        .slice(0, 2)
         .map((parametro) => ({ ...parametro, verticalName: vertical.name })),
     )
-    .sort((a, b) => b.noCumple - a.noCumple || b.total - a.total)
-    .slice(0, 6)
 
   return (
     <>
       <DialogHeader className="pr-10 text-left">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
-            <DialogTitle>Radiografia del lote</DialogTitle>
+            <DialogTitle>Detalles del Lote</DialogTitle>
             <DialogDescription className="mt-0">
               {lote.unidadNombre} | {lote.modeloNombre}
             </DialogDescription>
@@ -1099,6 +789,7 @@ function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) 
             {lote.verticalScores.map((vertical) => {
               const verticalNoCumple = vertical.parameterStats.reduce((sum, parametro) => sum + parametro.noCumple, 0)
               const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
+              const weightedScore = vertical.achieved !== null ? `${vertical.achieved}%` : "Sin score"
 
               return (
                 <div key={`${lote.id}-${vertical.id}-radiography`} className="rounded-md border border-border/70 bg-background p-3">
@@ -1108,12 +799,9 @@ function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) 
                         <p className="truncate text-sm font-semibold">{vertical.name}</p>
                         <Badge variant="outline" className="h-5 px-2 text-[10px]">{vertical.weight}% peso</Badge>
                       </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                        <div className={cn("h-full rounded-full", verticalNoCumple ? "bg-destructive" : "bg-success")} style={{ width: `${Math.min(100, vertical.completed ? (vertical.completed / Math.max(1, vertical.total)) * 100 : 0)}%` }} />
-                      </div>
                     </div>
                     <p className={cn("text-sm font-semibold md:text-right", verticalSemaphore.text)}>
-                      {vertical.performancePct !== null ? `${vertical.performancePct}%` : "Sin score"}
+                      {weightedScore}
                     </p>
                     <p className={cn("text-sm font-semibold md:text-right", verticalNoCumple ? "text-destructive" : "text-success")}>
                       {verticalNoCumple} NC
@@ -1121,23 +809,19 @@ function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) 
                   </div>
 
                   <div className="mt-3 space-y-1.5">
-                    {vertical.parameterStats
-                      .filter((parametro) => parametro.total > 0 || parametro.noResponse > 0)
-                      .sort((a, b) => b.noCumple - a.noCumple || b.noCumplePct - a.noCumplePct)
-                      .slice(0, 5)
-                      .map((parametro) => (
-                        <div key={parametro.id} className="grid gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_repeat(5,4.25rem)] md:items-center">
-                          <p className="truncate text-sm font-medium">{parametro.name}</p>
-                          <span className="text-success">C {parametro.cumple}</span>
-                          <span className="text-warning">I {parametro.intermedio}</span>
-                          <span className="font-semibold text-destructive">NC {parametro.noCumple}</span>
-                          <span className="text-muted-foreground">NA {parametro.na}</span>
-                          <span className="text-muted-foreground">S/R {parametro.noResponse}</span>
-                        </div>
-                      ))}
-                    {vertical.parameterStats.every((parametro) => parametro.total === 0) && (
+                    {vertical.parameterStats.map((parametro) => (
+                      <div key={parametro.id} className="grid gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_repeat(5,4.25rem)] md:items-center">
+                        <p className="truncate text-sm font-medium">{parametro.name}</p>
+                        <span className="text-success">C {parametro.cumple}</span>
+                        <span className="text-warning">I {parametro.intermedio}</span>
+                        <span className="font-semibold text-destructive">NC {parametro.noCumple}</span>
+                        <span className="text-muted-foreground">NA {parametro.na}</span>
+                        <span className="text-muted-foreground">S/R {parametro.noResponse}</span>
+                      </div>
+                    ))}
+                    {vertical.parameterStats.length === 0 && (
                       <p className="rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-                        Sin respuestas registradas en esta vertical.
+                        Sin parametros configurados en esta vertical.
                       </p>
                     )}
                   </div>
@@ -1167,65 +851,6 @@ function LotRadiographyDialogContent({ lote }: { lote: SupervisorLoteSummary }) 
         </div>
       </div>
     </>
-  )
-}
-
-function SupervisorUnitScores({ lotes }: { lotes: SupervisorLoteSummary[] }) {
-  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null)
-  const selectedLote = lotes.find((lote) => lote.id === selectedLoteId)
-
-  return (
-    <Card className="border-border/70 bg-card shadow-none hover:shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Calificacion de unidades del ciclo</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {lotes.map((lote) => {
-          const semaphore = getSemaphore(lote.unitScore)
-
-          return (
-            <div key={lote.id} className="rounded-lg border border-border/60 bg-background p-4">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold">{lote.unidadNombre}</p>
-                  <p className="text-xs text-muted-foreground">{lote.modeloNombre}</p>
-                </div>
-                <p className={cn("self-center text-2xl font-semibold leading-none", semaphore.text)}>{lote.unitScore}%</p>
-              </div>
-              <div className="responsive-scroll mt-3 flex gap-2 overflow-x-auto pb-1">
-                {lote.verticalScores.map((vertical) => {
-                  const verticalSemaphore = getSemaphore(vertical.performancePct ?? 0)
-
-                  return (
-                    <div key={vertical.id} className={cn("min-w-[9rem] flex-1 rounded-md border px-3 py-2", verticalSemaphore.border)}>
-                      <p className="truncate text-xs font-semibold text-muted-foreground">{vertical.name}</p>
-                      <p className={cn("mt-1 text-base font-semibold", verticalSemaphore.text)}>
-                        {vertical.achieved !== null ? `${vertical.achieved}%` : "-"}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="mt-2 flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-primary shadow-none hover:bg-primary/8 hover:text-primary"
-                  onClick={() => setSelectedLoteId(lote.id)}
-                >
-                  Ver detalle
-                </Button>
-              </div>
-            </div>
-          )
-        })}
-      </CardContent>
-      <Dialog open={Boolean(selectedLote)} onOpenChange={(open) => !open && setSelectedLoteId(null)}>
-        <DialogContent className="max-h-[86vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:w-[90vw] lg:w-[64rem]">
-          {selectedLote && <LotRadiographyDialogContent lote={selectedLote} />}
-        </DialogContent>
-      </Dialog>
-    </Card>
   )
 }
 
@@ -1330,7 +955,7 @@ function SupervisorRiskMonitor({
 export function DashboardContent() {
   const [activeView, setActiveView] = useState<DashboardView>("analista")
   const { appUser } = useAuth()
-  const { data: appData, source: dataSource, error: dataError } = useAppData()
+  const { data: appData } = useAppData()
   const isAuditor = appUser?.role === "auditor"
   const isSupervisor = appUser?.role === "supervisor"
   const users = appData.users
@@ -1407,43 +1032,18 @@ export function DashboardContent() {
     const coveragePct = unidades.length
       ? Math.round((new Set(activeLotes.map((lote) => lote.unidadNegocioId)).size / unidades.length) * 100)
       : 0
-    const verticals = Array.from(verticalMap.values())
     const answeredControlIds = new Set(appData.answeredControlIds)
     const globalCounts = getCounts(allControls, answeredControlIds)
     const analystCounts = getCounts(analystControls, answeredControlIds)
     const assignedLotControls = allControls.filter((control) => analystAssignedLotes.some((lote) => lote.id === control.loteId))
     const assignedLotCounts = getCounts(assignedLotControls, answeredControlIds)
-    const analystLoteScores: AnalystLoteScore[] = analystAssignedLotes.map((lote) => {
-      const unidad = unidades.find((unit) => unit.id === lote.unidadNegocioId)
-      const modelo = modelos.find((model) => model.id === lote.modeloControlId)
-      const loteControls = allControls.filter((control) => control.loteId === lote.id)
-      const loteVerticals = modelo?.verticales.map((vertical) => ({
-        id: vertical.id,
-        name: vertical.nombre,
-        weight: vertical.peso,
-      })) ?? verticals
-      const verticalScores = buildAnalystVerticalSummaries(loteControls, loteVerticals)
-      const score = Number(
-        verticalScores
-          .reduce((sum, vertical) => sum + (vertical.achieved ?? 0), 0)
-          .toFixed(1),
-      )
-
-      return {
-        id: lote.id,
-        unitName: unidad?.nombre || "Unidad asignada",
-        modelName: modelo?.nombre || "Modelo de control",
-        counts: getCounts(loteControls),
-        score,
-        verticals: verticalScores,
-      }
-    })
+    const analystLoteCount = analystAssignedLotes.length
     const analystOpenControls = analystControls.filter((control) => control.estado !== "terminado" && control.estado !== "terminada")
     const supervisorAnalystSummaries: SupervisorAnalystSummary[] = users
       .filter((user) => user.role === "auditor")
       .map((auditor) => {
         const assignedControls = allControls.filter((control) => control.auditorId === auditor.id)
-        const counts = getCounts(assignedControls)
+        const counts = getCounts(assignedControls, answeredControlIds)
 
         return {
           id: auditor.id,
@@ -1454,14 +1054,13 @@ export function DashboardContent() {
           completed: counts.completed,
           pending: counts.pending,
           progressPct: counts.progressPct,
-          risk: counts.risk,
         }
       })
     const supervisorLoteSummaries: SupervisorLoteSummary[] = activeLotes.map((lote) => {
       const unidad = unidades.find((unit) => unit.id === lote.unidadNegocioId)
       const modelo = modelos.find((model) => model.id === lote.modeloControlId)
       const loteControls = allControls.filter((control) => control.loteId === lote.id)
-      const counts = getCounts(loteControls)
+      const counts = getCounts(loteControls, answeredControlIds)
       const verticalScores = modelo?.verticales.map((vertical) => {
         const verticalControls = loteControls.filter((control) => control.verticalId === vertical.id)
         const verticalControlIds = new Set(verticalControls.map((control) => control.id))
@@ -1553,12 +1152,11 @@ export function DashboardContent() {
       globalCounts,
       analystCounts,
       assignedLotCounts,
-      analystLoteScores,
+      analystLoteCount,
       supervisorLoteSummaries,
       supervisorAnalystSummaries,
       daysToCycleClose: getDaysUntil(activeCycle.fechaFin),
       coveragePct,
-      verticals,
       activeCycleYear: activeCycle.fechaInicio.slice(0, 4),
       progressLabel: `${globalCounts.started}/${globalCounts.total || 0}`,
     }
@@ -1569,213 +1167,81 @@ export function DashboardContent() {
     const ceoCounts = metrics.globalCounts
     const analystCounts = metrics.analystCounts
 
-    const analystScoreData = buildScoreData(metrics.analystControls, metrics.verticals)
-    const globalScoreData = buildScoreData(metrics.allControls, metrics.verticals)
-
     return {
       analista: {
         cards: [
           {
             title: "Controles Asignados",
             value: analystCounts.total,
-            icon: ClipboardCheck,
-            description: "",
-            delta: `${analystCounts.started}/${analystCounts.total || 0}`,
             tone: "neutral",
           },
           {
             title: "En curso",
             value: analystCounts.inCourse,
-            icon: Activity,
-            description: "",
-            delta: "curso",
             tone: "primary",
           },
           {
             title: "Terminados",
             value: analystCounts.completed,
-            icon: CheckCircle2,
-            description: "",
-            delta: "cierre",
             tone: "success",
           },
           {
             title: "Pendientes",
             value: analystCounts.pending,
-            icon: Clock,
-            description: "",
-            delta: "pendiente",
             tone: "danger",
           },
         ],
-        progressData: buildProgressData(analystCounts),
-        scoreData: analystScoreData,
-        pipelineData: buildPipelineData(analystCounts),
-        timelineData: buildTimelineData(analystCounts),
-        radarData: buildRadarData(analystCounts, metrics.coveragePct),
-        insights: [
-          {
-            title: "Siguiente accion",
-            value: "Resolver en curso",
-            description: "Mantener ritmo sobre controles con evidencia ya levantada antes de iniciar nuevos pendientes.",
-            icon: ArrowUpRight,
-            tone: "primary",
-          },
-          {
-            title: "Riesgo personal",
-            value: `${analystCounts.risk} senales`,
-            description: "Pendientes o score bajo que pueden afectar el cierre del ciclo.",
-            icon: ShieldAlert,
-            tone: analystCounts.risk ? "warning" : "success",
-          },
-          {
-            title: "Calidad de ejecucion",
-            value: `${analystCounts.score}%`,
-            description: "Promedio actual del trabajo iniciado por el analista.",
-            icon: Activity,
-            tone: analystCounts.score >= 80 ? "success" : "danger",
-          },
-        ],
-        chartTitle: "Flujo de trabajo del analista",
-        chartSubtitle: "Lectura tactica de pendientes, avances y cierres propios.",
-        radarTitle: "Perfil de ejecucion personal",
       },
       supervisor: {
         cards: [
           {
             title: "Avance Equipo",
             value: `${supervisorCounts.progressPct}%`,
-            icon: Gauge,
-            description: "Auditorias iniciadas del ciclo",
-            delta: metrics.progressLabel,
             tone: "primary",
           },
           {
             title: "Lotes Abiertos",
             value: metrics.activeLotes.filter((lote) => lote.estado === "abierto").length,
-            icon: Layers,
-            description: "Frentes operativos activos",
-            delta: "en control",
             tone: "success",
           },
           {
             title: "Pendientes",
             value: supervisorCounts.pending,
-            icon: Clock,
-            description: "Controles sin iniciar",
-            delta: "bloqueos",
             tone: supervisorCounts.pending ? "warning" : "success",
           },
           {
             title: "Score Equipo",
             value: `${supervisorCounts.score}%`,
-            icon: TrendingUp,
-            description: "Promedio consolidado",
-            delta: "ciclo",
             tone: supervisorCounts.score >= 80 ? "success" : "warning",
           },
         ],
-        progressData: buildProgressData(supervisorCounts),
-        scoreData: globalScoreData,
-        pipelineData: buildPipelineData(supervisorCounts),
-        timelineData: buildTimelineData(supervisorCounts),
-        radarData: buildRadarData(supervisorCounts, metrics.coveragePct),
-        insights: [
-          {
-            title: "Cuello de botella",
-            value: `${supervisorCounts.pending} pendientes`,
-            description: "Redistribuir atencion sobre controles no iniciados antes de que impacten el cierre.",
-            icon: AlertTriangle,
-            tone: supervisorCounts.pending ? "warning" : "success",
-          },
-          {
-            title: "Equipo activo",
-            value: `${users.filter((user) => user.role === "auditor").length} auditores`,
-            description: "Capacidad disponible para cerrar el ciclo activo.",
-            icon: Users,
-            tone: "primary",
-          },
-          {
-            title: "Prioridad vertical",
-            value: globalScoreData.sort((a, b) => a.score - b.score)[0]?.name || "Sin datos",
-            description: "Vertical con menor score relativo dentro del ciclo.",
-            icon: Target,
-            tone: "danger",
-          },
-        ],
-        chartTitle: "Flujo operativo del equipo",
-        chartSubtitle: "Avance de auditorias y calidad del ciclo por semana.",
-        radarTitle: "Matriz de control operativo",
       },
       ceo: {
         cards: [
           {
             title: "Cobertura Ciclo",
             value: `${metrics.coveragePct}%`,
-            icon: Building2,
-            description: "Unidades con lote activo",
-            delta: `${metrics.activeLotes.length} lotes`,
             tone: "primary",
           },
           {
             title: "Progreso General",
             value: metrics.progressLabel,
-            icon: LineChart,
-            description: "Auditorias ya iniciadas",
-            delta: `${ceoCounts.progressPct}%`,
             tone: "success",
           },
           {
             title: "Score Ejecutivo",
             value: `${ceoCounts.score}%`,
-            icon: Crown,
-            description: "Salud agregada del ciclo",
-            delta: "board view",
             tone: ceoCounts.score >= 80 ? "success" : "warning",
           },
           {
             title: "Riesgo Residual",
             value: ceoCounts.risk,
-            icon: ShieldAlert,
-            description: "Pendientes o scores criticos",
-            delta: "watchlist",
             tone: ceoCounts.risk ? "danger" : "success",
           },
         ],
-        progressData: buildProgressData(ceoCounts),
-        scoreData: globalScoreData,
-        pipelineData: buildPipelineData(ceoCounts),
-        timelineData: buildTimelineData(ceoCounts),
-        radarData: buildRadarData(ceoCounts, metrics.coveragePct),
-        insights: [
-          {
-            title: "Decision clave",
-            value: "Acelerar pendientes",
-            description: "La cobertura esta activa, pero el valor ejecutivo depende de iniciar los controles restantes.",
-            icon: ArrowUpRight,
-            tone: "primary",
-          },
-          {
-            title: "Exposicion",
-            value: `${ceoCounts.risk} senales`,
-            description: "Indicador agregado para seguimiento de comite.",
-            icon: ShieldAlert,
-            tone: ceoCounts.risk ? "danger" : "success",
-          },
-          {
-            title: "Tendencia",
-            value: `${ceoCounts.score}% score`,
-            description: "Calidad consolidada de los controles evaluados.",
-            icon: BarChart3,
-            tone: ceoCounts.score >= 80 ? "success" : "warning",
-          },
-        ],
-        chartTitle: "Pulso ejecutivo del ciclo",
-        chartSubtitle: "Avance, calidad y riesgo para lectura de direccion.",
-        radarTitle: "Indice estrategico de auditoria",
       },
     }
-  }, [metrics, users])
+  }, [metrics])
 
   const dashboardView: DashboardView = isAuditor ? "analista" : isSupervisor ? "supervisor" : activeView
   const activeDashboard = roleDashboards[dashboardView]
@@ -1803,7 +1269,7 @@ export function DashboardContent() {
         )}
 
         <section className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-          <AnalystProgressPanel counts={metrics.assignedLotCounts} loteCount={metrics.analystLoteScores.length} />
+          <AnalystProgressPanel counts={metrics.assignedLotCounts} loteCount={metrics.analystLoteCount} />
 
           <Card className="overflow-hidden border border-border/70 bg-card py-0 shadow-none hover:shadow-none">
             <CardContent className="flex h-full min-h-[5.25rem] flex-col justify-center px-4 py-3">
@@ -1825,12 +1291,6 @@ export function DashboardContent() {
           {activeDashboard.cards.map((stat) => (
             <KpiCard key={stat.title} stat={stat} />
           ))}
-        </section>
-
-        <section>
-          <AnalystUnitScore
-            lotes={metrics.analystLoteScores}
-          />
         </section>
 
         <Card className="border-border/70 bg-card py-0 shadow-none hover:shadow-none">
@@ -1911,7 +1371,7 @@ export function DashboardContent() {
           />
         </section>
 
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,0.72fr)]">
+        <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <SupervisorFocusPanel
             lotes={metrics.supervisorLoteSummaries}
             analysts={metrics.supervisorAnalystSummaries}
@@ -1929,10 +1389,7 @@ export function DashboardContent() {
 
         <SupervisorLoteProgress lotes={metrics.supervisorLoteSummaries} />
 
-        <div className="grid grid-cols-1 gap-5">
-          <SupervisorUnitScores lotes={metrics.supervisorLoteSummaries} />
-          <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
-        </div>
+        <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
 
         <SupervisorRiskMonitor lotes={metrics.supervisorLoteSummaries} daysToClose={metrics.daysToCycleClose} />
       </div>
@@ -1968,10 +1425,7 @@ export function DashboardContent() {
         />
       </section>
 
-      <div className="grid grid-cols-1 gap-5">
-        <SupervisorUnitScores lotes={metrics.supervisorLoteSummaries} />
-        <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
-      </div>
+      <SupervisorNonCompliance lotes={metrics.supervisorLoteSummaries} />
     </div>
   )
 }

@@ -89,15 +89,28 @@ function getLoteVerticalesCompletas(lote: Lote, loteVerticalesData: LoteVertical
   }) ?? existentes
 }
 
-function controlMatches(control: Control, searchTerm: string, filterEstado: string) {
-  const normalized = searchTerm.toLowerCase()
-  const matchesSearch =
-    control.identificador.toLowerCase().includes(normalized) ||
-    (control.proceso || "").toLowerCase().includes(normalized) ||
-    (control.subproceso || "").toLowerCase().includes(normalized)
+function matchesControlEstado(estado: string, filterEstado: string) {
+  if (filterEstado === "all") return true
+  if (filterEstado === "terminado") return estado === "terminado" || estado === "terminada"
+  if (filterEstado === "en_curso") return estado === "en_curso" || estado === "en_replica"
 
-  const matchesEstado = filterEstado === "all" || control.estado === filterEstado
-  return matchesSearch && matchesEstado
+  return estado === filterEstado
+}
+
+function controlMatches(control: Control, normalizedSearch: string, filterEstado: string) {
+  const searchableFields = [
+    control.identificador,
+    control.descripcion,
+    control.etiqueta,
+    control.proceso,
+    control.subproceso,
+    control.producto,
+    ...(control.productosVinculados ?? []),
+  ]
+  const matchesSearch = normalizedSearch.length === 0 ||
+    searchableFields.some((value) => value?.toLowerCase().includes(normalizedSearch))
+
+  return matchesSearch && matchesControlEstado(control.estado, filterEstado)
 }
 
 interface EvaluacionesContentProps {
@@ -169,25 +182,31 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
     .filter((lote) => lote.estado === "abierto")
     .flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
 
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
+  const hasActiveControlFilters = normalizedSearchTerm.length > 0 || filterEstado !== "all"
   const lotesFiltrados = lotesConDatos
     .map((lote) => {
       const loteCoincide =
-        lote.unidadNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lote.modeloNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        `ciclo ${lote.ciclo}`.includes(searchTerm.toLowerCase())
+        normalizedSearchTerm.length === 0 ||
+        lote.unidadNombre.toLowerCase().includes(normalizedSearchTerm) ||
+        lote.modeloNombre.toLowerCase().includes(normalizedSearchTerm) ||
+        `ciclo ${lote.ciclo}`.includes(normalizedSearchTerm)
+      const loteVerticalesFiltradas = lote.loteVerticales
+        .map((lv) => ({
+          ...lv,
+          controles: loteCoincide
+            ? lv.controles.filter((control) => matchesControlEstado(control.estado, filterEstado))
+            : lv.controles.filter((control) => controlMatches(control, normalizedSearchTerm, filterEstado)),
+        }))
+        .filter((lv) => !hasActiveControlFilters || lv.controles.length > 0)
 
       return {
         ...lote,
-        loteVerticales: lote.loteVerticales.map((lv) => ({
-          ...lv,
-          controles: loteCoincide
-            ? lv.controles.filter((control) => filterEstado === "all" || control.estado === filterEstado)
-            : lv.controles.filter((control) => controlMatches(control, searchTerm, filterEstado)),
-        })),
+        loteVerticales: loteVerticalesFiltradas,
         loteCoincide,
       }
     })
-    .filter((lote) => lote.loteCoincide || lote.loteVerticales.some((lv) => lv.controles.length > 0))
+    .filter((lote) => (!hasActiveControlFilters && lote.loteCoincide) || lote.loteVerticales.some((lv) => lv.controles.length > 0))
 
   const stats = {
     total: controles.length,
@@ -490,7 +509,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
             footer: "Formato de informe ejecutivo de control de calidad",
           },
           {
-            eyebrow: "Resumen ejecutivo",
+            eyebrow: "Resumen de Controles",
             title: "Resultado por vertical",
             subtitle: "Aporte ponderado de cada vertical al resultado final.",
             table: {
@@ -505,7 +524,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
             footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote.año}`,
           },
           {
-            eyebrow: "Detalle de controles",
+            eyebrow: "Resumen de la Unidad de Negocio",
             title: "Controles con menor desempeno",
             subtitle: "Priorizacion de hallazgos y seguimientos segun score disponible.",
             bullets: criticalControls.length
@@ -545,7 +564,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
               <div>
                 <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total Controles</p>
+                <p className="text-sm text-muted-foreground">Total de Controles</p>
               </div>
             </CardContent>
           </Card>
