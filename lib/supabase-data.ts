@@ -705,6 +705,26 @@ export async function updateUserProfile(id: string, input: { role?: User["role"]
   if (error) throw error
 }
 
+export async function assignUserPassword(id: string, password: string) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error("No se encontro una sesion valida.")
+
+  const response = await fetch(`/api/users/${id}/password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ password }),
+  })
+  const result = (await response.json().catch(() => null)) as { error?: string } | null
+
+  if (!response.ok) {
+    throw new Error(result?.error || "No se pudo asignar la contrasena.")
+  }
+}
+
 export async function updateOwnProfile(input: { name: string; company?: string; cargo?: string; avatar?: string | null }) {
   const profile = await getCurrentProfile()
   const { error } = await supabase

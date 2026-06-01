@@ -20,6 +20,7 @@ import {
   Trash2,
   Download,
   Shield,
+  KeyRound,
 } from "lucide-react"
 import {
   Table,
@@ -58,6 +59,7 @@ import {
   createBusinessUnit,
   createCycle,
   createUserProfile,
+  assignUserPassword,
   deleteBusinessUnit,
   updateBusinessUnit,
   updateThresholds,
@@ -97,6 +99,11 @@ export function AjustesContent() {
   const [userRole, setUserRole] = useState<"admin" | "supervisor" | "auditor" | "auditado">("auditor")
   const [userError, setUserError] = useState<string | null>(null)
   const [isSavingUser, setIsSavingUser] = useState(false)
+  const [passwordUser, setPasswordUser] = useState<typeof users[number] | null>(null)
+  const [assignedPassword, setAssignedPassword] = useState("")
+  const [assignedPasswordConfirm, setAssignedPasswordConfirm] = useState("")
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [newCycleYear, setNewCycleYear] = useState("2026")
   const [newCycleBimester, setNewCycleBimester] = useState("1")
   const [isCycleOpen, setIsCycleOpen] = useState(false)
@@ -225,6 +232,37 @@ export function AjustesContent() {
   const handleUpdateUserRole = async (id: string, role: "admin" | "supervisor" | "auditor" | "auditado") => {
     await updateUserProfile(id, { role })
     await refresh()
+  }
+
+  const resetPasswordForm = () => {
+    setPasswordUser(null)
+    setAssignedPassword("")
+    setAssignedPasswordConfirm("")
+    setPasswordError(null)
+  }
+
+  const handleAssignPassword = async () => {
+    if (!passwordUser) return
+
+    setPasswordError(null)
+    if (assignedPassword.length < 6) {
+      setPasswordError("La contrasena debe tener al menos 6 caracteres.")
+      return
+    }
+    if (assignedPassword !== assignedPasswordConfirm) {
+      setPasswordError("Las contrasenas no coinciden.")
+      return
+    }
+
+    setIsSavingPassword(true)
+    try {
+      await assignUserPassword(passwordUser.id, assignedPassword)
+      resetPasswordForm()
+    } catch (submitError) {
+      setPasswordError(getErrorMessage(submitError, "No se pudo asignar la contrasena."))
+    } finally {
+      setIsSavingPassword(false)
+    }
   }
 
   const resetCycleForm = () => {
@@ -471,6 +509,10 @@ export function AjustesContent() {
                               <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
                                 {user.role === "auditor" ? "Pasar a supervisor" : "Pasar a auditor"}
                               </DropdownMenuItem>
+                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => setPasswordUser(user)}>
+                                <KeyRound className="h-4 w-4 mr-2" />
+                                Asignar contrasena
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem disabled={!canManageUsers} className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -485,6 +527,54 @@ export function AjustesContent() {
               </Table>
             </CardContent>
           </Card>
+          <Dialog
+            open={Boolean(passwordUser)}
+            onOpenChange={(open) => {
+              if (!open) resetPasswordForm()
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Asignar contrasena</DialogTitle>
+                <DialogDescription>
+                  Define una nueva contrasena para {passwordUser?.name}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="assigned-password">Nueva contrasena</Label>
+                  <Input
+                    id="assigned-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={assignedPassword}
+                    onChange={(event) => setAssignedPassword(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assigned-password-confirm">Confirmar contrasena</Label>
+                  <Input
+                    id="assigned-password-confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    value={assignedPasswordConfirm}
+                    onChange={(event) => setAssignedPasswordConfirm(event.target.value)}
+                  />
+                </div>
+                {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                  <Button variant="outline" onClick={resetPasswordForm}>Cancelar</Button>
+                  <Button
+                    className="bg-primary"
+                    onClick={handleAssignPassword}
+                    disabled={isSavingPassword || !assignedPassword || !assignedPasswordConfirm}
+                  >
+                    {isSavingPassword ? "Guardando..." : "Asignar contrasena"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           </TabsContent>
         )}
 
