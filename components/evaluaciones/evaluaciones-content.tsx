@@ -251,6 +251,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
           { value: "Respuesta", styleId: "GreenHeaderCenter" },
           { value: "Personas auditadas", styleId: "GreenHeaderCenter" },
           { value: "Cargo", styleId: "GreenHeaderCenter" },
+          { value: "Área", styleId: "GreenHeaderCenter" },
           { value: "Comentario / hallazgo", styleId: "GreenHeaderCenter" },
         ],
         ...lote.loteVerticales.flatMap((loteVertical) => {
@@ -267,6 +268,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                 { value: answer?.valor ? formatEstado(answer.valor) : "Sin responder", styleId: "Bordered" },
                 { value: answer?.personasAuditadas.filter(Boolean).join("\n") ?? "", styleId: "Bordered" },
                 { value: answer?.cargos.filter(Boolean).join("\n") ?? "", styleId: "Bordered" },
+                { value: answer?.areas.filter(Boolean).join("\n") ?? "", styleId: "Bordered" },
                 { value: answer?.comentario ?? "", styleId: "Bordered" },
               ]
             })
@@ -298,6 +300,10 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
       const getAnswerRoles = (control: Control) => {
         const answers = answersByControl.get(control.id) ?? []
         return Array.from(new Set(answers.flatMap((answer) => answer.cargos).filter(Boolean))).join("\n")
+      }
+      const getAnswerAreas = (control: Control) => {
+        const answers = answersByControl.get(control.id) ?? []
+        return Array.from(new Set(answers.flatMap((answer) => answer.areas).filter(Boolean))).join("\n")
       }
       const buildEvaluationSheet = (
         sheetName: string,
@@ -467,7 +473,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               { value: control.proceso ?? control.identificador, styleId: "Bordered" },
               { value: control.subprocesos?.join("\n") || control.subproceso || "", styleId: "Bordered" },
               { value: "", styleId: "Bordered" },
-              { value: "", styleId: "Bordered" },
+              { value: getAnswerAreas(control), styleId: "Bordered" },
               { value: formatEstado(control.estado), styleId: "Bordered" },
               { value: [getAnswerPeople(control), getAnswerRoles(control)].filter(Boolean).join("\n"), styleId: "Bordered" },
               { value: getAuditorName(control), styleId: "Bordered" },

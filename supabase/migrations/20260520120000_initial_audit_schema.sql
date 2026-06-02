@@ -220,6 +220,7 @@ create table if not exists public.answers (
   comment text,
   audited_people text[] not null default '{}',
   audited_roles text[] not null default '{}',
+  audited_areas text[] not null default '{}',
   answered_at timestamptz not null default now(),
   auditor_id uuid not null references public.users(id) on delete restrict,
   created_at timestamptz not null default now(),

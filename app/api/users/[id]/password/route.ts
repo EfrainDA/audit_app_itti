@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
@@ -30,7 +31,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-    return errorResponse("Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.", 500)
+    return errorResponse("Falta configurar SUPABASE_SECRET_KEY en el servidor.", 500)
+  }
+  if (supabaseServiceRoleKey.startsWith("sb_service_role_")) {
+    return errorResponse(
+      "La clave administrativa no es valida. Usa la Secret key con prefijo sb_secret_ desde Supabase > Settings > API Keys.",
+      500,
+    )
   }
 
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")

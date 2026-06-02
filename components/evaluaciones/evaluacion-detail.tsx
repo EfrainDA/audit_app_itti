@@ -56,6 +56,8 @@ interface Respuesta {
   valor: RespuestaValor
   personasAuditadas: string[]
   cargos: string[]
+  areas: string[]
+  fechaRespuesta?: string
   comentario: string
 }
 
@@ -64,6 +66,7 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
   valor: null,
   personasAuditadas: [""],
   cargos: [""],
+  areas: [""],
   comentario: "",
 })
 
@@ -76,6 +79,14 @@ const respuestaValorLabels: Record<Exclude<RespuestaValor, null>, string> = {
 
 const getRespuestaValorLabel = (valor: RespuestaValor) =>
   valor ? respuestaValorLabels[valor] : "Sin responder"
+
+const formatFechaRespuesta = (fechaRespuesta?: string) => {
+  if (!fechaRespuesta) return "Sin responder"
+  return new Date(fechaRespuesta).toLocaleString("es-PY", {
+    dateStyle: "short",
+    timeStyle: "short",
+  })
+}
 
 const maxEvidenceFiles = 3
 const evidenceFileAccept = [
@@ -150,6 +161,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                 valor: answer.valor,
                 personasAuditadas: answer.personasAuditadas,
                 cargos: answer.cargos,
+                areas: answer.areas,
+                fechaRespuesta: answer.fechaRespuesta,
                 comentario: answer.comentario,
               },
             ]),
@@ -176,6 +189,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
           comentario: respuesta.comentario,
           personasAuditadas: respuesta.personasAuditadas,
           cargos: respuesta.cargos,
+          areas: respuesta.areas,
+          fechaRespuesta: respuesta.fechaRespuesta,
         })),
       )
         .then(() => setAutoSaveStatus("saved"))
@@ -212,6 +227,10 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         ...createEmptyRespuesta(parametroId),
         ...prev[parametroId],
         valor,
+        fechaRespuesta:
+          prev[parametroId]?.valor === valor && prev[parametroId]?.fechaRespuesta
+            ? prev[parametroId].fechaRespuesta
+            : new Date().toISOString(),
       },
     }))
   }
@@ -229,7 +248,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   const handleSetRespuestaListItem = (
     parametroId: string,
-    field: "personasAuditadas" | "cargos",
+    field: "personasAuditadas" | "cargos" | "areas",
     index: number,
     value: string
   ) => {
@@ -251,7 +270,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     })
   }
 
-  const handleAddRespuestaListItem = (parametroId: string, field: "personasAuditadas" | "cargos") => {
+  const handleAddRespuestaListItem = (parametroId: string, field: "personasAuditadas" | "cargos" | "areas") => {
     setRespuestas((prev) => {
       const current = {
         ...createEmptyRespuesta(parametroId),
@@ -270,7 +289,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   const handleRemoveRespuestaListItem = (
     parametroId: string,
-    field: "personasAuditadas" | "cargos",
+    field: "personasAuditadas" | "cargos" | "areas",
     index: number
   ) => {
     setRespuestas((prev) => {
@@ -299,6 +318,8 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         comentario: respuesta.comentario,
         personasAuditadas: respuesta.personasAuditadas,
         cargos: respuesta.cargos,
+        areas: respuesta.areas,
+        fechaRespuesta: respuesta.fechaRespuesta,
       }))
 
   const getAnsweredParamsWithoutComment = () =>
@@ -615,7 +636,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                             </p>
                           </div>
                         )}
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-3">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label className="text-xs font-semibold text-muted-foreground">Personas auditadas</Label>
@@ -696,6 +717,50 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                                       size="icon"
                                       className="mt-1 text-muted-foreground hover:text-destructive"
                                       onClick={() => handleRemoveRespuestaListItem(parametro.id, "cargos", cargoIndex)}
+                                      disabled={!canEditEvaluation}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs font-semibold text-muted-foreground">Área</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => handleAddRespuestaListItem(parametro.id, "areas")}
+                                disabled={!canEditEvaluation}
+                              >
+                                <Plus className="mr-1 h-3 w-3" />
+                                Agregar
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {respuesta.areas.map((area, areaIndex) => (
+                                <div key={`area-${parametro.id}-${areaIndex}`} className="flex gap-2">
+                                  <Textarea
+                                    placeholder="Área..."
+                                    className="min-h-[42px] border-border bg-background"
+                                    value={area}
+                                    onChange={(e) =>
+                                      handleSetRespuestaListItem(parametro.id, "areas", areaIndex, e.target.value)
+                                    }
+                                    disabled={!canEditEvaluation}
+                                  />
+                                  {respuesta.areas.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="mt-1 text-muted-foreground hover:text-destructive"
+                                      onClick={() => handleRemoveRespuestaListItem(parametro.id, "areas", areaIndex)}
                                       disabled={!canEditEvaluation}
                                     >
                                       <Trash2 className="h-4 w-4" />
@@ -846,6 +911,10 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                           <AlertCircle className="h-3.5 w-3.5" />
                           N/A
                         </Button>
+                        <div className="mt-1 border-t border-border/60 px-1 pt-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Respondido</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{formatFechaRespuesta(respuesta.fechaRespuesta)}</p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

@@ -55,6 +55,8 @@ export type EvaluationAnswerInput = {
   comentario?: string
   personasAuditadas: string[]
   cargos: string[]
+  areas: string[]
+  fechaRespuesta?: string
 }
 
 type DbUser = {
@@ -181,6 +183,7 @@ type DbAnswer = {
   comment: string | null
   audited_people: string[] | null
   audited_roles: string[] | null
+  audited_areas: string[] | null
   answered_at: string
   auditor_id: string
   answer_evidences?: { file_name: string | null; file_url: string }[]
@@ -194,6 +197,12 @@ type DbNotification = {
   type: Notificacion["tipo"]
   read: boolean
   created_at: string
+}
+
+function isMissingAuditedAreasColumn(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const record = error as Record<string, unknown>
+  return record.code === "42703" || (typeof record.message === "string" && record.message.includes("audited_areas"))
 }
 
 function mapParameter(parameter: DbParameter): Parametro {
@@ -1293,10 +1302,20 @@ export async function deleteControl(id: string) {
 
 export async function fetchAnswersForControl(controlId: string) {
   await assertCanReadControl(controlId)
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("answers")
-    .select("parameter_id,value,comment,audited_people,audited_roles,answer_evidences(file_name,file_url)")
+    .select("parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url)")
     .eq("control_id", controlId)
+
+  if (isMissingAuditedAreasColumn(error)) {
+    const fallbackResult = await supabase
+      .from("answers")
+      .select("parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url)")
+      .eq("control_id", controlId)
+
+    data = fallbackResult.data
+    error = fallbackResult.error
+  }
 
   if (error) throw error
 
@@ -1306,6 +1325,8 @@ export async function fetchAnswersForControl(controlId: string) {
     comentario: (answer.comment as string | null) ?? "",
     personasAuditadas: ((answer.audited_people as string[] | null) ?? []).length ? (answer.audited_people as string[]) : [""],
     cargos: ((answer.audited_roles as string[] | null) ?? []).length ? (answer.audited_roles as string[]) : [""],
+    areas: ((answer.audited_areas as string[] | null) ?? []).length ? (answer.audited_areas as string[]) : [""],
+    fechaRespuesta: answer.answered_at as string,
     evidencias: ((answer.answer_evidences as DbAnswer["answer_evidences"]) ?? []).map((evidence) => evidence.file_name || evidence.file_url),
   }))
 }
@@ -1418,7 +1439,7 @@ export async function saveEvaluationDraft(controlId: string, answers: Evaluation
 
   if (!answers.length) return
 
-  const { error } = await supabase.from("answers").upsert(
+  const buildRows = (includeAreas: boolean) =>
     answers.map((answer) => ({
       control_id: controlId,
       parameter_id: answer.parametroId,
@@ -1426,11 +1447,23 @@ export async function saveEvaluationDraft(controlId: string, answers: Evaluation
       comment: answer.comentario?.trim() || null,
       audited_people: answer.personasAuditadas.map((item) => item.trim()).filter(Boolean),
       audited_roles: answer.cargos.map((item) => item.trim()).filter(Boolean),
+      ...(includeAreas ? { audited_areas: answer.areas.map((item) => item.trim()).filter(Boolean) } : {}),
       auditor_id: auditorId,
-      answered_at: new Date().toISOString(),
-    })),
+      answered_at: answer.fechaRespuesta ?? new Date().toISOString(),
+    }))
+
+  let { error } = await supabase.from("answers").upsert(
+    buildRows(true),
     { onConflict: "control_id,parameter_id" },
   )
+
+  if (isMissingAuditedAreasColumn(error)) {
+    const fallbackResult = await supabase.from("answers").upsert(
+      buildRows(false),
+      { onConflict: "control_id,parameter_id" },
+    )
+    error = fallbackResult.error
+  }
 
   if (error) throw error
 }
