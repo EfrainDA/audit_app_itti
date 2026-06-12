@@ -1,7 +1,8 @@
-﻿"use client"
+"use client"
 
 import { useState } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useRouter } from "next/navigation"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,7 +13,6 @@ import {
   Search,
   Calendar,
   Building2,
-  User,
   Lock,
   Unlock,
   Download,
@@ -34,7 +34,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -47,16 +46,15 @@ import {
   getEstadoBadgeColor,
   formatEstado,
   isCountableLote,
-  type Lote,
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
-import { LoteDetail } from "./lote-detail"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { downloadCsv, downloadXlsx } from "@/lib/export"
 import { updateLotStatus } from "@/lib/supabase-data"
 
 export function PlanificacionContent() {
+  const router = useRouter()
   const { data, error: dataError, refresh } = useAppData()
   const { appUser } = useAuth()
   const isAuditor = appUser?.role === "auditor"
@@ -67,12 +65,12 @@ export function PlanificacionContent() {
   const users = data.users
   const modelos = data.modelos
   const [searchTerm, setSearchTerm] = useState("")
-  const [unidadFilter, setUnidadFilter] = useState("all")
   const [cicloFilter, setCicloFilter] = useState("all")
   const [anioFilter, setAnioFilter] = useState("all")
-  const [selectedLote, setSelectedLote] = useState<Lote | null>(null)
+  const [estadoFilter, setEstadoFilter] = useState("abierto")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
+  const [statusError, setStatusError] = useState<string | null>(null)
   const unidades = data.unidades
   const lotesComputables = lotes.filter(isCountableLote)
   const lotesDadosDeBaja = lotes.filter((lote) => lote.estado === "deprecado")
@@ -130,12 +128,12 @@ export function PlanificacionContent() {
 
   const filteredLotes = lotesConDatos.filter((lote) => {
     const matchesSearch = !normalizedSearch || lote.unidadNombre.toLowerCase().includes(normalizedSearch)
-    const matchesUnidad = unidadFilter === "all" || lote.unidadNegocioId === unidadFilter
     const matchesCiclo = cicloFilter === "all" || String(lote.ciclo) === cicloFilter
     const matchesAnio = anioFilter === "all" || String(lote.año) === anioFilter
+    const matchesEstado = estadoFilter === "all" || lote.estado === estadoFilter
     const matchesAuditor = !isAuditor || lote.auditores.includes(appUser?.id ?? "")
 
-    return matchesSearch && matchesUnidad && matchesCiclo && matchesAnio && matchesAuditor
+    return matchesSearch && matchesCiclo && matchesAnio && matchesEstado && matchesAuditor
   })
 
   const exportLotes = () => {
@@ -226,93 +224,77 @@ export function PlanificacionContent() {
   }
 
   const handleCloseLote = async (loteId: string) => {
-    await updateLotStatus(loteId, "cerrado")
-    await refresh()
+    setStatusError(null)
+    try {
+      await updateLotStatus(loteId, "cerrado")
+      await refresh()
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "No se pudo cerrar el lote.")
+    }
   }
 
   const handleDeprecateLote = async (loteId: string) => {
     if (!window.confirm("Dar de baja este lote? Quedara fuera de metricas y evaluaciones.")) return
-    await updateLotStatus(loteId, "deprecado")
-    await refresh()
+    setStatusError(null)
+    try {
+      await updateLotStatus(loteId, "deprecado")
+      await refresh()
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "No se pudo dar de baja el lote.")
+    }
   }
 
   const handleReactivateLote = async (loteId: string) => {
-    await updateLotStatus(loteId, "abierto")
-    await refresh()
+    setStatusError(null)
+    try {
+      await updateLotStatus(loteId, "abierto")
+      await refresh()
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "No se pudo reactivar el lote.")
+    }
   }
 
-  const selectedLoteConDatos = selectedLote ? lotesConDatos.find((lote) => lote.id === selectedLote.id) : null
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
+      {statusError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{statusError}</p>}
       <Tabs value={isAuditor ? "lotes" : activeTab} onValueChange={setActiveTab} className="w-full">
-        {false && (
-        <div className="hidden">
-          {!isAuditor && (
-            <TabsList className="w-full bg-secondary sm:w-fit">
-              <TabsTrigger value="lotes">Lotes</TabsTrigger>
-              <TabsTrigger value="calendario">Calendario</TabsTrigger>
-            </TabsList>
-          )}
-          <div className={isAuditor ? "hidden" : "flex flex-col gap-2 sm:flex-row"}>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className={canManageLots ? "w-full bg-primary hover:bg-primary/90 sm:w-auto" : "hidden"}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Lote
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
-                <DialogHeader>
-                  <DialogTitle>Crear Nuevo Lote</DialogTitle>
-                  <DialogDescription>
-                    Define el ciclo de auditoría para una unidad de negocio
-                  </DialogDescription>
-                </DialogHeader>
-                <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-        )}
-
-        <TabsContent value="lotes" className="space-y-6">
+        <TabsContent value="lotes" className="space-y-4">
           {/* Stats */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
+            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.length}</p>
-                  <p className="text-sm text-muted-foreground">Total de Lotes</p>
+                  <p className="text-xs text-muted-foreground">Total de Lotes</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
+            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Unlock} tone="success" size="md" />
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "abierto").length}</p>
-                  <p className="text-sm text-muted-foreground">Abiertos</p>
+                  <p className="text-xs text-muted-foreground">Abiertos</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
+            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Lock} tone="neutral" size="md" />
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "cerrado").length}</p>
-                  <p className="text-sm text-muted-foreground">Cerrados</p>
+                  <p className="text-xs text-muted-foreground">Cerrados</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-24 gap-0 border-destructive/15 bg-card py-0 dark:border-destructive/25">
+            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Lock} tone="danger" size="md" />
                 <div>
                   <p className="text-2xl font-semibold leading-none tracking-tight">{lotesDadosDeBaja.length}</p>
-                  <p className="text-sm text-muted-foreground">Dados de baja</p>
+                  <p className="text-xs text-muted-foreground">Dados de baja</p>
                 </div>
               </CardContent>
             </Card>
@@ -320,18 +302,29 @@ export function PlanificacionContent() {
 
           {/* Search */}
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(180px,1.4fr)_minmax(150px,0.9fr)_minmax(130px,0.7fr)_minmax(120px,0.6fr)] xl:max-w-5xl">
-              <div className="relative w-full">
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:w-fit lg:grid-cols-[280px_150px_120px_110px]">
+              <div className="relative w-full lg:w-[280px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por unidad de negocio..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-secondary border-border"
+                  className="pl-9 bg-card border-border/70"
                 />
               </div>
-              <Select value={unidadFilter} onValueChange={setCicloFilter}>
-                <SelectTrigger className="w-full bg-secondary border-border">
+              <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                <SelectTrigger className="w-full bg-card border-border/70 lg:w-[150px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abierto">Abiertos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="cerrado">Cerrados</SelectItem>
+                  <SelectItem value="deprecado">Dados de baja</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={cicloFilter} onValueChange={setCicloFilter}>
+                <SelectTrigger className="w-full bg-card border-border/70">
                   <SelectValue placeholder="Ciclo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -344,7 +337,7 @@ export function PlanificacionContent() {
                 </SelectContent>
               </Select>
               <Select value={anioFilter} onValueChange={setAnioFilter}>
-                <SelectTrigger className="w-full bg-secondary border-border">
+                <SelectTrigger className="w-full bg-card border-border/70">
                   <SelectValue placeholder="Año" />
                 </SelectTrigger>
                 <SelectContent>
@@ -379,82 +372,78 @@ export function PlanificacionContent() {
           </div>
 
           {/* Lotes */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredLotes.map((lote) => (
               <Card
                 key={lote.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-border/50 bg-card shadow-none transition-colors hover:border-primary/50 cursor-pointer"
-                onClick={() => setSelectedLote(lote)}
+                className="min-w-0 cursor-pointer overflow-hidden rounded-lg border border-border/60 bg-card shadow-none transition-colors hover:border-primary/50"
+                onClick={() => router.push(`/planificacion/${lote.id}`)}
               >
-                <CardContent className="px-3 py-2 sm:px-5">
-                  <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left lg:flex-row lg:items-center lg:justify-between lg:pr-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex h-11 w-16 shrink-0 items-center justify-center rounded-lg overflow-hidden">
+                <CardContent className="px-3 py-3 sm:px-4">
+                  <div className="grid min-w-0 w-full grid-cols-1 gap-3 text-left md:grid-cols-[1.35fr_0.8fr_1fr_auto] md:items-center">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex h-7 w-12 shrink-0 items-center justify-center overflow-hidden rounded">
                         {lote.unidadLogo ? (
                           <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                         ) : (
-                          <div className="flex items-center justify-center w-full h-full rounded-lg border border-primary/20 bg-primary/10">
-                            <Building2 className="h-5 w-5 text-primary" />
+                          <div className="flex h-full w-full items-center justify-center rounded border border-primary/20 bg-primary/10">
+                            <Building2 className="h-4 w-4 text-primary" />
                           </div>
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold">{lote.unidadNombre}</p>
-                        <p className="truncate text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año} | {lote.modeloNombre}</p>
-                        <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                          <User className="h-3.5 w-3.5" />
-                          <span className="truncate">{lote.auditoresNombres || "Sin auditores asignados"}</span>
-                        </p>
+                        <p className="truncate font-medium">{lote.unidadNombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">{lote.modeloNombre}</p>
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
-                      <div className="flex items-center gap-4">
-                        <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedLote(lote); }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver detalle
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportSingleLote(lote); }}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Exportar Excel
-                            </DropdownMenuItem>
-                            {canManageLots && lote.estado === "abierto" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-warning">
-                                  <Lock className="h-4 w-4 mr-2" />
-                                  Cerrar Lote
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {canManageLots && lote.estado !== "deprecado" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeprecateLote(lote.id); }} className="text-destructive">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Dar de baja
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {canManageLots && lote.estado === "deprecado" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-success">
-                                  <RotateCcw className="h-4 w-4 mr-2" />
-                                  Reactivar lote
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                    <p className="text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
+                    <p className="truncate text-sm text-muted-foreground">{lote.auditoresNombres || "Sin auditores"}</p>
+                    <div className="flex items-center gap-2 md:justify-end">
+                      <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/planificacion/${lote.id}`); }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver detalle
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportSingleLote(lote); }}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Exportar Excel
+                          </DropdownMenuItem>
+                          {canManageLots && lote.estado === "abierto" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-warning">
+                                <Lock className="h-4 w-4 mr-2" />
+                                Cerrar Lote
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canManageLots && lote.estado !== "deprecado" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeprecateLote(lote.id); }} className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Dar de baja
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canManageLots && lote.estado === "deprecado" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-success">
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Reactivar lote
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardContent>
@@ -543,7 +532,7 @@ export function PlanificacionContent() {
                           {bimestre === 5 && "Septiembre - Octubre"}
                           {bimestre === 6 && "Noviembre - Diciembre"}
                         </p>
-                        <Badge className={isActive ? "bg-primary text-primary-foreground" : isPast ? "bg-muted text-muted-foreground" : "bg-secondary"}>
+                        <Badge className={isActive ? "bg-primary text-primary-foreground" : isPast ? "bg-muted text-muted-foreground" : "bg-card"}>
                           {lotesBimestre.length} lotes
                         </Badge>
                         {isActive && <p className="text-xs text-primary mt-2 font-medium">Activo</p>}
@@ -557,35 +546,6 @@ export function PlanificacionContent() {
         </TabsContent>
       </Tabs>
 
-      {/* Lote Detail Dialog */}
-      {selectedLote && (
-        <Dialog open={!!selectedLote} onOpenChange={(open) => !open && setSelectedLote(null)}>
-          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[90vw] lg:w-[70vw]">
-            <DialogHeader>
-              <div className="flex flex-col gap-3 pr-9 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-              <DialogTitle className="flex flex-wrap items-center gap-2">
-                {selectedLoteConDatos?.unidadNombre} - Ciclo {selectedLote.ciclo}
-                <Badge className={getEstadoBadgeColor(selectedLote.estado)}>
-                  {formatEstado(selectedLote.estado)}
-                </Badge>
-              </DialogTitle>
-              <DialogDescription>
-                Año {selectedLote.año}
-              </DialogDescription>
-                </div>
-                <div className="flex shrink-0 flex-col items-start gap-2 sm:mr-2 sm:mt-2 sm:flex-row sm:items-center">
-                  <Button variant="outline" size="sm" className="h-8" disabled={!selectedLoteConDatos} onClick={() => selectedLoteConDatos && exportSingleLote(selectedLoteConDatos)}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </div>
-              </div>
-            </DialogHeader>
-            <LoteDetail lote={selectedLote} onChanged={refresh} />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   )
 }

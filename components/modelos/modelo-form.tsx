@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,22 +16,24 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Trash2, GripVertical } from "lucide-react"
+import { FileText, Layers3, Plus, Trash2 } from "lucide-react"
 import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
 import type { ModeloControl } from "@/lib/data"
 
 interface ModeloFormProps {
-  onClose: () => void
+  onClose?: () => void
   onSaved?: () => Promise<void> | void
   modelo?: ModeloControl
+  redirectOnSaved?: string
+  cancelHref?: string
 }
 
 interface VerticalForm {
   id: string
   nombre: string
   peso: number
-  tipoEvaluacion: 'distribuida' | 'cascada'
+  tipoEvaluacion: "distribuida" | "cascada"
   parametros: ParametroForm[]
 }
 
@@ -53,19 +56,7 @@ function createEmptyParametro(id = Date.now().toString(), puntosBase = 100): Par
 }
 
 function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
-  if (!modelo) {
-    return [
-      {
-        id: "1",
-        nombre: "",
-        peso: 100,
-        tipoEvaluacion: "distribuida",
-        parametros: [createEmptyParametro("1", 100)],
-      },
-    ]
-  }
-
-  if (!modelo.verticales.length) {
+  if (!modelo?.verticales.length) {
     return [
       {
         id: "1",
@@ -94,7 +85,8 @@ function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
   }))
 }
 
-export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
+export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHref }: ModeloFormProps) {
+  const router = useRouter()
   const isEditing = Boolean(modelo)
   const [nombre, setNombre] = useState(modelo?.nombre ?? "")
   const [descripcion, setDescripcion] = useState(modelo?.descripcion ?? "")
@@ -102,7 +94,8 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [verticales, setVerticales] = useState<VerticalForm[]>(() => getInitialVerticales(modelo))
 
-  const totalPeso = verticales.reduce((acc, v) => acc + v.peso, 0)
+  const totalPeso = verticales.reduce((acc, vertical) => acc + vertical.peso, 0)
+  const pesoCompleto = totalPeso === 100
 
   const addVertical = () => {
     setVerticales([
@@ -119,42 +112,36 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
 
   const removeVertical = (id: string) => {
     if (verticales.length > 1) {
-      setVerticales(verticales.filter((v) => v.id !== id))
+      setVerticales(verticales.filter((vertical) => vertical.id !== id))
     }
   }
 
   const updateVertical = (id: string, field: keyof VerticalForm, value: unknown) => {
     setVerticales(
-      verticales.map((v) => (v.id === id ? { ...v, [field]: value } : v))
+      verticales.map((vertical) => (vertical.id === id ? { ...vertical, [field]: value } : vertical)),
     )
   }
 
   const addParametro = (verticalId: string) => {
     setVerticales(
-      verticales.map((v) =>
-        v.id === verticalId
+      verticales.map((vertical) =>
+        vertical.id === verticalId
           ? {
-              ...v,
-              parametros: [
-                ...v.parametros,
-                createEmptyParametro(Date.now().toString(), 0),
-              ],
+              ...vertical,
+              parametros: [...vertical.parametros, createEmptyParametro(Date.now().toString(), 0)],
             }
-          : v
-      )
+          : vertical,
+      ),
     )
   }
 
   const removeParametro = (verticalId: string, parametroId: string) => {
     setVerticales(
-      verticales.map((v) =>
-        v.id === verticalId
-          ? {
-              ...v,
-              parametros: v.parametros.filter((p) => p.id !== parametroId),
-            }
-          : v
-      )
+      verticales.map((vertical) =>
+        vertical.id === verticalId
+          ? { ...vertical, parametros: vertical.parametros.filter((parametro) => parametro.id !== parametroId) }
+          : vertical,
+      ),
     )
   }
 
@@ -162,20 +149,38 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
     verticalId: string,
     parametroId: string,
     field: keyof ParametroForm,
-    value: unknown
+    value: unknown,
   ) => {
     setVerticales(
-      verticales.map((v) =>
-        v.id === verticalId
+      verticales.map((vertical) =>
+        vertical.id === verticalId
           ? {
-              ...v,
-              parametros: v.parametros.map((p) =>
-                p.id === parametroId ? { ...p, [field]: value } : p
+              ...vertical,
+              parametros: vertical.parametros.map((parametro) =>
+                parametro.id === parametroId ? { ...parametro, [field]: value } : parametro,
               ),
             }
-          : v
-      )
+          : vertical,
+      ),
     )
+  }
+
+  const closeOrRedirect = () => {
+    if (redirectOnSaved) {
+      router.push(redirectOnSaved)
+      return
+    }
+
+    onClose?.()
+  }
+
+  const handleCancel = () => {
+    if (cancelHref) {
+      router.push(cancelHref)
+      return
+    }
+
+    onClose?.()
   }
 
   const saveModel = async (status: ControlModelInput["status"]) => {
@@ -207,7 +212,7 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
       }
 
       await onSaved?.()
-      onClose()
+      closeOrRedirect()
     } catch (submitError) {
       setError(getErrorMessage(submitError, "No se pudo guardar el modelo."))
     } finally {
@@ -216,49 +221,61 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Basic Info */}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="nombre">Nombre del Modelo *</Label>
-          <Input
-            id="nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Ecosistema Financiero V.1"
-            className="bg-secondary border-border"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="descripcion">Descripción</Label>
-          <Textarea
-            id="descripcion"
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Describe el propósito de este modelo..."
-            className="bg-secondary border-border"
-            rows={3}
-          />
-        </div>
-      </div>
-
-      {/* Verticales */}
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h3 className="font-medium">Verticales</h3>
-            <p className="text-sm text-muted-foreground">
-              Define las dimensiones de evaluación
-            </p>
+    <div className="space-y-3">
+      <section className="rounded-lg border border-border/70 bg-card p-3 shadow-none">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+            <FileText className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold">Datos base</h3>
+            <p className="text-xs text-muted-foreground">Identifica el modelo antes de construir su estructura.</p>
           </div>
-          <Badge className={totalPeso === 100 ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}>
-            Peso Total: {totalPeso}%
+        </div>
+        <div className="space-y-2.5">
+          <div className="space-y-1.5">
+            <Label htmlFor="nombre">Nombre del modelo *</Label>
+            <Input
+              id="nombre"
+              value={nombre}
+              onChange={(event) => setNombre(event.target.value)}
+              placeholder="Ej: Ecosistema Financiero V.1"
+              className="h-10 border-border bg-card"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="descripcion">Descripcion</Label>
+            <Textarea
+              id="descripcion"
+              value={descripcion}
+              onChange={(event) => setDescripcion(event.target.value)}
+              placeholder="Describe el proposito de este modelo..."
+              className="min-h-10 border-border bg-card"
+              rows={1}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2.5 rounded-lg border border-border/70 bg-card p-3 shadow-none">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+              <Layers3 className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Estructura del modelo</h3>
+              <p className="text-xs text-muted-foreground">Verticales, peso relativo y parametros evaluables.</p>
+            </div>
+          </div>
+          <Badge className={pesoCompleto ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}>
+            Peso total: {totalPeso}%
           </Badge>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2.5">
           {verticales.map((vertical, index) => (
-            <Card key={vertical.id} className="relative bg-card border-border shadow-none rounded-xl">
+            <Card key={vertical.id} className="relative rounded-lg border-border/70 bg-muted/15 py-0 shadow-none">
               <Button
                 variant="ghost"
                 size="icon"
@@ -268,89 +285,94 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-              <CardContent className="p-3 pr-11 sm:p-4 sm:pr-12">
-                <div className="flex items-start gap-3 mb-1">
-                  <GripVertical className="hidden h-5 w-5 text-muted-foreground mt-2 cursor-grab sm:block" />
-                  <div className="min-w-0 flex-1 space-y-5">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-                      <div className="space-y-2 lg:col-span-2">
-                        <Label>Nombre de la Vertical</Label>
-                        <Input
-                          value={vertical.nombre}
-                          onChange={(e) => updateVertical(vertical.id, "nombre", e.target.value)}
-                          placeholder="Ej: Producto / Servicio"
-                          className="bg-secondary border-border"
-                        />
+              <CardContent className="p-3 pr-10">
+                <div className="min-w-0 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">{vertical.nombre || "Nueva vertical"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {vertical.parametros.length}{" "}
+                          {vertical.parametros.length === 1 ? "parametro configurado" : "parametros configurados"}
+                        </p>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label>Peso (%)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={vertical.peso}
-                          onChange={(e) => updateVertical(vertical.id, "peso", parseInt(e.target.value) || 0)}
-                          className="bg-secondary border-border"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Tipo de Evaluación</Label>
-                        <Select
-                          value={vertical.tipoEvaluacion}
-                          onValueChange={(value) => updateVertical(vertical.id, "tipoEvaluacion", value)}
-                        >
-                          <SelectTrigger className="w-full bg-secondary border-border">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="distribuida">Distribuida</SelectItem>
-                            <SelectItem value="cascada">Cascada</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_7rem_13rem]">
+                    <div className="space-y-1.5">
+                      <Label>Nombre de la vertical</Label>
+                      <Input
+                        value={vertical.nombre}
+                        onChange={(event) => updateVertical(vertical.id, "nombre", event.target.value)}
+                        placeholder="Ej: Producto / Servicio"
+                        className="h-9 border-border bg-card"
+                      />
                     </div>
+                    <div className="space-y-1.5">
+                      <Label>Peso (%)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={vertical.peso}
+                        onChange={(event) => updateVertical(vertical.id, "peso", parseInt(event.target.value) || 0)}
+                        className="h-9 border-border bg-card [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Tipo</Label>
+                      <Select
+                        value={vertical.tipoEvaluacion}
+                        onValueChange={(value) => updateVertical(vertical.id, "tipoEvaluacion", value)}
+                      >
+                        <SelectTrigger className="h-9 w-full border-border bg-card">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="distribuida">Distribuida</SelectItem>
+                          <SelectItem value="cascada">Cascada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                    {/* Parámetros */}
-                    <div className="border-t border-border pt-4">
-                      <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-medium text-foreground">Parámetros</p>
-                        <Badge variant="outline" className="text-xs">
-                          Total: {vertical.parametros.reduce((acc, p) => acc + p.puntosBase, 0)} / 100 pts
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        {vertical.parametros.map((parametro) => (
-                          <div
-                            key={parametro.id}
-                            className="rounded-md border border-border/70 bg-secondary p-2"
-                          >
-                            <div className="grid min-h-[42px] grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1.7fr)_minmax(0,2fr)_96px_auto] md:gap-1.5">
+                  <div className="border-t border-border/60 pt-2.5">
+                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm font-medium text-foreground">Parametros</p>
+                      <Badge variant="outline" className="text-xs">
+                        Total: {vertical.parametros.reduce((acc, parametro) => acc + parametro.puntosBase, 0)} / 100 pts
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {vertical.parametros.map((parametro) => (
+                        <div key={parametro.id} className="rounded-md border border-border/65 bg-card p-2">
+                          <div className="grid min-h-[42px] grid-cols-1 items-start gap-2 md:grid-cols-[minmax(14rem,1fr)_minmax(24rem,2.4fr)_6rem_auto] md:gap-2">
                             <Input
                               value={parametro.nombre}
-                              onChange={(e) => updateParametro(vertical.id, parametro.id, "nombre", e.target.value)}
-                              placeholder="Nombre del parámetro"
-                              className="h-7 bg-background border-border text-sm"
+                              onChange={(event) => updateParametro(vertical.id, parametro.id, "nombre", event.target.value)}
+                              placeholder="Nombre del parametro"
+                              className="h-9 border-border bg-card text-sm"
+                            />
+                            <Textarea
+                              value={parametro.descripcion}
+                              onChange={(event) => updateParametro(vertical.id, parametro.id, "descripcion", event.target.value)}
+                              placeholder="Descripcion del parametro"
+                              className="min-h-9 border-border bg-card py-2 text-sm"
+                              rows={1}
                             />
                             <Input
-                              value={parametro.descripcion}
-                              onChange={(e) => updateParametro(vertical.id, parametro.id, "descripcion", e.target.value)}
-                              placeholder="Descripción del parámetro"
-                              className="h-7 bg-background border-border text-sm"
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={parametro.puntosBase}
+                              onChange={(event) =>
+                                updateParametro(vertical.id, parametro.id, "puntosBase", parseInt(event.target.value) || 0)
+                              }
+                              className="h-9 w-full border-border bg-card text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              placeholder="Puntaje"
                             />
-                            <div className="flex h-full items-center">
-                              <Input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={parametro.puntosBase}
-                                onChange={(e) =>
-                                  updateParametro(vertical.id, parametro.id, "puntosBase", parseInt(e.target.value) || 0)
-                                }
-                                className="h-7 w-full bg-background border-border text-center text-sm"
-                                placeholder="Puntaje"
-                              />
-                            </div>
-                            <div className="flex h-full items-center justify-between gap-1.5">
+                            <div className="flex h-9 items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
                                 <Switch
                                   checked={parametro.permiteIntermedio}
@@ -358,32 +380,26 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
                                     updateParametro(vertical.id, parametro.id, "permiteIntermedio", checked)
                                   }
                                 />
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">Intermedio</span>
+                                <span className="whitespace-nowrap text-xs text-muted-foreground">Intermedio</span>
                               </div>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-8 w-8"
                                 onClick={() => removeParametro(vertical.id, parametro.id)}
                                 disabled={vertical.parametros.length === 1}
                               >
                                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                               </Button>
                             </div>
-                            </div>
                           </div>
-                        ))}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => addParametro(vertical.id)}
-                      >
-                        <Plus className="h-3 w-3" />
-                        Agregar Parámetro
-                      </Button>
+                        </div>
+                      ))}
                     </div>
+                    <Button variant="outline" size="sm" className="mt-2 h-8" onClick={() => addParametro(vertical.id)}>
+                      <Plus className="h-3 w-3" />
+                      Agregar Parametro
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -395,23 +411,22 @@ export function ModeloForm({ onClose, onSaved, modelo }: ModeloFormProps) {
           <Plus className="h-4 w-4" />
           Agregar Vertical
         </Button>
-      </div>
+      </section>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-border">
+      <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
         {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
-        <Button variant="outline" onClick={onClose}>
-          Cancelar
+        <Button variant="outline" onClick={handleCancel}>
+          {cancelHref ? "Volver" : "Cancelar"}
         </Button>
         <Button variant="secondary" onClick={() => saveModel("borrador")} disabled={isSubmitting || !nombre}>
-          {isEditing ? "Guardar Cambios" : "Guardar como Borrador"}
+          {isEditing ? "Guardar cambios" : "Guardar como borrador"}
         </Button>
         <Button
           className="bg-primary hover:bg-primary/90"
           onClick={() => saveModel("publicado")}
           disabled={isSubmitting || !nombre || totalPeso !== 100}
         >
-          {isSubmitting ? "Guardando..." : "Publicar Modelo"}
+          {isSubmitting ? "Guardando..." : "Publicar modelo"}
         </Button>
       </div>
     </div>

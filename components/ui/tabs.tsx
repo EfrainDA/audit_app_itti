@@ -26,7 +26,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'bg-card text-muted-foreground inline-flex min-h-9 max-w-full items-center justify-start overflow-x-auto rounded-lg border border-border/70 p-[3px] shadow-none sm:w-fit sm:justify-center',
+        'inline-flex min-h-9 max-w-full items-center justify-start overflow-x-auto rounded-lg border border-border/65 bg-card p-[3px] text-muted-foreground shadow-none sm:w-fit sm:justify-center',
         className,
       )}
       {...props}
@@ -42,7 +42,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:border-primary/30 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:text-foreground dark:data-[state=active]:border-primary/35 dark:data-[state=active]:bg-primary/14 text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-semibold whitespace-nowrap transition-[color,border-color,background] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-none data-[state=active]:[&_svg]:text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-2.5 py-1 text-sm font-semibold text-foreground transition-[color,border-color,background] focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-[2px] focus-visible:ring-ring/35 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary/28 data-[state=active]:bg-primary/9 data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:[&_svg]:text-primary dark:text-muted-foreground dark:data-[state=active]:border-primary/35 dark:data-[state=active]:bg-primary/12 dark:data-[state=active]:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

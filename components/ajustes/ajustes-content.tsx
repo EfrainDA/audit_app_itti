@@ -21,6 +21,8 @@ import {
   Download,
   Shield,
   KeyRound,
+  CheckCircle2,
+  Ban,
 } from "lucide-react"
 import {
   Table,
@@ -65,10 +67,20 @@ import {
   updateThresholds,
   updateUserProfile,
   updateCycle,
+  updateCycleStatus,
+  deleteCycle,
 } from "@/lib/supabase-data"
 import { downloadCsv } from "@/lib/export"
 import { getErrorMessage } from "@/lib/error-message"
 import { supabase } from "@/lib/supabase"
+
+function getUserInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const first = parts[0]?.[0] ?? ""
+  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : ""
+
+  return `${first}${last}`.toUpperCase() || "U"
+}
 
 export function AjustesContent() {
   const { data, error: dataError, refresh } = useAppData()
@@ -83,6 +95,7 @@ export function AjustesContent() {
   const users = data.users
   const unidades = data.unidades
   const ciclos = data.ciclos
+  const lotes = data.lotes
   const umbrales = data.umbrales
   const [activeTab, setActiveTab] = useState(isAdmin ? "usuarios" : "unidades")
   const [searchTerm, setSearchTerm] = useState("")
@@ -96,6 +109,8 @@ export function AjustesContent() {
   const [isUserOpen, setIsUserOpen] = useState(false)
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
+  const [userCargo, setUserCargo] = useState("")
+  const [userArea, setUserArea] = useState("")
   const [userRole, setUserRole] = useState<"admin" | "supervisor" | "auditor" | "auditado">("auditor")
   const [userError, setUserError] = useState<string | null>(null)
   const [isSavingUser, setIsSavingUser] = useState(false)
@@ -114,6 +129,13 @@ export function AjustesContent() {
   const [thresholdError, setThresholdError] = useState<string | null>(null)
   const [isSavingThresholds, setIsSavingThresholds] = useState(false)
   const currentTab = activeTab
+  const normalizedUserSearch = searchTerm.trim().toLowerCase()
+  const filteredUsers = users.filter((user) =>
+    user.name.toLowerCase().includes(normalizedUserSearch) ||
+    user.email.toLowerCase().includes(normalizedUserSearch) ||
+    (user.cargo ?? "").toLowerCase().includes(normalizedUserSearch) ||
+    (user.area ?? "").toLowerCase().includes(normalizedUserSearch)
+  )
 
   useEffect(() => {
     if (!isAdmin && activeTab === "usuarios") {
@@ -204,6 +226,8 @@ export function AjustesContent() {
   const resetUserForm = () => {
     setUserName("")
     setUserEmail("")
+    setUserCargo("")
+    setUserArea("")
     setUserRole("auditor")
     setUserError(null)
   }
@@ -213,7 +237,7 @@ export function AjustesContent() {
     setIsSavingUser(true)
 
     try {
-      await createUserProfile({ name: userName, email: userEmail, role: userRole })
+      await createUserProfile({ name: userName, email: userEmail, role: userRole, cargo: userCargo, area: userArea })
       await refresh()
       resetUserForm()
       setIsUserOpen(false)
@@ -245,8 +269,8 @@ export function AjustesContent() {
     if (!passwordUser) return
 
     setPasswordError(null)
-    if (assignedPassword.length < 6) {
-      setPasswordError("La contrasena debe tener al menos 6 caracteres.")
+    if (assignedPassword.length < 12 || !/[A-Z]/.test(assignedPassword) || !/[a-z]/.test(assignedPassword) || !/\d/.test(assignedPassword)) {
+      setPasswordError("La contrasena debe tener al menos 12 caracteres, mayusculas, minusculas y numeros.")
       return
     }
     if (assignedPassword !== assignedPasswordConfirm) {
@@ -274,6 +298,19 @@ export function AjustesContent() {
 
   const openCreateCycle = () => {
     resetCycleForm()
+    const sortedCycles = [...ciclos].sort((first, second) => {
+      if (first.año !== second.año) return first.año - second.año
+      return first.bimestre - second.bimestre
+    })
+    const lastCycle = sortedCycles[sortedCycles.length - 1]
+    const today = new Date()
+    const fallbackYear = today.getFullYear()
+    const fallbackBimester = Math.floor(today.getMonth() / 2) + 1
+    const nextBimester = lastCycle ? lastCycle.bimestre + 1 : fallbackBimester
+    const nextYear = lastCycle ? lastCycle.año + (nextBimester > 6 ? 1 : 0) : fallbackYear
+
+    setNewCycleYear(String(nextYear))
+    setNewCycleBimester(String(nextBimester > 6 ? 1 : nextBimester))
     setIsCycleOpen(true)
   }
 
@@ -306,6 +343,16 @@ export function AjustesContent() {
     }
   }
 
+  const handleCycleAction = async (action: () => Promise<void>) => {
+    setCycleError(null)
+    try {
+      await action()
+      await refresh()
+    } catch (submitError) {
+      setCycleError(getErrorMessage(submitError, "No se pudo actualizar el ciclo."))
+    }
+  }
+
   const handleSaveThresholds = async () => {
     setThresholdError(null)
     setIsSavingThresholds(true)
@@ -333,6 +380,8 @@ export function AjustesContent() {
         nombre: user.name,
         email: user.email,
         empresa: user.company ?? "",
+        cargo: user.cargo ?? "",
+        area: user.area ?? "",
         rol: user.role,
         estado: user.status,
       })),
@@ -341,7 +390,7 @@ export function AjustesContent() {
 
   if (isAuditor) {
     return (
-      <Card className="border-border bg-card">
+      <Card className="border-border/70 bg-card py-0 shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Ajustes no disponibles</CardTitle>
           <CardDescription>Usa Preferencias para administrar tu perfil personal.</CardDescription>
@@ -351,10 +400,10 @@ export function AjustesContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
       <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`responsive-scroll flex w-full justify-start gap-1 overflow-x-auto bg-secondary sm:grid ${isAdmin ? "sm:grid-cols-4" : "sm:grid-cols-3"} sm:overflow-visible`}>
+        <TabsList className={`responsive-scroll mb-4 flex w-full justify-start gap-1 overflow-x-auto border border-border/70 bg-card sm:grid ${isAdmin ? "sm:grid-cols-4" : "sm:grid-cols-3"} sm:overflow-visible`}>
           {isAdmin && (
             <TabsTrigger value="usuarios" className="min-w-[5.5rem] flex-none flex items-center gap-2 sm:min-w-0 sm:flex-1">
               <Users className="h-4 w-4" />
@@ -378,11 +427,10 @@ export function AjustesContent() {
         {/* Usuarios Tab */}
         {isAdmin && (
           <TabsContent value="usuarios" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <Card className="border-border/70 bg-card py-0 shadow-none">
+            <CardHeader className="flex flex-col items-start justify-between gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0">
-                <CardTitle className="text-base">Gestión de Usuarios</CardTitle>
-                <CardDescription>Administra los usuarios y sus roles en el sistema</CardDescription>
+                <CardTitle className="text-base">Gestion de Usuarios</CardTitle>
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={exportUsers}>
@@ -402,7 +450,7 @@ export function AjustesContent() {
                       Nuevo Usuario
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="!w-[min(calc(100vw-2rem),42rem)] !max-w-[42rem]">
                     <DialogHeader>
                       <DialogTitle>Crear Usuario</DialogTitle>
                       <DialogDescription>
@@ -412,16 +460,26 @@ export function AjustesContent() {
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
                         <Label>Nombre Completo</Label>
-                        <Input value={userName} disabled={!canManageUsers} onChange={(event) => setUserName(event.target.value)} placeholder="Nombre del usuario" className="bg-secondary" />
+                        <Input value={userName} disabled={!canManageUsers} onChange={(event) => setUserName(event.target.value)} placeholder="Nombre del usuario" className="bg-card" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Correo Electrónico</Label>
-                        <Input value={userEmail} disabled={!canManageUsers} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-secondary" />
+                        <Label>Correo Electronico</Label>
+                        <Input value={userEmail} disabled={!canManageUsers} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-card" />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Cargo</Label>
+                          <Input value={userCargo} disabled={!canManageUsers} onChange={(event) => setUserCargo(event.target.value)} placeholder="Ej. Analista" className="bg-card" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Area</Label>
+                          <Input value={userArea} disabled={!canManageUsers} onChange={(event) => setUserArea(event.target.value)} placeholder="Ej. Operaciones" className="bg-card" />
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Rol</Label>
                         <Select value={userRole} onValueChange={(value) => setUserRole(value as typeof userRole)} disabled={!canManageUsers}>
-                          <SelectTrigger className="bg-secondary">
+                          <SelectTrigger className="bg-card">
                             <SelectValue placeholder="Selecciona un rol" />
                           </SelectTrigger>
                           <SelectContent>
@@ -444,87 +502,78 @@ export function AjustesContent() {
                 </Dialog>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="relative mb-4 w-full max-w-md">
+            <CardContent className="px-4 pb-4 pt-3">
+              <div className="relative mb-3 w-full max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar usuarios..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-secondary border-border"
+                  className="pl-9 bg-card border-border/70"
                 />
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users
-                    .filter((u) =>
-                      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      u.email.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((user) => (
-                      <TableRow key={user.id} className="border-border">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                              <span className="text-primary text-xs font-medium">
-                                {user.name.split(" ").map((n) => n[0]).join("")}
-                              </span>
-                            </div>
-                            <span className="font-medium">{user.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {user.role === "admin" && <Shield className="h-3 w-3 mr-1" />}
+              <div className="space-y-2">
+                {filteredUsers.map((user) => (
+                  <div key={user.id} className="grid min-w-0 gap-2 rounded-md border border-border/70 bg-card px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/35">
+                        <span className="text-[10px] font-medium text-primary">{getUserInitials(user.name)}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <p className="min-w-0 truncate text-[13px] font-semibold leading-5 text-foreground">{user.name}</p>
+                          <Badge className={getEstadoBadgeColor(user.status)}>{formatEstado(user.status)}</Badge>
+                        </div>
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                          <span className="max-w-full truncate">{user.email}</span>
+                          <Badge variant="outline" className="h-5 capitalize">
+                            {user.role === "admin" && <Shield className="mr-1 h-3 w-3" />}
                             {user.role}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getEstadoBadgeColor(user.status)}>
-                            {formatEstado(user.status)}
+                          <Badge variant="secondary" className="h-5 max-w-full truncate font-normal">
+                            {user.cargo || "Sin cargo"}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={!canManageUsers}>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                {user.role === "admin" ? "Quitar admin" : "Hacer admin"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
-                                {user.role === "auditor" ? "Pasar a supervisor" : "Pasar a auditor"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem disabled={!canManageUsers} onClick={() => setPasswordUser(user)}>
-                                <KeyRound className="h-4 w-4 mr-2" />
-                                Asignar contrasena
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem disabled={!canManageUsers} className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                {user.status === "activo" ? "Desactivar" : "Reactivar"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                          <Badge variant="secondary" className="h-5 max-w-full truncate font-normal">
+                            {user.area || "Sin area"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end sm:justify-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!canManageUsers}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {user.role === "admin" ? "Quitar admin" : "Hacer admin"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "auditor" ? "supervisor" : "auditor")}>
+                            {user.role === "auditor" ? "Pasar a supervisor" : "Pasar a auditor"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!canManageUsers} onClick={() => setPasswordUser(user)}>
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Asignar contrasena
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem disabled={!canManageUsers} className="text-destructive" onClick={() => handleUpdateUserStatus(user.id, user.status === "activo" ? "inactivo" : "activo")}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {user.status === "activo" ? "Desactivar" : "Reactivar"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <div className="rounded-md border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+                    No se encontraron usuarios.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
           <Dialog
@@ -533,7 +582,7 @@ export function AjustesContent() {
               if (!open) resetPasswordForm()
             }}
           >
-            <DialogContent>
+            <DialogContent className="!w-[min(calc(100vw-2rem),26rem)] !max-w-[26rem]">
               <DialogHeader>
                 <DialogTitle>Asignar contrasena</DialogTitle>
                 <DialogDescription>
@@ -547,6 +596,8 @@ export function AjustesContent() {
                     id="assigned-password"
                     type="password"
                     autoComplete="new-password"
+                    minLength={12}
+                    placeholder="Minimo 12 caracteres"
                     value={assignedPassword}
                     onChange={(event) => setAssignedPassword(event.target.value)}
                   />
@@ -580,11 +631,10 @@ export function AjustesContent() {
 
         {/* Unidades Tab */}
         <TabsContent value="unidades" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Card className="border-border/70 bg-card py-0 shadow-none">
+            <CardHeader className="flex flex-col gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base">Unidades de Negocio</CardTitle>
-                <CardDescription>Administra las unidades de negocioy el ecosistema al que pertenecen</CardDescription>
               </div>
               <Dialog
                 open={isUnidadOpen}
@@ -599,7 +649,7 @@ export function AjustesContent() {
                     Nueva Unidad
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent className="!w-[min(calc(100vw-2rem),42rem)] !max-w-[42rem]">
                   <DialogHeader>
                     <DialogTitle>{editingUnidad ? "Editar Unidad de Negocio" : "Nueva Unidad de Negocio"}</DialogTitle>
                     <DialogDescription>
@@ -607,8 +657,8 @@ export function AjustesContent() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-5 pt-2">
-                    <div className="flex items-center gap-4 rounded-lg border border-border/70 bg-secondary/35 p-4">
-                      <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-primary/10">
+                    <div className="flex items-center gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
+                      <div className="flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-card">
                         {unidadLogo ? (
                           <img src={unidadLogo} alt="Logo de la unidad" className="h-full w-full object-contain" />
                         ) : (
@@ -620,7 +670,7 @@ export function AjustesContent() {
                           Logo de la unidad
                         </Label>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Se usará como identificador visual en planificación y lotes.
+                          Se usara como identificador visual en planificacion y lotes.
                         </p>
                       </div>
                       <Button variant="outline" size="sm" asChild disabled={!canCreateUnits}>
@@ -645,7 +695,7 @@ export function AjustesContent() {
                         disabled={!canCreateUnits}
                         onChange={(event) => setUnidadNombre(event.target.value)}
                         placeholder="Ej. ueno bank"
-                        className="bg-secondary border-border"
+                        className="bg-card border-border/70"
                       />
                     </div>
                     <div className="space-y-2">
@@ -654,8 +704,8 @@ export function AjustesContent() {
                         value={unidadEcosistema}
                         disabled={!canCreateUnits}
                         onChange={(event) => setUnidadEcosistema(event.target.value)}
-                        placeholder="Ej. Financiero, Tecnológico, etc."
-                        className="bg-secondary border-border"
+                        placeholder="Ej. Financiero, Tecnologico, etc."
+                        className="bg-card border-border/70"
                       />
                     </div>
                     {unidadError && <p className="text-sm text-destructive">{unidadError}</p>}
@@ -682,7 +732,7 @@ export function AjustesContent() {
                 </DialogContent>
               </Dialog>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-3">
               <Table className="table-fixed">
                 <TableHeader>
                   <TableRow className="border-border">
@@ -696,7 +746,7 @@ export function AjustesContent() {
                     <TableRow key={unidad.id} className="border-border">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-14 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-primary/10">
+                          <div className="flex h-8 w-14 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-card">
                             {unidad.logo ? (
                               <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
                             ) : (
@@ -707,7 +757,7 @@ export function AjustesContent() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="border-primary/20 bg-primary/8 text-primary">
+                        <Badge variant="outline" className="border-border/70 bg-muted/25 text-muted-foreground">
                           {unidad.ecosistema}
                         </Badge>
                       </TableCell>
@@ -752,11 +802,10 @@ export function AjustesContent() {
 
         {/* Ciclos Tab */}
         <TabsContent value="ciclos" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <Card className="border-border/70 bg-card py-0 shadow-none">
+            <CardHeader className="flex flex-col items-start justify-between gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0">
-                <CardTitle className="text-base">Configuración de Ciclos</CardTitle>
-                <CardDescription>Define los períodos bimestrales para auditorías</CardDescription>
+                <CardTitle className="text-base">Configuracion de Ciclos</CardTitle>
               </div>
               <Dialog
                 open={isCycleOpen}
@@ -780,7 +829,7 @@ export function AjustesContent() {
                   <DialogHeader>
                     <DialogTitle>{editingCycleId ? "Editar ciclo" : "Nuevo ciclo"}</DialogTitle>
                     <DialogDescription>
-                      Selecciona el año y bimestre. Las fechas se calculan automáticamente.
+                      Selecciona el año y bimestre. Las fechas se calculan automaticamente.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid grid-cols-1 gap-3">
@@ -788,7 +837,7 @@ export function AjustesContent() {
                       <Label htmlFor="cycle-year">Año</Label>
                       <Input
                         id="cycle-year"
-                        className="h-9 w-full bg-secondary"
+                        className="h-9 w-full bg-card"
                         value={newCycleYear}
                         disabled={!canManageSettings}
                         onChange={(event) => setNewCycleYear(event.target.value)}
@@ -797,7 +846,7 @@ export function AjustesContent() {
                     <div className="space-y-2">
                       <Label htmlFor="cycle-bimester">Bimestre</Label>
                       <Select value={newCycleBimester} onValueChange={setNewCycleBimester} disabled={!canManageSettings}>
-                        <SelectTrigger id="cycle-bimester" className="h-9 w-full bg-secondary">
+                        <SelectTrigger id="cycle-bimester" className="h-9 w-full bg-card">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -831,7 +880,7 @@ export function AjustesContent() {
                 </DialogContent>
               </Dialog>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-3">
               {cycleError && !isCycleOpen && <p className="mb-4 text-sm text-destructive">{cycleError}</p>}
               <Table>
                 <TableHeader>
@@ -846,7 +895,14 @@ export function AjustesContent() {
                 </TableHeader>
                 <TableBody>
                   {ciclos.map((ciclo) => {
-                    const isActive = ciclo.bimestre === 3 && ciclo.año === 2026
+                    const todayTime = Date.now()
+                    const start = new Date(`${ciclo.fechaInicio}T00:00:00`).getTime()
+                    const end = new Date(`${ciclo.fechaFin}T23:59:59`).getTime()
+                    const cycleStatus = ciclo.estado ?? "habilitado"
+                    const isEnabled = cycleStatus === "habilitado"
+                    const isActive = isEnabled && todayTime >= start && todayTime <= end
+                    const isFuture = isEnabled && todayTime < start
+                    const linkedLotsCount = lotes.filter((lote) => lote.ciclo === ciclo.bimestre && lote.año === ciclo.año).length
                     return (
                       <TableRow key={ciclo.id} className="border-border">
                         <TableCell className="font-medium">{ciclo.año}</TableCell>
@@ -854,19 +910,51 @@ export function AjustesContent() {
                         <TableCell>{new Date(ciclo.fechaInicio).toLocaleDateString("es-ES")}</TableCell>
                         <TableCell>{new Date(ciclo.fechaFin).toLocaleDateString("es-ES")}</TableCell>
                         <TableCell>
-                          <Badge className={isActive ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}>
-                            {isActive ? "Activo" : "Inactivo"}
+                          <Badge className={!isEnabled ? "bg-destructive/20 text-destructive" : isActive ? "bg-success/20 text-success" : isFuture ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}>
+                            {!isEnabled ? "Deshabilitado" : isActive ? "Activo" : isFuture ? "Habilitado" : "Cerrado"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={!canManageSettings}
-                            onClick={() => openEditCycle(ciclo)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" disabled={!canManageSettings}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditCycle(ciclo)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleCycleAction(() => updateCycleStatus(ciclo.id, isEnabled ? "deshabilitado" : "habilitado"))}
+                              >
+                                {isEnabled ? (
+                                  <>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Deshabilitar
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Habilitar
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                disabled={linkedLotsCount > 0}
+                                onClick={() => {
+                                  if (!window.confirm(`Eliminar el ciclo ${ciclo.bimestre} - ${ciclo.año}? Esta accion no se puede deshacer.`)) return
+                                  handleCycleAction(() => deleteCycle(ciclo.id))
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar{linkedLotsCount > 0 ? " (con lotes)" : ""}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     )
@@ -879,31 +967,28 @@ export function AjustesContent() {
 
         {/* Umbrales Tab */}
         <TabsContent value="umbrales" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Umbrales de Calidad (Semáforo)</CardTitle>
-              <CardDescription>
-                Configura los rangos de calificación para la visualización en dashboards
-              </CardDescription>
+          <Card className="border-border/70 bg-card py-0 shadow-none">
+            <CardHeader className="border-b border-border/60 px-4 py-3">
+              <CardTitle className="text-base">Umbrales de Calidad (Semaforo)</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <CardContent className="space-y-4 px-4 pb-4 pt-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {umbrales.map((umbral) => (
                   <Card
                     key={umbral.id}
-                    className={`border-2 ${
+                    className={`border-border/70 bg-card py-0 shadow-none ${
                       umbral.color === "rojo"
-                        ? "border-destructive bg-destructive/5"
+                        ? "border-t-2 border-t-destructive"
                         : umbral.color === "amarillo"
-                        ? "border-warning bg-warning/5"
-                        : "border-success bg-success/5"
+                        ? "border-t-2 border-t-warning"
+                        : "border-t-2 border-t-success"
                     }`}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-4">
+                    <CardContent className="p-3">
+                      <div className="mb-3 flex items-center justify-between">
                         <h3 className="font-semibold">{umbral.nombre}</h3>
                         <div
-                          className={`w-4 h-4 rounded-full ${
+                          className={`h-2.5 w-2.5 rounded-full ${
                             umbral.color === "rojo"
                               ? "bg-destructive"
                               : umbral.color === "amarillo"
@@ -912,9 +997,9 @@ export function AjustesContent() {
                           }`}
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label className="text-xs text-muted-foreground">Mínimo</Label>
+                          <Label className="text-xs text-muted-foreground">Minimo</Label>
                           <Input
                             type="number"
                             value={thresholdDrafts[umbral.id]?.min ?? umbral.min}
@@ -928,11 +1013,11 @@ export function AjustesContent() {
                                 },
                               }))
                             }
-                            className="mt-1 bg-background"
+                            className="mt-1 bg-card"
                           />
                         </div>
                         <div>
-                          <Label className="text-xs text-muted-foreground">Máximo</Label>
+                          <Label className="text-xs text-muted-foreground">Maximo</Label>
                           <Input
                             type="number"
                             value={thresholdDrafts[umbral.id]?.max ?? umbral.max}
@@ -946,7 +1031,7 @@ export function AjustesContent() {
                                 },
                               }))
                             }
-                            className="mt-1 bg-background"
+                            className="mt-1 bg-card"
                           />
                         </div>
                       </div>

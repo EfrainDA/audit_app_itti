@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const
+const CSS_IDENTIFIER_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_-]*$/
+const CSS_COLOR_PATTERN = /^(#[0-9a-fA-F]{3,8}|rgb\([\d\s,%.]+\)|rgba\([\d\s,%.]+\)|hsl\([\d\s,%.]+\)|hsla\([\d\s,%.]+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$/
 
 export type ChartConfig = {
   [k in string]: {
@@ -20,6 +22,17 @@ export type ChartConfig = {
 
 type ChartContextProps = {
   config: ChartConfig
+}
+
+function sanitizeCssIdentifier(value: string) {
+  const sanitized = CSS_IDENTIFIER_PATTERN.test(value) ? value : value.replace(/[^a-zA-Z0-9_-]/g, '')
+  return CSS_IDENTIFIER_PATTERN.test(sanitized) ? sanitized : 'chart'
+}
+
+function sanitizeCssColor(value: string | undefined) {
+  if (!value) return null
+  const trimmed = value.trim()
+  return CSS_COLOR_PATTERN.test(trimmed) ? trimmed : null
 }
 
 const ChartContext = React.createContext<ChartContextProps | null>(null)
@@ -84,13 +97,15 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
         __html: Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart=${sanitizeCssIdentifier(id)}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
-    const color =
+    const color = sanitizeCssColor(
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+      itemConfig.color,
+    )
+    const safeKey = sanitizeCssIdentifier(key)
+    return color && safeKey ? `  --color-${safeKey}: ${color};` : null
   })
   .join('\n')}
 }

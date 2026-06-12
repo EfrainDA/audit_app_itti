@@ -14,7 +14,7 @@ interface MainLayoutProps {
   subtitle?: string
 }
 
-export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
+export function MainLayout({ children, title }: MainLayoutProps) {
   const { session, appUser, isLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -27,12 +27,19 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
 
   const isAuditorBlockedPath =
     appUser?.role === "auditor" && (pathname.startsWith("/modelos") || pathname.startsWith("/ajustes"))
+  const isAuditadoBlockedPath =
+    appUser?.role === "auditado" &&
+    !(
+      pathname === "/" ||
+      pathname.startsWith("/evaluaciones") ||
+      pathname.startsWith("/preferencias")
+    )
 
   useEffect(() => {
-    if (!isLoading && session && isAuditorBlockedPath) {
-      router.replace(pathname.startsWith("/ajustes") ? "/preferencias" : "/")
+    if (!isLoading && session && (isAuditorBlockedPath || isAuditadoBlockedPath)) {
+      router.replace(isAuditorBlockedPath && pathname.startsWith("/ajustes") ? "/preferencias" : "/")
     }
-  }, [isAuditorBlockedPath, isLoading, pathname, router, session])
+  }, [isAuditadoBlockedPath, isAuditorBlockedPath, isLoading, pathname, router, session])
 
   useEffect(() => {
     if (isLoading || !session) return
@@ -52,7 +59,7 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
     )
   }
 
-  if (isAuditorBlockedPath) {
+  if (isAuditorBlockedPath || isAuditadoBlockedPath) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
@@ -66,8 +73,8 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
     <div className="relative flex h-dvh overflow-hidden bg-background">
       <Sidebar />
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header title={title} subtitle={subtitle} />
-        <main className="min-w-0 flex-1 overflow-auto scroll-smooth px-3 pb-24 pt-4 [scrollbar-gutter:stable] sm:px-5 sm:py-5 md:px-6 lg:px-8 lg:pb-5">
+        <Header title={title} />
+        <main className="min-w-0 flex-1 overflow-auto scroll-smooth px-3 pb-20 pt-3 [scrollbar-gutter:stable] sm:px-5 sm:py-3 md:px-6 lg:px-6 lg:pb-5">
           <div className="mx-auto w-full max-w-[1520px]">
             {children}
           </div>

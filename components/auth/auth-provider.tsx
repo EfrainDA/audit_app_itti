@@ -25,6 +25,7 @@ function mapProfile(row: {
   avatar: string | null
   company: string | null
   cargo: string | null
+  area: string | null
 }): User {
   return {
     id: row.id,
@@ -35,22 +36,19 @@ function mapProfile(row: {
     avatar: row.avatar ?? undefined,
     company: row.company ?? undefined,
     cargo: row.cargo ?? undefined,
+    area: row.area ?? undefined,
   }
 }
 
 async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
   const email = authUser.email ?? ""
-  const displayName =
-    authUser.user_metadata?.name ||
-    authUser.user_metadata?.full_name ||
-    email.split("@")[0] ||
-    "Usuario"
   const company = authUser.user_metadata?.company || authUser.user_metadata?.empresa || null
   const cargo = authUser.user_metadata?.cargo || null
+  const area = authUser.user_metadata?.area || null
 
   const { data: existingByAuthId, error: authIdError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar,company,cargo")
+    .select("id,name,email,role,status,avatar,company,cargo,area")
     .eq("auth_user_id", authUser.id)
     .maybeSingle()
 
@@ -59,7 +57,7 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
 
   const { data: existingByEmail, error: emailError } = await supabase
     .from("users")
-    .select("id,name,email,role,status,avatar,company,cargo")
+    .select("id,name,email,role,status,avatar,company,cargo,area")
     .eq("email", email)
     .maybeSingle()
 
@@ -68,31 +66,22 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
   if (existingByEmail) {
     const { data: linkedProfile, error: updateError } = await supabase
       .from("users")
-      .update({ auth_user_id: authUser.id, company: company ?? existingByEmail.company, cargo: cargo ?? existingByEmail.cargo })
+      .update({
+        auth_user_id: authUser.id,
+        company: company ?? existingByEmail.company,
+        cargo: cargo ?? existingByEmail.cargo,
+        area: area ?? existingByEmail.area,
+      })
       .eq("id", existingByEmail.id)
-      .select("id,name,email,role,status,avatar,company,cargo")
+      .select("id,name,email,role,status,avatar,company,cargo,area")
       .single()
 
     if (updateError) throw updateError
     return mapProfile(linkedProfile)
   }
 
-  const { data: createdProfile, error: insertError } = await supabase
-    .from("users")
-    .insert({
-      auth_user_id: authUser.id,
-      name: displayName,
-      email,
-      company,
-      cargo,
-      role: "auditor",
-      status: "activo",
-    })
-    .select("id,name,email,role,status,avatar,company,cargo")
-    .single()
-
-  if (insertError) throw insertError
-  return mapProfile(createdProfile)
+  await supabase.auth.signOut()
+  throw new Error("Tu cuenta no tiene un perfil habilitado. Solicita acceso al administrador.")
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -127,6 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await ensureProfile(data.session.user)
           if (isMounted) setAppUser(profile)
         }
+      } catch {
+        if (isMounted) {
+          setSession(null)
+          setAppUser(null)
+        }
       } finally {
         if (isMounted) setIsLoading(false)
       }
@@ -146,6 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ensureProfile(nextSession.user)
         .then((profile) => {
           if (isMounted) setAppUser(profile)
+        })
+        .catch(() => {
+          if (isMounted) {
+            setSession(null)
+            setAppUser(null)
+          }
         })
         .finally(() => {
           if (isMounted) setIsLoading(false)

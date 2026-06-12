@@ -85,6 +85,7 @@ create table if not exists public.cycles (
   bimester integer not null check (bimester between 1 and 6),
   start_date date not null,
   end_date date not null,
+  status text not null default 'habilitado' check (status in ('habilitado', 'deshabilitado')),
   created_at timestamptz not null default now(),
   unique (year, bimester),
   check (end_date >= start_date)

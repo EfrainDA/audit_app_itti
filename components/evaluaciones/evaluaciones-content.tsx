@@ -17,11 +17,8 @@ import {
   ClipboardCheck,
   Clock,
   Download,
-  Eye,
   Filter,
-  Play,
   Search,
-  User,
 } from "lucide-react"
 import {
   Select,
@@ -43,16 +40,18 @@ import {
   type Lote,
   type LoteVertical,
   getScoreColor,
-  getScoreBgColor,
   getEstadoBadgeColor,
   formatEstado,
   isCountableLote,
+  getControlDisplayEstado,
 } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { downloadPptx, downloadXlsx } from "@/lib/export"
 import { fetchAnswersForControl } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
+import { cn } from "@/lib/utils"
+
+const YEAR_KEY = "a\u00f1o"
 
 interface LoteConDatos extends Lote {
   unidadNombre: string
@@ -97,7 +96,7 @@ function matchesControlEstado(estado: string, filterEstado: string) {
   return estado === filterEstado
 }
 
-function controlMatches(control: Control, normalizedSearch: string, filterEstado: string) {
+function controlMatches(control: Control, normalizedSearch: string, filterEstado: string, answeredControlIds: Set<string>) {
   const searchableFields = [
     control.identificador,
     control.descripcion,
@@ -110,7 +109,7 @@ function controlMatches(control: Control, normalizedSearch: string, filterEstado
   const matchesSearch = normalizedSearch.length === 0 ||
     searchableFields.some((value) => value?.toLowerCase().includes(normalizedSearch))
 
-  return matchesSearch && matchesControlEstado(control.estado, filterEstado)
+  return matchesSearch && matchesControlEstado(getControlDisplayEstado(control, answeredControlIds), filterEstado)
 }
 
 interface EvaluacionesContentProps {
@@ -120,19 +119,21 @@ interface EvaluacionesContentProps {
 export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesContentProps) {
   const { data } = useAppData()
   const { appUser } = useAuth()
-  const canEvaluateControls = appUser?.role === "auditor"
   const lotes = data.lotes
   const unidades = data.unidades
   const users = data.users
   const modelos = data.modelos
   const loteVerticalesData = data.loteVerticales
+  const answeredControlIds = useMemo(() => new Set(data.respuestas.map((answer) => answer.controlId)), [data.respuestas])
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<string>("all")
+  const [loteEstadoFilter, setLoteEstadoFilter] = useState<string>("abierto")
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [exportLoteId, setExportLoteId] = useState("")
   const [exportFormat, setExportFormat] = useState<"excel" | "presentation">("excel")
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [calificacionesCycleFilter, setCalificacionesCycleFilter] = useState("current")
 
   const lotesConDatos = useMemo<LoteConDatos[]>(() => {
     return lotes.filter(isCountableLote).map((lote) => {
@@ -175,7 +176,55 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
         verticalResultados,
       }
     })
-  }, [appUser?.id, canEvaluateControls, loteVerticalesData, lotes, modelos, unidades, users])
+  }, [loteVerticalesData, lotes, modelos, unidades, users])
+
+  const calificacionesCycleOptions = useMemo(() => {
+    const options = new Map<string, { key: string; year: number; cycle: number }>()
+
+    lotesConDatos.forEach((lote) => {
+      const key = `${lote[YEAR_KEY]}-${lote.ciclo}`
+      if (!options.has(key)) {
+        options.set(key, { key, year: Number(lote[YEAR_KEY]), cycle: lote.ciclo })
+      }
+    })
+
+    return Array.from(options.values()).sort((first, second) => {
+        if (first[YEAR_KEY] !== second[YEAR_KEY]) return Number(second[YEAR_KEY]) - Number(first[YEAR_KEY])
+      return second.cycle - first.cycle
+    })
+  }, [lotesConDatos])
+
+  const defaultCalificacionesCycleKey = useMemo(() => {
+    const today = new Date()
+    const activeCycle = data.ciclos.find((cycle) => {
+      const start = new Date(`${cycle.fechaInicio}T00:00:00`)
+      const end = new Date(`${cycle.fechaFin}T23:59:59`)
+
+      return today >= start && today <= end
+    })
+    const activeKey = activeCycle ? `${activeCycle[YEAR_KEY]}-${activeCycle.bimestre}` : null
+
+    if (activeKey && calificacionesCycleOptions.some((option) => option.key === activeKey)) {
+      return activeKey
+    }
+
+    return calificacionesCycleOptions[0]?.key ?? "all"
+  }, [calificacionesCycleOptions, data.ciclos])
+
+  const selectedCalificacionesCycleKey =
+    calificacionesCycleFilter === "current" ? defaultCalificacionesCycleKey : calificacionesCycleFilter
+  const lotesCalificacionesFiltrados = useMemo(() => {
+    return lotesConDatos
+      .filter((lote) => {
+        if (selectedCalificacionesCycleKey === "all") return true
+
+        return `${lote[YEAR_KEY]}-${lote.ciclo}` === selectedCalificacionesCycleKey
+      })
+      .sort((first, second) => {
+        if (first[YEAR_KEY] !== second[YEAR_KEY]) return Number(second[YEAR_KEY]) - Number(first[YEAR_KEY])
+        return second.ciclo - first.ciclo
+      })
+  }, [lotesConDatos, selectedCalificacionesCycleKey])
 
   const controles = lotesConDatos.flatMap((lote) => lote.loteVerticales.flatMap((lv) => lv.controles))
   const controlesLotesAbiertos = lotesConDatos
@@ -185,6 +234,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
   const normalizedSearchTerm = searchTerm.trim().toLowerCase()
   const hasActiveControlFilters = normalizedSearchTerm.length > 0 || filterEstado !== "all"
   const lotesFiltrados = lotesConDatos
+    .filter((lote) => loteEstadoFilter === "all" || lote.estado === loteEstadoFilter)
     .map((lote) => {
       const loteCoincide =
         normalizedSearchTerm.length === 0 ||
@@ -195,8 +245,8 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
         .map((lv) => ({
           ...lv,
           controles: loteCoincide
-            ? lv.controles.filter((control) => matchesControlEstado(control.estado, filterEstado))
-            : lv.controles.filter((control) => controlMatches(control, normalizedSearchTerm, filterEstado)),
+            ? lv.controles.filter((control) => matchesControlEstado(getControlDisplayEstado(control, answeredControlIds), filterEstado))
+            : lv.controles.filter((control) => controlMatches(control, normalizedSearchTerm, filterEstado, answeredControlIds)),
         }))
         .filter((lv) => !hasActiveControlFilters || lv.controles.length > 0)
 
@@ -210,8 +260,8 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
 
   const stats = {
     total: controles.length,
-    pendientes: controlesLotesAbiertos.filter((c) => c.estado === "pendiente").length,
-    enCurso: controlesLotesAbiertos.filter((c) => c.estado === "en_curso").length,
+    pendientes: controlesLotesAbiertos.filter((c) => getControlDisplayEstado(c, answeredControlIds) === "pendiente").length,
+    enCurso: controlesLotesAbiertos.filter((c) => getControlDisplayEstado(c, answeredControlIds) === "en_curso").length,
     terminados: controlesLotesAbiertos.filter((c) => c.estado === "terminado").length,
   }
 
@@ -251,7 +301,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
           { value: "Respuesta", styleId: "GreenHeaderCenter" },
           { value: "Personas auditadas", styleId: "GreenHeaderCenter" },
           { value: "Cargo", styleId: "GreenHeaderCenter" },
-          { value: "Área", styleId: "GreenHeaderCenter" },
+          { value: "Area", styleId: "GreenHeaderCenter" },
           { value: "Comentario / hallazgo", styleId: "GreenHeaderCenter" },
         ],
         ...lote.loteVerticales.flatMap((loteVertical) => {
@@ -419,12 +469,12 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
         }))
       ]
       const detailRows = [
-        [{ value: `${lote.unidadNombre} - Ciclo ${lote.ciclo} - ${lote.año}`, styleId: "TitleCenter", mergeAcross: 5 }],
+        [{ value: `${lote.unidadNombre} - Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`, styleId: "TitleCenter", mergeAcross: 5 }],
         ["", "", "", "", "", ""],
         [{ value: "DETALLES DEL LOTE", styleId: "DarkHeader", mergeAcross: 5 }],
         [{ value: "Unidad evaluada", styleId: "DetailLabel" }, { value: lote.unidadNombre, styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Modelo de control", styleId: "DetailLabel" }, { value: lote.modeloNombre, styleId: "DetailValue", mergeAcross: 4 }],
-        [{ value: "Ciclo", styleId: "DetailLabel" }, { value: `Ciclo ${lote.ciclo} - ${lote.año}`, styleId: "DetailValue", mergeAcross: 4 }],
+        [{ value: "Ciclo", styleId: "DetailLabel" }, { value: `Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`, styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Estado", styleId: "DetailLabel" }, { value: formatEstado(lote.estado), styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Auditores", styleId: "DetailLabel" }, { value: lote.auditoresNombres || "Sin auditores asignados", styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Fecha de exportacion", styleId: "DetailLabel" }, { value: today, styleId: "DetailValue", mergeAcross: 4 }],
@@ -463,7 +513,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               { value: "CODIGO DEL PROCEDIMIENTO", styleId: "DarkHeaderCenter" },
               { value: "AREA", styleId: "DarkHeaderCenter" },
               { value: "ADHERENCIA AL PROCESO", styleId: "DarkHeaderCenter" },
-              { value: "PERSONAS AUDITADAS - CARGOS", styleId: "DarkHeaderCenter" },
+              { value: "PERSONAS AUDITADAS - CargoS", styleId: "DarkHeaderCenter" },
               { value: "ANALISTA DE CALIDAD", styleId: "DarkHeaderCenter" },
               { value: "FECHA DE CONTROL", styleId: "DarkHeaderCenter" },
               { value: "COMENTARIOS", styleId: "DarkHeaderCenter" },
@@ -474,7 +524,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
               { value: control.subprocesos?.join("\n") || control.subproceso || "", styleId: "Bordered" },
               { value: "", styleId: "Bordered" },
               { value: getAnswerAreas(control), styleId: "Bordered" },
-              { value: formatEstado(control.estado), styleId: "Bordered" },
+              { value: formatEstado(getControlDisplayEstado(control, answersByControl.has(control.id) ? [control.id] : answeredControlIds)), styleId: "Bordered" },
               { value: [getAnswerPeople(control), getAnswerRoles(control)].filter(Boolean).join("\n"), styleId: "Bordered" },
               { value: getAuditorName(control), styleId: "Bordered" },
               { value: today, styleId: "Bordered" },
@@ -496,10 +546,10 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
           .sort((first, second) => (first.scoreControl ?? 0) - (second.scoreControl ?? 0))
           .slice(0, 5)
 
-        downloadPptx(`${safeName}-presentacion-ciclo-${lote.ciclo}-${lote.año}.pptx`, [
+        downloadPptx(`${safeName}-presentation-ciclo-${lote.ciclo}-${lote[YEAR_KEY]}.pptx`, [
           {
             eyebrow: "Informe de evaluacion",
-            title: `${lote.unidadNombre}\nCiclo ${lote.ciclo} - ${lote.año}`,
+            title: `${lote.unidadNombre}\nCiclo ${lote.ciclo} - ${lote[YEAR_KEY]}`,
             subtitle: `${lote.modeloNombre} | ${lote.auditoresNombres || "Sin auditores asignados"}`,
             metrics: [
               { label: "Calificacion final", value: lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-" },
@@ -527,7 +577,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                 vertical.aporte !== null ? `${vertical.aporte}%` : "-",
               ]),
             },
-            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote.año}`,
+            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`,
           },
           {
             eyebrow: "Resumen de la Unidad de Negocio",
@@ -544,11 +594,11 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
                 ["Terminados", completedControls],
               ],
             },
-            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote.año}`,
+            footer: `${lote.unidadNombre} | Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`,
           },
         ])
       } else {
-        downloadXlsx(`${safeName}-informe-ciclo-${lote.ciclo}-${lote.año}.xlsx`, [
+        downloadXlsx(`${safeName}-informe-ciclo-${lote.ciclo}-${lote[YEAR_KEY]}.xlsx`, [
           ...excelSheets,
           { name: "Respuestas", rows: respuestasRows, columns: [220, 150, 320, 100, 140, 220, 180, 420] },
         ])
@@ -561,43 +611,101 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
     }
   }
 
+  const auditedControls = lotesConDatos.flatMap((lote) =>
+    lote.loteVerticales.flatMap((loteVertical) =>
+      loteVertical.controles.map((control) => ({
+        control,
+        lote,
+        vertical: modelos
+          .find((modelo) => modelo.id === lote.modeloControlId)
+          ?.verticales.find((vertical) => vertical.id === loteVertical.verticalId),
+      })).filter((item) => item.control.estado === "en_replica" || item.control.estado === "terminado"),
+    ),
+  )
+
+  if (view === "evaluaciones" && appUser?.role === "auditado") {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-3">
+          {auditedControls.map(({ control, lote, vertical }) => (
+            <Card key={control.id} className="border-border/70 bg-card py-0 shadow-none">
+              <CardContent className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_8rem_auto] md:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">{control.identificador}</p>
+                    <Badge className={cn("h-5 px-2 text-[10px]", getEstadoBadgeColor(control.estado))}>{formatEstado(control.estado)}</Badge>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {lote.unidadNombre} | {vertical?.nombre ?? "Vertical sin configurar"} | Ciclo {lote.ciclo} - {lote[YEAR_KEY]}
+                  </p>
+                </div>
+                <div className="md:text-right">
+                  <p className={cn("text-xl font-semibold leading-none", control.scoreControl !== undefined ? getScoreColor(control.scoreControl) : "text-muted-foreground")}>
+                    {control.scoreControl !== undefined ? control.scoreControl : "-"}
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Puntaje</p>
+                </div>
+                <Button size="sm" className="h-8 px-3 text-xs" asChild>
+                  <Link href={`/evaluaciones/${control.id}`}>
+                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                    Verificar
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {auditedControls.length === 0 && (
+          <Card className="border-border/70 bg-card">
+            <CardContent className="p-12 text-center">
+              <ClipboardCheck className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <p className="font-medium">No hay controles recibidos</p>
+              <p className="mt-1 text-sm text-muted-foreground">Cuando un control se envie a replica, aparecera en esta bandeja.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {view === "evaluaciones" && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
+          <Card className="h-20 gap-0 border-border/70 bg-card py-0">
             <CardContent className="flex h-full items-center gap-3 px-4 py-0">
               <RealisticIcon icon={ClipboardCheck} tone="primary" size="md" />
               <div>
                 <p className="text-2xl font-semibold leading-none tracking-tight">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total de Controles</p>
+                <p className="text-xs text-muted-foreground">Total de Controles</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="h-24 gap-0 border-border/70 bg-card py-0 dark:border-primary/18">
+          <Card className="h-20 gap-0 border-border/70 bg-card py-0">
             <CardContent className="flex h-full items-center gap-3 px-4 py-0">
               <RealisticIcon icon={AlertCircle} tone="neutral" size="md" />
               <div>
                 <p className="text-2xl font-semibold leading-none tracking-tight">{stats.pendientes}</p>
-                <p className="text-sm text-muted-foreground">Pendientes</p>
+                <p className="text-xs text-muted-foreground">Pendientes</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="h-24 gap-0 border-primary/15 bg-card py-0 dark:border-primary/25">
+          <Card className="h-20 gap-0 border-border/70 bg-card py-0">
             <CardContent className="flex h-full items-center gap-3 px-4 py-0">
               <RealisticIcon icon={Clock} tone="primary" size="md" />
               <div>
                 <p className="text-2xl font-semibold leading-none tracking-tight">{stats.enCurso}</p>
-                <p className="text-sm text-muted-foreground">En Curso</p>
+                <p className="text-xs text-muted-foreground">En Curso</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="h-24 gap-0 border-success/15 bg-card py-0 dark:border-success/25">
+          <Card className="h-20 gap-0 border-border/70 bg-card py-0">
             <CardContent className="flex h-full items-center gap-3 px-4 py-0">
               <RealisticIcon icon={CheckCircle2} tone="success" size="md" />
               <div>
                 <p className="text-2xl font-semibold leading-none tracking-tight">{stats.terminados}</p>
-                <p className="text-sm text-muted-foreground">Terminados</p>
+                <p className="text-xs text-muted-foreground">Terminados</p>
               </div>
             </CardContent>
           </Card>
@@ -606,28 +714,42 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
 
       {view === "evaluaciones" && (
         <>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative w-full flex-1 lg:max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por lote, unidad, control o proceso..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="border-border bg-secondary/70 pl-9"
-          />
+      <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:w-fit lg:grid-cols-[280px_150px_220px]">
+          <div className="relative w-full lg:w-[280px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por lote, unidad, control o proceso..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border-border/70 bg-card/70 pl-9"
+            />
+          </div>
+          <Select value={loteEstadoFilter} onValueChange={setLoteEstadoFilter}>
+            <SelectTrigger className="w-full border-border/70 bg-card/70 lg:w-[150px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Lote" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="abierto">Abiertos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="cerrado">Cerrados</SelectItem>
+              <SelectItem value="deprecado">Dados de baja</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-full border-border/70 bg-card/70 lg:w-[220px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Control" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los controles</SelectItem>
+              <SelectItem value="pendiente">Pendientes</SelectItem>
+              <SelectItem value="en_curso">En Curso</SelectItem>
+              <SelectItem value="terminado">Terminados</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-full border-border bg-secondary/70 sm:w-[190px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="pendiente">Pendientes</SelectItem>
-            <SelectItem value="en_curso">En Curso</SelectItem>
-            <SelectItem value="terminado">Terminados</SelectItem>
-          </SelectContent>
-        </Select>
         <Dialog
           open={isExportOpen}
           onOpenChange={(open) => {
@@ -648,19 +770,19 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
             </DialogHeader>
             <div className="space-y-3 pt-1">
               <Select value={exportLoteId} onValueChange={setExportLoteId}>
-                <SelectTrigger className="w-full border-border bg-secondary/70">
+                <SelectTrigger className="w-full border-border/70 bg-card/70">
                   <SelectValue placeholder="Seleccionar lote" />
                 </SelectTrigger>
                 <SelectContent>
                   {lotesConDatos.map((lote) => (
                     <SelectItem key={lote.id} value={lote.id}>
-                      {lote.unidadNombre} - Ciclo {lote.ciclo} - {lote.año}
+                      <p className="mt-1 text-sm font-semibold">Ciclo {lote.ciclo} - {lote[YEAR_KEY]}</p>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as typeof exportFormat)}>
-                <SelectTrigger className="w-full border-border bg-secondary/70">
+                <SelectTrigger className="w-full border-border/70 bg-card/70">
                   <SelectValue placeholder="Formato" />
                 </SelectTrigger>
                 <SelectContent>
@@ -685,234 +807,153 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
       )}
 
       {view === "calificaciones" && (
-      <Card className="border-border/70 bg-card">
-        <CardHeader>
+      <Card className="border-border/70 bg-card py-0">
+        <CardHeader className="items-start gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-start">
           <CardTitle className="text-base">Calificacion por Unidad de Negocio</CardTitle>
+          <Select value={calificacionesCycleFilter} onValueChange={setCalificacionesCycleFilter}>
+            <SelectTrigger className="h-9 w-full bg-card sm:w-[220px]">
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Filtrar ciclo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Ciclo vigente</SelectItem>
+              <SelectItem value="all">Todos los ciclos</SelectItem>
+              {calificacionesCycleOptions.map((option) => (
+                <SelectItem key={option.key} value={option.key}>
+                  Ciclo {option.cycle} - {option.year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground">
+        <CardContent className="px-4 py-3">
+          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
             La calificacion final se calcula con el aporte de cada vertical segun su peso dentro del modelo de control.
           </p>
           <Accordion type="multiple" className="space-y-3">
-            {lotesConDatos.map((lote) => (
-              <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/60 bg-background">
-                <AccordionTrigger className="px-3 py-3 hover:bg-secondary/35 hover:no-underline sm:px-4">
-                  <div className="grid min-w-0 w-full grid-cols-1 gap-3 pr-2 text-left md:grid-cols-[1.4fr_0.8fr_1fr_0.8fr] md:items-center md:pr-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-12 items-center justify-center overflow-hidden rounded">
+            {lotesCalificacionesFiltrados.map((lote) => (
+              <AccordionItem key={lote.id} value={`calificacion-${lote.id}`} className="overflow-hidden rounded-lg border border-border/70 bg-card">
+                <AccordionTrigger className="px-4 py-3 hover:bg-muted/25 hover:no-underline">
+                  <div className="grid min-w-0 w-full grid-cols-1 gap-3 pr-2 text-left lg:grid-cols-[minmax(0,1.35fr)_10rem_minmax(0,1fr)_8rem] lg:items-center lg:pr-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-background">
                         {lote.unidadLogo ? (
                           <Image src={lote.unidadLogo} alt={lote.unidadNombre} width={48} height={28} className="h-full w-full object-contain" />
                         ) : (
                           <Building2 className="h-4 w-4 text-primary" />
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium">{lote.unidadNombre}</p>
-                        <p className="text-xs text-muted-foreground">{lote.modeloNombre}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{lote.unidadNombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">{lote.modeloNombre}</p>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">Ciclo {lote.ciclo} - {lote.año}</p>
-                    <p className="truncate text-sm text-muted-foreground">{lote.auditoresNombres || "Sin auditores"}</p>
-                    <div className="text-left md:text-right">
-                      <p className={`text-lg font-semibold ${lote.calificacionFinal !== null ? getScoreColor(lote.calificacionFinal) : "text-muted-foreground"}`}>
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Ciclo</p>
+                      <p className="mt-1 text-sm font-semibold">Ciclo {lote.ciclo} - {lote[YEAR_KEY]}</p>
+                    </div>
+                    <div className="min-w-0 rounded-md border border-border/60 bg-background px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Auditores</p>
+                      <p className="mt-1 truncate text-sm font-medium">{lote.auditoresNombres || "Sin auditores"}</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background px-3 py-2 text-left lg:text-right">
+                      <p className={`text-xl font-semibold leading-none ${lote.calificacionFinal !== null ? getScoreColor(lote.calificacionFinal) : "text-muted-foreground"}`}>
                         {lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-"}
                       </p>
-                      <p className="text-xs text-muted-foreground">Calificacion final</p>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Final</p>
                     </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <div className="responsive-scroll overflow-x-auto rounded-lg border border-border/60">
-                    <table className="w-full min-w-[760px]">
-                      <thead>
-                        <tr className="border-b border-border bg-secondary/45">
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Vertical</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Peso</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Promedio logrado</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Controles</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Aporte final</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lote.verticalResultados.map((vertical) => (
-                          <tr key={vertical.id} className="border-b border-border/60 last:border-0">
-                            <td className="px-4 py-3 text-sm font-medium">{vertical.nombre}</td>
-                            <td className="px-4 py-3 text-right text-sm">{vertical.peso}%</td>
-                            <td className="px-4 py-3 text-right text-sm">
-                              {vertical.scorePromedio !== null ? vertical.scorePromedio.toFixed(1) : "-"}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-                              {vertical.controlesConScore}/{vertical.controlesTotal}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-semibold">
-                              {vertical.aporte !== null ? `${vertical.aporte}%` : "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="overflow-hidden rounded-lg border border-border/60">
+                    <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_7rem] gap-3 border-b border-border/60 bg-muted/25 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Vertical</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Peso</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Controles</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Aporte</p>
+                    </div>
+                    <div className="divide-y divide-border/60">
+                      {lote.verticalResultados.map((vertical) => (
+                        <div key={vertical.id} className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_7rem] gap-3 px-3 py-3">
+                          <p className="truncate text-sm font-semibold">{vertical.nombre}</p>
+                          <p className="text-sm font-semibold">{vertical.peso}%</p>
+                          <p className="text-sm font-semibold">{vertical.controlesConScore}/{vertical.controlesTotal}</p>
+                          <p className={`text-sm font-semibold ${vertical.aporte !== null ? getScoreColor(vertical.aporte) : "text-muted-foreground"}`}>
+                            {vertical.aporte !== null ? `${vertical.aporte}%` : "-"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
+          {lotesCalificacionesFiltrados.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border/70 p-8 text-center">
+              <ClipboardCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="font-medium">No hay calificaciones para este ciclo</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Cambia el filtro para consultar ciclos anteriores o todos los ciclos.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
       )}
 
       {view === "evaluaciones" && (
         <>
-      <Accordion type="multiple" className="space-y-4">
+      <div className="space-y-3">
         {lotesFiltrados.map((lote) => {
           const totalControles = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
           const terminados = lote.loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
 
           return (
-            <AccordionItem key={lote.id} value={lote.id} className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-none">
-              <AccordionTrigger className="px-3 py-4 hover:no-underline hover:bg-secondary/35 sm:px-5">
-                <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left lg:flex-row lg:items-center lg:justify-between lg:pr-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-11 w-16 shrink-0 items-center justify-center rounded-lg overflow-hidden">
+            <Link key={lote.id} href={`/evaluaciones/${lote.id}`} className="block">
+              <Card className="min-w-0 overflow-hidden rounded-lg border border-border/60 bg-card shadow-none transition-colors hover:border-primary/50">
+                <CardContent className="px-3 py-3 sm:px-4">
+                <div className="grid min-w-0 w-full grid-cols-1 gap-3 text-left md:grid-cols-[1.35fr_0.8fr_1fr_auto] md:items-center">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex h-7 w-12 shrink-0 items-center justify-center overflow-hidden rounded">
                       {lote.unidadLogo ? (
                         <Image
                           src={lote.unidadLogo}
                           alt={lote.unidadNombre}
-                          width={64}
-                          height={44}
+                          width={48}
+                          height={28}
                           className="h-full w-full object-contain"
                         />
                       ) : (
-                        <div className="flex items-center justify-center w-full h-full rounded-lg border border-primary/20 bg-primary/10">
-                          <Building2 className="h-5 w-5 text-primary" />
+                        <div className="flex h-full w-full items-center justify-center rounded border border-primary/20 bg-primary/10">
+                          <Building2 className="h-4 w-4 text-primary" />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{lote.unidadNombre}</p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        Ciclo {lote.ciclo} - {lote.año} | {lote.modeloNombre}
-                      </p>
-                      <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                        <User className="h-3.5 w-3.5" />
-                        <span className="truncate">{lote.auditoresNombres || "Sin auditores asignados"}</span>
+                      <p className="truncate font-medium">{lote.unidadNombre}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {lote.modeloNombre}
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
+                      <p className="mt-1 text-sm font-semibold">Ciclo {lote.ciclo} - {lote[YEAR_KEY]}</p>
+                  <p className="truncate text-sm text-muted-foreground">{lote.auditoresNombres || "Sin auditores"}</p>
+                  <div className="flex items-center gap-3 md:justify-end">
                     <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>
-                    <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-right">
+                    <div className="min-w-[72px] text-right">
+                      <p className="text-sm font-semibold">{terminados}/{totalControles}</p>
                       <p className="text-xs text-muted-foreground">Controles</p>
-                      <p className="font-semibold">{terminados}/{totalControles}</p>
                     </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-3 pb-5 sm:px-5">
-                <Accordion type="multiple" className="space-y-3">
-                  {lote.loteVerticales.map((loteVertical) => {
-                    const modelo = modelos.find((m) => m.id === lote.modeloControlId)
-                    const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
-                    if (!vertical) return null
-
-                    const controlesTerminados = loteVertical.controles.filter((c) => c.estado === "terminado").length
-                    const controlesTotal = loteVertical.controles.length
-                    const controlesConScore = loteVertical.controles.filter((c) => c.scoreControl !== undefined)
-                    const scorePromedio = controlesConScore.length
-                      ? Math.round(controlesConScore.reduce((acc, control) => acc + (control.scoreControl || 0), 0) / controlesConScore.length)
-                      : null
-
-                    return (
-                      <AccordionItem key={loteVertical.id} value={loteVertical.id} className="overflow-hidden rounded-lg border border-border/60 bg-background">
-                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/30">
-                          <div className="flex w-full flex-col gap-3 pr-4 text-left md:flex-row md:items-center md:justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-14 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
-                                <span className="text-sm font-semibold text-primary">{vertical.peso}%</span>
-                              </div>
-                              <div>
-                                <p className="font-medium">{vertical.nombre}</p>
-                                <p className="text-xs text-muted-foreground">{vertical.parametros.length} parametros configurados</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-xs text-muted-foreground">Controles</p>
-                                <p className="font-medium">{controlesTerminados}/{controlesTotal}</p>
-                              </div>
-                              {scorePromedio !== null && (
-                                <div className="flex flex-col items-end gap-1">
-                                  <div className={`min-w-[64px] rounded-md px-2 py-1 text-center ${getScoreBgColor(scorePromedio)}`}>
-                                    <p className="text-[10px] font-medium text-muted-foreground">Logrado</p>
-                                    <p className={`font-semibold ${getScoreColor(scorePromedio)}`}>
-                                      {((scorePromedio / 100) * vertical.peso).toFixed(1)}%
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-4">
-                          {loteVertical.controles.length === 0 ? (
-                            <div className="rounded-lg border border-dashed border-border/70 py-6 text-center text-sm text-muted-foreground">
-                              No hay controles para esta vertical con los filtros actuales.
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {loteVertical.controles.map((control) => {
-                                const auditor = control.auditorId ? users.find((u) => u.id === control.auditorId) : null
-                                const canEvaluateThisControl = canEvaluateControls && control.auditorId === appUser?.id
-                                return (
-                                  <Card key={control.id} className="border-border/60 bg-card">
-                                    <CardContent className="p-3">
-                                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                        <div>
-                                          <div className="mb-1 flex flex-wrap items-center gap-2">
-                                            <span className="text-sm font-semibold text-foreground">{control.identificador}</span>
-                                            <Badge className={getEstadoBadgeColor(control.estado)}>{formatEstado(control.estado)}</Badge>
-                                            {control.scoreControl !== undefined && (
-                                              <span className={`text-sm font-semibold ${getScoreColor(control.scoreControl)}`}>{control.scoreControl}</span>
-                                            )}
-                                          </div>
-                                          {auditor && (
-                                            <p className="text-sm text-muted-foreground">{auditor.cargo || "Cargo"}: {auditor.name}</p>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          {!canEvaluateThisControl || control.estado === "terminado" ? (
-                                            <Button variant="outline" size="sm" asChild>
-                                              <Link href={`/evaluaciones/${control.id}`}>
-                                                <Eye className="mr-1 h-4 w-4" />
-                                                Ver
-                                              </Link>
-                                            </Button>
-                                          ) : (
-                                            <Button size="sm" asChild>
-                                              <Link href={`/evaluaciones/${control.id}`}>
-                                                <Play className="mr-1 h-4 w-4" />
-                                                Evaluar
-                                              </Link>
-                                            </Button>
-                                          )}
-                                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )
-                  })}
-                </Accordion>
-              </AccordionContent>
-            </AccordionItem>
+                </CardContent>
+              </Card>
+            </Link>
           )
         })}
-      </Accordion>
+      </div>
 
       {lotesFiltrados.length === 0 && (
         <Card className="border-border/70 bg-card">

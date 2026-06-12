@@ -3,7 +3,7 @@ import { PlanificacionContent } from "@/components/planificacion/planificacion-c
 
 export default function PlanificacionPage() {
   return (
-    <MainLayout title="Planificación" subtitle="Gestión de lotes y auditorías">
+    <MainLayout title="Planificacion" subtitle="Gestion de lotes y auditorias">
       <PlanificacionContent />
     </MainLayout>
   )

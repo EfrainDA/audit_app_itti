@@ -5,6 +5,7 @@ import type {
   Auditoria,
   Ciclo,
   Control,
+  DescargoAuditado,
   Lote,
   LoteVertical,
   ModeloControl,
@@ -65,6 +66,7 @@ type DbUser = {
   email: string
   company: string | null
   cargo: string | null
+  area: string | null
   role: User["role"]
   status: User["status"]
   avatar: string | null
@@ -86,6 +88,7 @@ type DbCycle = {
   bimester: number
   start_date: string
   end_date: string
+  status?: Ciclo["estado"] | null
 }
 
 type DbThreshold = {
@@ -145,7 +148,7 @@ type DbControl = {
   lot_vertical_id: string
   identifier: string
   description: string | null
-  status: Control["estado"] | "en_replica" | "terminada"
+  status: Control["estado"] | "terminada"
   control_score: number | null
   tag: Control["etiqueta"] | null
   process: string | null
@@ -187,6 +190,17 @@ type DbAnswer = {
   answered_at: string
   auditor_id: string
   answer_evidences?: { file_name: string | null; file_url: string }[]
+  audited_response_notes?: DbAuditedResponseNote[]
+}
+
+type DbAuditedResponseNote = {
+  id: string
+  answer_id: string
+  user_id: string
+  comment: string | null
+  file_url: string | null
+  file_name: string | null
+  created_at: string
 }
 
 type DbNotification = {
@@ -203,6 +217,12 @@ function isMissingAuditedAreasColumn(error: unknown) {
   if (!error || typeof error !== "object") return false
   const record = error as Record<string, unknown>
   return record.code === "42703" || (typeof record.message === "string" && record.message.includes("audited_areas"))
+}
+
+function isMissingCycleStatusColumn(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const record = error as Record<string, unknown>
+  return record.code === "42703" || (typeof record.message === "string" && record.message.includes("status"))
 }
 
 function mapParameter(parameter: DbParameter): Parametro {
@@ -229,13 +249,39 @@ function mapVertical(vertical: DbVertical): Vertical {
 
 function normalizeControlStatus(status: DbControl["status"]): Control["estado"] {
   if (status === "terminada") return "terminado"
-  if (status === "en_replica") return "en_curso"
   return status
+}
+
+function normalizeLookupValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+}
+
+function auditedPeopleMatchUser(answer: Pick<Respuesta, "personasAuditadas">, user: Pick<User, "name" | "email">) {
+  const userKeys = [user.name, user.email].map(normalizeLookupValue).filter(Boolean)
+  const auditedKeys = (answer.personasAuditadas ?? []).map(normalizeLookupValue).filter(Boolean)
+
+  return auditedKeys.some((auditedKey) =>
+    userKeys.some((userKey) => auditedKey === userKey || auditedKey.includes(userKey) || userKey.includes(auditedKey)),
+  )
 }
 
 function normalizeAuditStatus(status: DbAudit["status"]): Auditoria["estado"] {
   if (status === "terminado") return "terminada"
   return status
+}
+
+async function fetchCyclesData() {
+  let result = await supabase.from("cycles").select("id,year,bimester,start_date,end_date,status").order("year").order("bimester")
+
+  if (isMissingCycleStatusColumn(result.error)) {
+    result = await supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester")
+  }
+
+  return result
 }
 
 export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status">): Promise<AppData> {
@@ -252,9 +298,9 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     answersResult,
     notificationsResult,
   ] = await Promise.all([
-    supabase.from("users").select("id,name,email,company,cargo,role,status,avatar").order("name"),
+    supabase.from("users").select("id,name,email,company,cargo,area,role,status,avatar").order("name"),
     supabase.from("business_units").select("id,name,ecosystem,code,zone,owner_name,logo_url").order("name"),
-    supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester"),
+    fetchCyclesData(),
     supabase.from("thresholds").select("id,name,min_value,max_value,color").order("min_value"),
     supabase
       .from("control_models")
@@ -287,17 +333,29 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     currentProfile.role === "auditor"
       ? supabase
           .from("answers")
-          .select("id,control_id,parameter_id,value,comment,answered_at,auditor_id")
+          .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
           .eq("auditor_id", currentProfile.id)
       : supabase
           .from("answers")
-          .select("id,control_id,parameter_id,value,comment,answered_at,auditor_id"),
+          .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)"),
     supabase
       .from("notifications")
       .select("id,user_id,title,message,type,read,created_at")
       .eq("user_id", currentProfile.id)
       .order("created_at", { ascending: false }),
   ])
+
+  let normalizedAnswersResult = answersResult
+  if (isMissingAuditedAreasColumn(answersResult.error)) {
+    normalizedAnswersResult = currentProfile.role === "auditor"
+      ? await supabase
+          .from("answers")
+          .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+          .eq("auditor_id", currentProfile.id)
+      : await supabase
+          .from("answers")
+          .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+  }
 
   const firstError = [
     usersResult.error,
@@ -308,7 +366,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
     lotsResult.error,
     lotVerticalsResult.error,
     auditsResult.error,
-    answersResult.error,
+    normalizedAnswersResult.error,
     notificationsResult.error,
   ].find(Boolean)
 
@@ -323,6 +381,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       email: user.email,
       company: user.company ?? undefined,
       cargo: user.cargo ?? undefined,
+      area: user.area ?? undefined,
       role: user.role,
       status: user.status,
       avatar: user.avatar ?? undefined,
@@ -342,6 +401,7 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       bimestre: cycle.bimester,
       fechaInicio: cycle.start_date,
       fechaFin: cycle.end_date,
+      estado: cycle.status ?? "habilitado",
     })),
     umbrales: ((thresholdsResult.data ?? []) as DbThreshold[]).map((threshold) => ({
       id: threshold.id,
@@ -402,17 +462,29 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       scoreTotal: audit.total_score ?? undefined,
       auditorId: audit.auditor_id,
     })),
-    respuestas: ((answersResult.data ?? []) as DbAnswer[]).map((answer) => ({
+    respuestas: ((normalizedAnswersResult.data ?? []) as DbAnswer[]).map((answer) => ({
       id: answer.id,
       controlId: answer.control_id,
       parametroId: answer.parameter_id,
       valor: answer.value,
       comentario: answer.comment ?? undefined,
-      evidencias: [],
+      evidencias: ((answer.answer_evidences as DbAnswer["answer_evidences"]) ?? []).map((evidence) => evidence.file_name || evidence.file_url),
+      personasAuditadas: (answer.audited_people ?? []).filter(Boolean),
+      cargosAuditados: (answer.audited_roles ?? []).filter(Boolean),
+      areasAuditadas: (answer.audited_areas ?? []).filter(Boolean),
+      descargosAuditado: ((answer.audited_response_notes ?? []) as DbAuditedResponseNote[]).map((note): DescargoAuditado => ({
+        id: note.id,
+        respuestaId: note.answer_id,
+        usuarioId: note.user_id,
+        comentario: note.comment ?? undefined,
+        evidencia: note.file_name ?? undefined,
+        evidenciaUrl: note.file_url ?? undefined,
+        fecha: note.created_at,
+      })),
       fechaRespuesta: answer.answered_at,
       auditorId: answer.auditor_id,
     })),
-    answeredControlIds: ((answersResult.data ?? []) as DbAnswer[])
+    answeredControlIds: ((normalizedAnswersResult.data ?? []) as DbAnswer[])
       .map((answer) => answer.control_id),
     notificaciones: ((notificationsResult.data ?? []) as DbNotification[]).map((notification) => ({
       id: notification.id,
@@ -423,6 +495,40 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       leida: notification.read,
       fecha: notification.created_at,
     })),
+  }
+
+  if (currentProfile?.role === "auditado") {
+    const auditedControlIds = new Set(
+      appData.respuestas
+        .filter((answer) => auditedPeopleMatchUser(answer, { name: appData.users.find((user) => user.id === currentProfile.id)?.name ?? "", email: appData.users.find((user) => user.id === currentProfile.id)?.email ?? "" }))
+        .map((answer) => answer.controlId),
+    )
+    const assignedLotIds = new Set(
+      appData.loteVerticales
+        .filter((lotVertical) => lotVertical.controles.some((control) => auditedControlIds.has(control.id)))
+        .map((lotVertical) => lotVertical.loteId),
+    )
+    const assignedModelIds = new Set(
+      appData.lotes
+        .filter((lot) => assignedLotIds.has(lot.id))
+        .map((lot) => lot.modeloControlId),
+    )
+
+    return {
+      ...appData,
+      modelos: appData.modelos.filter((model) => assignedModelIds.has(model.id)),
+      lotes: appData.lotes.filter((lot) => assignedLotIds.has(lot.id)),
+      loteVerticales: appData.loteVerticales
+        .filter((lotVertical) => assignedLotIds.has(lotVertical.loteId))
+        .map((lotVertical) => ({
+          ...lotVertical,
+          controles: lotVertical.controles.filter((control) => auditedControlIds.has(control.id)),
+        })),
+      auditorias: appData.auditorias.filter((audit) => auditedControlIds.has(audit.controlId)),
+      respuestas: appData.respuestas.filter((answer) => auditedControlIds.has(answer.controlId)),
+      answeredControlIds: Array.from(auditedControlIds),
+      notificaciones: appData.notificaciones,
+    }
   }
 
   if (currentProfile?.role !== "auditor") {
@@ -507,6 +613,7 @@ async function getCurrentProfile() {
       email,
       company: authUser.user_metadata?.company || authUser.user_metadata?.empresa || null,
       cargo: authUser.user_metadata?.cargo || null,
+      area: authUser.user_metadata?.area || null,
       role: "auditor",
       status: "activo",
     })
@@ -542,7 +649,6 @@ async function requireControlManager() {
 
 async function assertCanManageControlsForLotVertical(lotVerticalId: string, lotId?: string) {
   const profile = await requireControlManager()
-  if (profile.role !== "auditor") return profile
 
   let resolvedLotId = lotId
   if (!resolvedLotId) {
@@ -557,6 +663,19 @@ async function assertCanManageControlsForLotVertical(lotVerticalId: string, lotI
   }
 
   if (!resolvedLotId) throw new Error("No se pudo validar el lote del control.")
+
+  const { data: lot, error: lotError } = await supabase
+    .from("lots")
+    .select("status")
+    .eq("id", resolvedLotId)
+    .maybeSingle()
+
+  if (lotError) throw lotError
+  if (!lot || lot.status !== "abierto") {
+    throw new Error("Solo se pueden modificar controles mientras el lote esta abierto.")
+  }
+
+  if (profile.role !== "auditor") return profile
 
   const { data: assignment, error: assignmentError } = await supabase
     .from("lot_auditors")
@@ -575,16 +694,29 @@ async function assertCanManageControlsForLotVertical(lotVerticalId: string, lotI
 
 async function assertCanManageExistingControl(controlId: string) {
   const profile = await requireControlManager()
-  if (profile.role !== "auditor") return profile
 
   const { data, error } = await supabase
     .from("controls")
-    .select("lot_vertical_id")
+    .select("status,lot_vertical_id,lot_verticals(lot_id,lots(status))")
     .eq("id", controlId)
     .maybeSingle()
 
   if (error) throw error
   if (!data?.lot_vertical_id) throw new Error("No se pudo validar el control.")
+
+  const lotVerticalRelation = data.lot_verticals as unknown as { lot_id?: string; lots?: { status?: Lote["estado"] } | { status?: Lote["estado"] }[] | null } | { lot_id?: string; lots?: { status?: Lote["estado"] } | { status?: Lote["estado"] }[] | null }[] | null
+  const lotVertical = Array.isArray(lotVerticalRelation) ? lotVerticalRelation[0] : lotVerticalRelation
+  const lotRelation = Array.isArray(lotVertical?.lots) ? lotVertical?.lots[0] : lotVertical?.lots
+
+  if (lotRelation?.status !== "abierto") {
+    throw new Error("Solo se pueden modificar controles mientras el lote esta abierto.")
+  }
+
+  if (profile.role !== "auditor") return profile
+
+  if (normalizeControlStatus(data.status as DbControl["status"]) === "terminado") {
+    throw new Error("Los controles terminados solo pueden ser modificados por supervisor o admin.")
+  }
 
   return assertCanManageControlsForLotVertical(data.lot_vertical_id as string)
 }
@@ -615,7 +747,7 @@ async function assertCanEvaluateControl(controlId: string) {
 
   const { data, error } = await supabase
     .from("controls")
-    .select("auditor_id")
+    .select("auditor_id,lot_verticals(lots(cycles(start_date,end_date,status)))")
     .eq("id", controlId)
     .maybeSingle()
 
@@ -624,12 +756,68 @@ async function assertCanEvaluateControl(controlId: string) {
     throw new Error("No tienes permiso para evaluar este control.")
   }
 
+  const lotVerticalRelation = data.lot_verticals as unknown as
+    | { lots?: { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null } | { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null }[] | null }
+    | { lots?: { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null } | { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null }[] | null }[]
+    | null
+  const lotVertical = Array.isArray(lotVerticalRelation) ? lotVerticalRelation[0] : lotVerticalRelation
+  const lotRelation = Array.isArray(lotVertical?.lots) ? lotVertical?.lots[0] : lotVertical?.lots
+  const cycleRelation = Array.isArray(lotRelation?.cycles) ? lotRelation?.cycles[0] : lotRelation?.cycles
+
+  if (!cycleRelation) {
+    throw new Error("No se pudo validar el ciclo del lote.")
+  }
+
+  const now = Date.now()
+  const startsAt = new Date(`${cycleRelation.start_date}T00:00:00`).getTime()
+  const endsAt = new Date(`${cycleRelation.end_date}T23:59:59`).getTime()
+  if ((cycleRelation.status ?? "habilitado") !== "habilitado") {
+    throw new Error("El ciclo del lote esta deshabilitado.")
+  }
+  if (now < startsAt) {
+    throw new Error("La evaluacion estara disponible cuando el ciclo del lote entre en vigor.")
+  }
+  if (now > endsAt) {
+    throw new Error("El ciclo del lote ya finalizo.")
+  }
+
   return profile
 }
 
 async function assertCanReadControl(controlId: string) {
   const profile = await getCurrentProfile()
   if (profile.role === "admin" || profile.role === "supervisor") return profile
+  if (profile.role === "auditado") {
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id,name,email")
+      .eq("id", profile.id)
+      .maybeSingle()
+
+    if (userError) throw userError
+    if (!user) throw new Error("No tienes permiso para ver este control.")
+
+    const { data: answers, error: answersError } = await supabase
+      .from("answers")
+      .select("audited_people,controls(status)")
+      .eq("control_id", controlId)
+
+    if (answersError) throw answersError
+
+    const canRead = (answers ?? []).some((answer) => {
+      const controlRelation = answer.controls as unknown as { status?: DbControl["status"] } | { status?: DbControl["status"] }[] | null
+      const relatedControl = Array.isArray(controlRelation) ? controlRelation[0] : controlRelation
+      const isReplica = relatedControl?.status === "en_replica" || relatedControl?.status === "terminado" || relatedControl?.status === "terminada"
+
+      return isReplica && auditedPeopleMatchUser(
+        { personasAuditadas: ((answer.audited_people as string[] | null) ?? []) },
+        { name: user.name as string, email: user.email as string },
+      )
+    })
+
+    if (!canRead) throw new Error("No tienes permiso para ver este control.")
+    return profile
+  }
 
   const { data, error } = await supabase
     .from("controls")
@@ -656,6 +844,44 @@ async function assertCanReadControl(controlId: string) {
 
   if (assignmentError) throw assignmentError
   if (!assignment) throw new Error("No tienes permiso para ver este control.")
+
+  return profile
+}
+
+async function assertCanRespondAsAudited(answerId: string) {
+  const profile = await getCurrentProfile()
+  if (profile.role !== "auditado") {
+    throw new Error("Solo el perfil auditado puede agregar descargos.")
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id,name,email")
+    .eq("id", profile.id)
+    .maybeSingle()
+
+  if (userError) throw userError
+  if (!user) throw new Error("No se pudo validar el usuario auditado.")
+
+  const { data: answer, error: answerError } = await supabase
+    .from("answers")
+    .select("id,audited_people,controls(status)")
+    .eq("id", answerId)
+    .maybeSingle()
+
+  if (answerError) throw answerError
+
+  const controlRelation = answer?.controls as unknown as { status?: DbControl["status"] } | { status?: DbControl["status"] }[] | null
+  const control = Array.isArray(controlRelation) ? controlRelation[0] : controlRelation
+  const isInReplica = control?.status === "en_replica" || control?.status === "terminado" || control?.status === "terminada"
+  const isAssigned = auditedPeopleMatchUser(
+    { personasAuditadas: ((answer?.audited_people as string[] | null) ?? []) },
+    { name: user.name as string, email: user.email as string },
+  )
+
+  if (!answer || !isInReplica || !isAssigned) {
+    throw new Error("No tienes permiso para agregar descargos en esta respuesta.")
+  }
 
   return profile
 }
@@ -734,7 +960,7 @@ export async function assignUserPassword(id: string, password: string) {
   }
 }
 
-export async function updateOwnProfile(input: { name: string; company?: string; cargo?: string; avatar?: string | null }) {
+export async function updateOwnProfile(input: { name: string; company?: string; cargo?: string; area?: string; avatar?: string | null }) {
   const profile = await getCurrentProfile()
   const { error } = await supabase
     .from("users")
@@ -742,6 +968,7 @@ export async function updateOwnProfile(input: { name: string; company?: string; 
       name: input.name.trim(),
       company: input.company?.trim() || null,
       cargo: input.cargo?.trim() || null,
+      area: input.area?.trim() || null,
       avatar: input.avatar || null,
     })
     .eq("id", profile.id)
@@ -770,6 +997,29 @@ export async function updateCycle(id: string, input: { year: number; bimester: n
   if (error) throw error
 }
 
+export async function updateCycleStatus(id: string, status: NonNullable<Ciclo["estado"]>) {
+  await requireAdminOrSupervisor()
+  const { error } = await supabase.from("cycles").update({ status }).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteCycle(id: string) {
+  await requireAdminOrSupervisor()
+  const { data: linkedLots, error: linkedLotsError } = await supabase
+    .from("lots")
+    .select("id")
+    .eq("cycle_id", id)
+    .limit(1)
+
+  if (linkedLotsError) throw linkedLotsError
+  if ((linkedLots ?? []).length > 0) {
+    throw new Error("No se puede eliminar un ciclo vinculado a lotes.")
+  }
+
+  const { error } = await supabase.from("cycles").delete().eq("id", id)
+  if (error) throw error
+}
+
 export async function updateThresholds(
   thresholds: Array<{ id: string; min: number; max: number }>,
 ) {
@@ -787,12 +1037,14 @@ export async function updateThresholds(
   }
 }
 
-export async function createUserProfile(input: { name: string; email: string; role: User["role"]; company?: string }) {
+export async function createUserProfile(input: { name: string; email: string; role: User["role"]; company?: string; cargo?: string; area?: string }) {
   await requireAdmin()
   const { error } = await supabase.from("users").insert({
     name: input.name.trim(),
     email: input.email.trim(),
     company: input.company?.trim() || null,
+    cargo: input.cargo?.trim() || null,
+    area: input.area?.trim() || null,
     role: input.role,
     status: "activo",
   })
@@ -967,12 +1219,30 @@ async function ensureCycle(year: number, bimester: number) {
       bimester,
       start_date: dates.startDate,
       end_date: dates.endDate,
+      status: "habilitado",
     })
     .select("id")
     .single()
 
   if (createError) throw createError
   return created.id as string
+}
+
+async function getEnabledCycleForLot(year: number, bimester: number) {
+  const { data, error } = await supabase
+    .from("cycles")
+    .select("id,status")
+    .eq("year", year)
+    .eq("bimester", bimester)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data?.id) throw new Error("El ciclo seleccionado no está habilitado para crear lotes.")
+  if (((data.status as Ciclo["estado"] | null) ?? "habilitado") !== "habilitado") {
+    throw new Error("El ciclo seleccionado está deshabilitado.")
+  }
+
+  return data.id as string
 }
 
 type NotificationDraft = {
@@ -1073,6 +1343,57 @@ async function notifyAuditorAboutControl(auditorId: string | undefined, controlN
   ])
 }
 
+async function notifyAuditedUsersAboutReplica(controlId: string, actorId: string) {
+  const { data: answers, error: answersError } = await supabase
+    .from("answers")
+    .select("audited_people,controls(identifier)")
+    .eq("control_id", controlId)
+
+  if (answersError) throw answersError
+
+  const auditedPeople = Array.from(
+    new Set(
+      (answers ?? [])
+        .flatMap((answer) => ((answer.audited_people as string[] | null) ?? []))
+        .map((item) => normalizeLookupValue(item))
+        .filter(Boolean),
+    ),
+  )
+  if (!auditedPeople.length) return
+
+  const { data: auditedUsers, error: usersError } = await supabase
+    .from("users")
+    .select("id,name,email")
+    .eq("role", "auditado")
+    .eq("status", "activo")
+
+  if (usersError) throw usersError
+
+  const recipients = (auditedUsers ?? []).filter((user) => {
+    const userKeys = [user.name as string, user.email as string].map(normalizeLookupValue).filter(Boolean)
+    return auditedPeople.some((auditedKey) =>
+      userKeys.some((userKey) => auditedKey === userKey || auditedKey.includes(userKey) || userKey.includes(auditedKey)),
+    )
+  })
+  if (!recipients.length) return
+
+  const firstAnswer = answers?.[0] as { controls?: { identifier?: string } | { identifier?: string }[] | null } | undefined
+  const controlRelation = firstAnswer?.controls
+  const control = Array.isArray(controlRelation) ? controlRelation[0] : controlRelation
+  const controlName = control?.identifier ?? "control"
+  const usersById = await getUserNames([actorId])
+  const actorName = usersById.get(actorId) ?? "Control de Calidad"
+
+  await createNotifications(
+    recipients.map((recipient) => ({
+      userId: recipient.id as string,
+      title: "Control recibido para replica",
+      message: `${actorName} envio "${controlName}" a replica. Ya puedes agregar tus descargos en /evaluaciones/${controlId}.`,
+      type: "replica" as const,
+    })),
+  )
+}
+
 export async function createLot(input: {
   businessUnitId: string
   modelId: string
@@ -1081,7 +1402,7 @@ export async function createLot(input: {
   auditorIds: string[]
 }) {
   await requirePlanningManager()
-  const cycleId = await ensureCycle(input.year, input.bimester)
+  const cycleId = await getEnabledCycleForLot(input.year, input.bimester)
 
   const { data: lot, error: lotError } = await supabase
     .from("lots")
@@ -1129,8 +1450,61 @@ export async function createLot(input: {
 
 export async function updateLotStatus(id: string, status: Lote["estado"]) {
   await requirePlanningManager()
+  const { data: currentLot, error: currentLotError } = await supabase
+    .from("lots")
+    .select("cycle_id")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (currentLotError) throw currentLotError
+  if (!currentLot?.cycle_id) throw new Error("No se pudo validar el ciclo del lote.")
+
+  if (status === "cerrado") {
+    const { data: controls, error: controlsError } = await supabase
+      .from("controls")
+      .select("id,status,lot_verticals!inner(lot_id)")
+      .eq("lot_verticals.lot_id", id)
+
+    if (controlsError) throw controlsError
+    if (!controls?.length) {
+      throw new Error("No se puede cerrar un lote sin controles cargados.")
+    }
+
+    const unfinishedControls = controls.filter((control) => normalizeControlStatus(control.status as DbControl["status"]) !== "terminado")
+    if (unfinishedControls.length > 0) {
+      throw new Error("No se puede cerrar el lote hasta que todos sus controles esten terminados.")
+    }
+  }
+
   const { error } = await supabase.from("lots").update({ status }).eq("id", id)
   if (error) throw error
+
+  if (status === "cerrado") {
+    const { data: cycleLots, error: cycleLotsError } = await supabase
+      .from("lots")
+      .select("id,status")
+      .eq("cycle_id", currentLot.cycle_id)
+      .neq("status", "deprecado")
+
+    if (cycleLotsError) throw cycleLotsError
+    if ((cycleLots ?? []).length > 0 && (cycleLots ?? []).every((lot) => lot.status === "cerrado")) {
+      const { error: cycleError } = await supabase
+        .from("cycles")
+        .update({ status: "deshabilitado" })
+        .eq("id", currentLot.cycle_id)
+
+      if (cycleError) throw cycleError
+    }
+  }
+
+  if (status === "abierto") {
+    const { error: cycleError } = await supabase
+      .from("cycles")
+      .update({ status: "habilitado" })
+      .eq("id", currentLot.cycle_id)
+
+    if (cycleError) throw cycleError
+  }
 }
 
 export async function addLotAuditor(lotId: string, auditorId: string) {
@@ -1304,13 +1678,13 @@ export async function fetchAnswersForControl(controlId: string) {
   await assertCanReadControl(controlId)
   let { data, error } = await supabase
     .from("answers")
-    .select("parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url)")
+    .select("id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
     .eq("control_id", controlId)
 
   if (isMissingAuditedAreasColumn(error)) {
     const fallbackResult = await supabase
       .from("answers")
-      .select("parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url)")
+      .select("id,parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
       .eq("control_id", controlId)
 
     data = fallbackResult.data
@@ -1320,6 +1694,7 @@ export async function fetchAnswersForControl(controlId: string) {
   if (error) throw error
 
   return (data ?? []).map((answer) => ({
+    id: answer.id as string,
     parametroId: answer.parameter_id as string,
     valor: answer.value as EvaluationAnswerInput["valor"],
     comentario: (answer.comment as string | null) ?? "",
@@ -1328,6 +1703,15 @@ export async function fetchAnswersForControl(controlId: string) {
     areas: ((answer.audited_areas as string[] | null) ?? []).length ? (answer.audited_areas as string[]) : [""],
     fechaRespuesta: answer.answered_at as string,
     evidencias: ((answer.answer_evidences as DbAnswer["answer_evidences"]) ?? []).map((evidence) => evidence.file_name || evidence.file_url),
+    descargosAuditado: ((answer.audited_response_notes as DbAuditedResponseNote[] | undefined) ?? []).map((note): DescargoAuditado => ({
+      id: note.id,
+      respuestaId: note.answer_id,
+      usuarioId: note.user_id,
+      comentario: note.comment ?? undefined,
+      evidencia: note.file_name ?? undefined,
+      evidenciaUrl: note.file_url ?? undefined,
+      fecha: note.created_at,
+    })),
   }))
 }
 
@@ -1374,6 +1758,58 @@ export async function saveAnswerEvidenceFiles(controlId: string, filesByParamete
     const { error: evidenceError } = await supabase.from("answer_evidences").insert(evidenceRows)
     if (evidenceError) throw evidenceError
   }
+}
+
+export async function saveAuditedResponseNote(answerId: string, input: { comment?: string; files?: File[] }) {
+  const profile = await assertCanRespondAsAudited(answerId)
+  const comment = input.comment?.trim() || null
+  const files = input.files ?? []
+
+  if (!comment && files.length === 0) {
+    throw new Error("Agrega un comentario o una evidencia para guardar el descargo.")
+  }
+
+  const rows: Array<{
+    answer_id: string
+    user_id: string
+    comment: string | null
+    file_url: string | null
+    file_name: string | null
+    file_type: string | null
+  }> = []
+
+  if (comment) {
+    rows.push({
+      answer_id: answerId,
+      user_id: profile.id,
+      comment,
+      file_url: null,
+      file_name: null,
+      file_type: null,
+    })
+  }
+
+  for (const file of files) {
+    const safeName = file.name.replace(/[^\w.-]+/g, "-").replace(/-+/g, "-")
+    const path = `auditado/${answerId}/${profile.id}/${crypto.randomUUID()}-${safeName}`
+    const { error: uploadError } = await supabase.storage
+      .from("answer-evidences")
+      .upload(path, file, { contentType: file.type || undefined, upsert: false })
+
+    if (uploadError) throw uploadError
+
+    rows.push({
+      answer_id: answerId,
+      user_id: profile.id,
+      comment: null,
+      file_url: path,
+      file_name: file.name,
+      file_type: file.type || null,
+    })
+  }
+
+  const { error } = await supabase.from("audited_response_notes").insert(rows)
+  if (error) throw error
 }
 
 async function notifySupervisorsAboutCompletion(input: {
@@ -1520,9 +1956,10 @@ export async function finalizeEvaluation(input: {
 }
 
 export async function sendControlToReplica(controlId: string) {
-  await assertCanEvaluateControl(controlId)
+  const profile = await assertCanEvaluateControl(controlId)
   const { error } = await supabase.from("controls").update({ status: "en_replica" }).eq("id", controlId)
   if (error) throw error
+  await notifyAuditedUsersAboutReplica(controlId, profile.id)
 }
 
 export async function markNotificationRead(id: string) {

@@ -181,19 +181,23 @@ CREATE OR REPLACE FUNCTION "public"."handle_new_auth_user"() RETURNS "trigger"
     SET "search_path" TO 'public'
     AS $$
 begin
-  insert into public.users (auth_user_id, name, email, company, role, status)
+  insert into public.users (auth_user_id, name, email, company, cargo, area, role, status)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1), 'Usuario'),
     new.email,
     coalesce(new.raw_user_meta_data->>'company', new.raw_user_meta_data->>'empresa'),
+    new.raw_user_meta_data->>'cargo',
+    new.raw_user_meta_data->>'area',
     'auditor',
     'activo'
   )
   on conflict (email) do update
-    set auth_user_id = excluded.auth_user_id,
+    set auth_user_id = coalesce(public.users.auth_user_id, excluded.auth_user_id),
         name = coalesce(public.users.name, excluded.name),
         company = coalesce(public.users.company, excluded.company),
+        cargo = coalesce(public.users.cargo, excluded.cargo),
+        area = coalesce(public.users.area, excluded.area),
         updated_at = now();
 
   return new;
@@ -332,9 +336,11 @@ CREATE TABLE IF NOT EXISTS "public"."cycles" (
     "bimester" integer NOT NULL,
     "start_date" "date" NOT NULL,
     "end_date" "date" NOT NULL,
+    "status" "text" DEFAULT 'habilitado'::"text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "cycles_bimester_check" CHECK ((("bimester" >= 1) AND ("bimester" <= 6))),
-    CONSTRAINT "cycles_check" CHECK (("end_date" >= "start_date"))
+    CONSTRAINT "cycles_check" CHECK (("end_date" >= "start_date")),
+    CONSTRAINT "cycles_status_check" CHECK (("status" = ANY (ARRAY['habilitado'::"text", 'deshabilitado'::"text"])))
 );
 
 
@@ -454,7 +460,8 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "company" "text",
-    "cargo" "text"
+    "cargo" "text",
+    "area" "text"
 );
 
 

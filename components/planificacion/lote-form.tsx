@@ -44,6 +44,18 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const unidades = data.unidades
+  const enabledCycles = useMemo(() => {
+    const today = new Date()
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+    const configuredCycles = data.ciclos
+      .filter((item) => (item.estado ?? "habilitado") === "habilitado" && new Date(`${item.fechaFin}T23:59:59`).getTime() >= todayStart)
+      .sort((first, second) => {
+        if (first.año !== second.año) return first.año - second.año
+        return first.bimestre - second.bimestre
+      })
+
+    return configuredCycles.length > 0 ? configuredCycles : []
+  }, [data.ciclos])
   const activeCycle = useMemo(() => {
     const today = new Date()
     const todayTime = today.getTime()
@@ -61,14 +73,37 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
       fechaFin: "",
     }
   }, [data.ciclos])
+  const availableCycles = useMemo(
+    () => enabledCycles.length > 0 ? enabledCycles : [activeCycle],
+    [activeCycle, enabledCycles],
+  )
+  const availableYears = useMemo(
+    () => Array.from(new Set(availableCycles.map((item) => item.año))).sort((first, second) => first - second),
+    [availableCycles],
+  )
+  const cyclesForSelectedYear = useMemo(
+    () => availableCycles.filter((item) => String(item.año) === año),
+    [año, availableCycles],
+  )
 
   const auditoresDisponibles = data.users.filter((u) => u.role === "auditor" && u.status === "activo")
   const modelosPublicados = data.modelos.filter((m) => m.estado === "publicado")
 
   useEffect(() => {
-    setAño(String(activeCycle.año))
-    setCiclo(String(activeCycle.bimestre))
-  }, [activeCycle.año, activeCycle.bimestre])
+    const selectedCycle = availableCycles[0]
+    setAño(String(selectedCycle.año))
+    setCiclo(String(selectedCycle.bimestre))
+  }, [availableCycles])
+
+  const handleYearChange = (value: string) => {
+    setAño(value)
+    const firstCycleForYear = availableCycles.find((item) => String(item.año) === value)
+    setCiclo(firstCycleForYear ? String(firstCycleForYear.bimestre) : "")
+  }
+
+  const handleCycleChange = (value: string) => {
+    setCiclo(value)
+  }
 
   const toggleAuditor = (auditorId: string) => {
     setAuditores(
@@ -133,26 +168,30 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
 
         <div className="space-y-2">
           <Label>Año *</Label>
-          <Select value={año} onValueChange={setAño} disabled>
+          <Select value={año} onValueChange={handleYearChange} disabled={availableYears.length <= 1}>
             <SelectTrigger className="bg-secondary border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={String(activeCycle.año)}>{activeCycle.año}</SelectItem>
+              {availableYears.map((cycleYear) => (
+                <SelectItem key={cycleYear} value={String(cycleYear)}>{cycleYear}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
           <Label>Ciclo de Control *</Label>
-          <Select value={ciclo} onValueChange={setCiclo}>
+          <Select value={ciclo} onValueChange={handleCycleChange}>
             <SelectTrigger className="bg-secondary border-border">
               <SelectValue placeholder="Selecciona el ciclo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={String(activeCycle.bimestre)}>
-                {cycleLabels[activeCycle.bimestre] ?? `Ciclo ${activeCycle.bimestre}`}
-              </SelectItem>
+              {cyclesForSelectedYear.map((cycle) => (
+                <SelectItem key={cycle.id} value={String(cycle.bimestre)}>
+                  {cycleLabels[cycle.bimestre] ?? `Ciclo ${cycle.bimestre}`}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -180,41 +219,59 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
           Selecciona los analistas o especialistas que participarán en este lote
         </p>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {auditoresDisponibles.map((auditor) => (
-            <div
-              key={auditor.id}
-              className="flex min-w-0 items-center gap-3 rounded-lg bg-secondary p-3 hover:bg-secondary/80 cursor-pointer"
-              onClick={() => toggleAuditor(auditor.id)}
-            >
-              <Checkbox
-                id={auditor.id}
-                checked={auditores.includes(auditor.id)}
-                onClick={(event) => event.stopPropagation()}
-                onCheckedChange={() => toggleAuditor(auditor.id)}
-              />
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-sm font-semibold text-primary">
-                {auditor.avatar ? (
-                  <img src={auditor.avatar} alt={auditor.name} className="h-full w-full object-cover" />
-                ) : (
-                  <span>
-                    {auditor.name
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((part) => part[0])
-                      .join("")
-                      .toUpperCase()}
+          {auditoresDisponibles.map((auditor) => {
+            const selected = auditores.includes(auditor.id)
+
+            return (
+              <div
+                key={auditor.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                className={`flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                  selected
+                    ? "border-primary/45 bg-primary/10"
+                    : "border-transparent bg-secondary hover:border-border hover:bg-secondary/80"
+                }`}
+                onClick={() => toggleAuditor(auditor.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    toggleAuditor(auditor.id)
+                  }
+                }}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-sm font-semibold text-primary">
+                  {auditor.avatar ? (
+                    <img src={auditor.avatar} alt={auditor.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span>
+                      {auditor.name
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {auditor.name}
                   </span>
-                )}
+                  <p className="truncate text-xs text-muted-foreground">{auditor.email}</p>
+                </div>
+                <Checkbox
+                  id={auditor.id}
+                  checked={selected}
+                  className="shrink-0"
+                  onClick={(event) => event.stopPropagation()}
+                  onCheckedChange={() => toggleAuditor(auditor.id)}
+                />
               </div>
-              <div className="min-w-0 flex-1">
-                <label htmlFor={auditor.id} className="block truncate text-sm font-medium cursor-pointer">
-                  {auditor.name}
-                </label>
-                <p className="truncate text-xs text-muted-foreground">{auditor.email}</p>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ export interface User {
   email: string
   company?: string
   cargo?: string
+  area?: string
   role: "admin" | "supervisor" | "auditor" | "auditado"
   status: "activo" | "inactivo"
   avatar?: string
@@ -25,6 +26,7 @@ export interface Ciclo {
   bimestre: number
   fechaInicio: string
   fechaFin: string
+  estado?: "habilitado" | "deshabilitado"
 }
 
 export interface Umbral {
@@ -92,7 +94,7 @@ export interface Control {
   loteVerticalId: string
   identificador: string
   descripcion?: string
-  estado: "pendiente" | "en_curso" | "terminado"
+  estado: "pendiente" | "en_curso" | "en_replica" | "terminado"
   scoreControl?: number
   etiqueta?: "Unidad de Negocio" | "Producto" | "Proceso" | "Proceso de apoyo"
   proceso?: string
@@ -122,8 +124,22 @@ export interface Respuesta {
   valor: "cumple" | "no_cumple" | "intermedio" | "na"
   comentario?: string
   evidencias: string[]
+  personasAuditadas?: string[]
+  cargosAuditados?: string[]
+  areasAuditadas?: string[]
+  descargosAuditado?: DescargoAuditado[]
   fechaRespuesta: string
   auditorId: string
+}
+
+export interface DescargoAuditado {
+  id: string
+  respuestaId: string
+  usuarioId: string
+  comentario?: string
+  evidencia?: string
+  evidenciaUrl?: string
+  fecha: string
 }
 
 export interface Notificacion {
@@ -143,9 +159,9 @@ export function getScoreColor(score: number): string {
 }
 
 export function getScoreBgColor(score: number): string {
-  if (score >= 90) return "bg-success/20"
-  if (score >= 71) return "bg-warning/20"
-  return "bg-destructive/20"
+  if (score >= 90) return "border-success/25 bg-success/10"
+  if (score >= 71) return "border-warning/25 bg-warning/10"
+  return "border-destructive/25 bg-destructive/10"
 }
 
 export function getEstadoBadgeColor(estado: string): string {
@@ -154,27 +170,40 @@ export function getEstadoBadgeColor(estado: string): string {
     case "terminado":
     case "publicado":
     case "activo":
-      return "bg-success/20 text-success"
+      return "border-success/25 bg-success/10 text-success"
     case "abierto":
-      return "bg-emerald-50 text-emerald-700"
+      return "border-success/25 bg-success/10 text-success"
     case "cerrado":
-      return "bg-stone-100 text-stone-600"
+      return "border-border bg-muted text-muted-foreground"
     case "en_curso":
-      return "bg-primary/20 text-primary"
+      return "border-primary/25 bg-primary/10 text-primary"
     case "pendiente":
     case "borrador":
-      return "bg-muted text-muted-foreground"
+      return "border-border bg-muted text-muted-foreground"
     case "en_replica":
-      return "bg-warning/20 text-warning"
+      return "border-warning/25 bg-warning/10 text-warning"
     case "deprecado":
     case "inactivo":
-      return "bg-destructive/20 text-destructive"
+      return "border-destructive/25 bg-destructive/10 text-destructive"
     default:
-      return "bg-muted text-muted-foreground"
+      return "border-border bg-muted text-muted-foreground"
   }
 }
 
 export function formatEstado(estado: string): string {
   if (estado === "deprecado") return "Dado de Baja"
   return estado.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+export function getControlDisplayEstado(
+  control: Pick<Control, "id" | "estado" | "scoreControl">,
+  answeredControlIds: Set<string> | string[] = new Set(),
+): Control["estado"] {
+  const answeredIds = Array.isArray(answeredControlIds) ? new Set(answeredControlIds) : answeredControlIds
+
+  if (control.estado === "pendiente" && (control.scoreControl !== undefined || answeredIds.has(control.id))) {
+    return "en_curso"
+  }
+
+  return control.estado
 }

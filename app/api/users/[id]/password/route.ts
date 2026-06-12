@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { createServerAdminClient, readJsonBody, requireAppRole } from "@/lib/server-auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -40,37 +41,21 @@ export async function POST(
     )
   }
 
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
-  if (!token) return errorResponse("No se encontro una sesion valida.", 401)
+  const auth = await requireAppRole(request, ["admin"])
+  if ("error" in auth) return auth.error
 
-  const body = (await request.json().catch(() => null)) as { password?: unknown } | null
+  const body = await readJsonBody<{ password?: unknown }>(request, 4096).catch(() => null)
   const password = typeof body?.password === "string" ? body.password : ""
-  if (password.length < 6) {
-    return errorResponse("La contrasena debe tener al menos 6 caracteres.", 400)
+  if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+    return errorResponse("La contrasena debe tener al menos 12 caracteres, mayusculas, minusculas y numeros.", 400)
   }
-
-  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-
-  const { data: requester, error: requesterError } = await authClient.auth.getUser(token)
-  if (requesterError || !requester.user) return errorResponse("La sesion ya no es valida.", 401)
-
-  const { data: adminProfile, error: adminProfileError } = await adminClient
-    .from("users")
-    .select("role")
-    .eq("auth_user_id", requester.user.id)
-    .maybeSingle()
-
-  if (adminProfileError) return errorResponse(adminProfileError.message, 500)
-  if (adminProfile?.role !== "admin") {
-    return errorResponse("Solo admin puede asignar contrasenas.", 403)
-  }
+  const adminClient = createServerAdminClient()
 
   const { id } = await params
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return errorResponse("Usuario invalido.", 400)
+  }
+
   const { data: profile, error: profileError } = await adminClient
     .from("users")
     .select("auth_user_id,email,name")

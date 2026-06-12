@@ -1,8 +1,9 @@
 "use client"
 
-import { useMemo, useState, type KeyboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Bell, Search } from "lucide-react"
+import { Bell, LogOut, Search, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -34,7 +35,10 @@ function matchesSearch(search: string, ...values: unknown[]) {
 function getNotificationHref(notification: Notificacion) {
   const title = normalizeSearch(notification.titulo)
   const message = normalizeSearch(notification.mensaje)
+  const evaluationHref = notification.mensaje.match(/\/evaluaciones\/[0-9a-f-]{32,36}/i)?.[0]
 
+  if (evaluationHref) return evaluationHref
+  if (notification.tipo === "replica") return "/evaluaciones"
   if (title.includes("auditor termino")) return "/"
   if (title.includes("lote") || message.includes("lote")) return "/planificacion"
   if (title.includes("control") || title.includes("reasignacion") || message.includes("control")) return "/evaluaciones"
@@ -43,19 +47,36 @@ function getNotificationHref(notification: Notificacion) {
 
 interface HeaderProps {
   title: string
-  subtitle?: string
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+const YEAR_KEY = "a\u00f1o" as const
+
+export function Header({ title }: HeaderProps) {
   const { data, refresh } = useAppData()
-  const { appUser } = useAuth()
+  const { appUser, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const notifications = data.notificaciones
   const unreadCount = notifications.filter(n => !n.leida).length
   const normalizedSearch = normalizeSearch(searchTerm)
+  const userName = appUser?.name ?? "Usuario"
+  const userInitials = userName
+    .split(" ")
+    .filter(Boolean)
+    .filter((_, index, parts) => index === 0 || index === parts.length - 1)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "U"
+
+  useEffect(() => {
+    if (!isSearchExpanded) return
+    window.setTimeout(() => searchInputRef.current?.focus(), 0)
+  }, [isSearchExpanded])
 
   const searchResults = useMemo(() => {
     if (!normalizedSearch) return []
@@ -69,7 +90,7 @@ export function Header({ title, subtitle }: HeaderProps) {
       { title: "Calificaciones", subtitle: "Resultados y calificaciones", href: "/calificaciones", keywords: "scores resultados notas" },
       ...(canSeeModels ? [{ title: "Modelos de Control", subtitle: "Modelos, verticales y parametros", href: "/modelos", keywords: "metodologia parametros verticales" }] : []),
       ...(canSeeSettings ? [{ title: "Ajustes", subtitle: "Usuarios, unidades, ciclos y umbrales", href: "/ajustes", keywords: "configuracion usuarios unidades negocio" }] : []),
-      { title: "Preferencias", subtitle: "Perfil, cargo, empresa y tema", href: "/preferencias", keywords: "perfil contrasena cargo empresa" },
+      { title: "Preferencias", subtitle: "Perfil, cargo, area, empresa y tema", href: "/preferencias", keywords: "perfil contrasena cargo area empresa" },
     ]
 
     const pageResults = pages
@@ -105,7 +126,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           title: `${unidad?.nombre ?? "Unidad"} - Ciclo ${lote.ciclo}`,
           subtitle: `${modelo?.nombre ?? "Modelo"} - ${formatEstado(lote.estado)}`,
           href: "/planificacion",
-          text: [unidad?.nombre, modelo?.nombre, `ciclo ${lote.ciclo}`, String(lote.año), lote.estado],
+          text: [unidad?.nombre, modelo?.nombre, `ciclo ${lote.ciclo}`, String(lote[YEAR_KEY]), lote.estado],
         }
       })
       .filter((result) => matchesSearch(normalizedSearch, result.title, result.subtitle, ...result.text))
@@ -132,7 +153,7 @@ export function Header({ title, subtitle }: HeaderProps) {
 
     const userResults = canSeeSettings
       ? data.users
-          .filter((user) => matchesSearch(normalizedSearch, user.name, user.email, user.company, user.cargo, user.role))
+          .filter((user) => matchesSearch(normalizedSearch, user.name, user.email, user.company, user.cargo, user.area, user.role))
           .map((user) => ({
             type: "Usuario",
             title: user.name,
@@ -156,9 +177,15 @@ export function Header({ title, subtitle }: HeaderProps) {
     await refresh()
   }
 
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace("/login")
+  }
+
   const handleSelectResult = (href: string) => {
     setSearchTerm("")
     setIsSearchOpen(false)
+    setIsSearchExpanded(false)
     if (href !== pathname) {
       router.push(href)
     }
@@ -172,61 +199,86 @@ export function Header({ title, subtitle }: HeaderProps) {
 
     if (event.key === "Escape") {
       setIsSearchOpen(false)
+      setIsSearchExpanded(false)
+      setSearchTerm("")
     }
   }
 
   return (
-    <header className="relative flex min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-card px-3 py-2 shadow-none sm:gap-3 sm:px-5 md:px-6 lg:h-16 lg:py-0">
+    <header className="relative flex h-16 min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-white px-3 shadow-none dark:bg-background sm:gap-3 sm:px-5 md:px-6">
       <div className="min-w-0 flex-1 pr-1">
-        <h1 className="truncate text-lg font-bold text-foreground sm:text-xl">{title}</h1>
-        {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p>}
+        <h1 className="truncate text-lg font-semibold leading-none text-foreground sm:text-xl">{title}</h1>
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
-          <Input
-            placeholder="Buscar..."
-            value={searchTerm}
-            onChange={(event) => {
-              setSearchTerm(event.target.value)
-              setIsSearchOpen(true)
-            }}
-            onFocus={() => setIsSearchOpen(true)}
-            onBlur={() => window.setTimeout(() => setIsSearchOpen(false), 120)}
-            onKeyDown={handleSearchKeyDown}
-            className="w-48 border-border/80 bg-card pl-9 lg:w-72"
-          />
-          {isSearchOpen && searchTerm.trim() && (
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-none">
-              {searchResults.length > 0 ? (
-                <div className="max-h-96 overflow-y-auto py-1">
-                  {searchResults.map((result, index) => (
-                    <button
-                      key={`${result.type}-${result.href}-${result.title}-${index}`}
-                      type="button"
-                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/80 focus:bg-secondary/80 focus:outline-none"
-                      onMouseDown={(event) => {
-                        event.preventDefault()
-                        handleSelectResult(result.href)
-                      }}
-                    >
-                      <span className="mt-0.5 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-normal text-muted-foreground">
-                        {result.type}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-foreground">{result.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{result.subtitle}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-3 py-4 text-sm text-muted-foreground">
-                  Sin resultados para "{searchTerm.trim()}"
+        <div className="relative flex items-center">
+          {isSearchExpanded ? (
+            <div className="relative w-48 lg:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
+              <Input
+                ref={searchInputRef}
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value)
+                  setIsSearchOpen(true)
+                }}
+                onFocus={() => setIsSearchOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsSearchOpen(false)
+                    if (!searchTerm.trim()) setIsSearchExpanded(false)
+                  }, 120)
+                }}
+                onKeyDown={handleSearchKeyDown}
+                className="h-9 border-border/80 bg-card pl-9"
+              />
+
+              {isSearchOpen && searchTerm.trim() && (
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
+                  {searchResults.length > 0 ? (
+                    <div className="max-h-96 overflow-y-auto py-1">
+                      {searchResults.map((result, index) => (
+                        <button
+                          key={`${result.type}-${result.href}-${result.title}-${index}`}
+                          type="button"
+                          className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/80 focus:bg-secondary/80 focus:outline-none"
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            handleSelectResult(result.href)
+                          }}
+                        >
+                          <span className="mt-0.5 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-normal text-muted-foreground">
+                            {result.type}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-foreground">{result.title}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{result.subtitle}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-3 py-4 text-sm text-muted-foreground">
+                      Sin resultados para "{searchTerm.trim()}"
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Abrir busqueda"
+              onClick={() => {
+                setIsSearchExpanded(true)
+                setIsSearchOpen(true)
+              }}
+            >
+              <Search className="h-5 w-5" />
+            </Button>
           )}
         </div>
 
@@ -262,6 +314,54 @@ export function Header({ title, subtitle }: HeaderProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem className="justify-center text-primary cursor-pointer" onClick={handleMarkAllNotificationsRead}>
               Marcar todas como leidas
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full p-0 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Abrir menu de usuario"
+            >
+              <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-none">
+                {appUser?.avatar ? (
+                  <img src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-primary">{userInitials}</span>
+                )}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={8} className="w-64">
+            <DropdownMenuLabel className="flex items-center gap-3 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
+                {appUser?.avatar ? (
+                  <img src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-primary">{userInitials}</span>
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-foreground">{userName}</span>
+                {appUser?.email && (
+                  <span className="block truncate text-xs font-normal text-muted-foreground">{appUser.email}</span>
+                )}
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/preferencias" className="cursor-pointer">
+                <Settings2 className="mr-2 h-4 w-4" />
+                Preferencias
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar sesion
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

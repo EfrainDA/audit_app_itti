@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,12 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -39,19 +32,14 @@ import {
   Pencil,
   Trash2, 
   FileCheck, 
-  Clock, 
-  CheckCircle2,
   LayoutList 
 } from "lucide-react"
 import {
   type Lote,
   type Control,
   type LoteVertical,
-  getEstadoBadgeColor,
-  getScoreColor,
-  formatEstado,
+  getControlDisplayEstado,
 } from "@/lib/data"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -142,16 +130,10 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   const [editControl, setEditControl] = useState(initialNewControl)
   const [isControlSuggestionsOpen, setIsControlSuggestionsOpen] = useState(false)
   const [isProcessSuggestionsOpen, setIsProcessSuggestionsOpen] = useState(false)
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [formError, setFormError] = useState<string | null>(null)
   const [isSavingControl, setIsSavingControl] = useState(false)
   const [auditorToAdd, setAuditorToAdd] = useState("")
   const [isAddingAuditor, setIsAddingAuditor] = useState(false)
-
-  // Implementación de autoguardado con debounce (retraso de 1.5s)
-  useEffect(() => {
-    if (loteVerticales.length > 0) setAutoSaveStatus('saved')
-  }, [loteVerticales])
 
   const controlsForCurrentUnit = useMemo(() => {
     const loteIdsForUnidad = data.lotes
@@ -379,8 +361,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
     }
   }
 
-  const getTotalControles = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.length, 0)
-  const getControlesTerminados = () => loteVerticales.reduce((acc, lv) => acc + lv.controles.filter((c) => c.estado === "terminado").length, 0)
+  const answeredControlIds = useMemo(() => new Set(data.respuestas.map((answer) => answer.controlId)), [data.respuestas])
   const getSubprocesosCount = (control: Control) => {
     if (control.subprocesos) return control.subprocesos.length
     if (!control.subproceso) return 0
@@ -401,29 +382,6 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header Info - Resumen de completado profesional */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-secondary/40 border border-border rounded-xl gap-6">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Modelo Aplicado</p>
-          <h2 className="text-lg font-bold text-foreground">{modelo?.nombre}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="h-5 text-[10px] font-bold uppercase">{loteVerticales.length} Verticales</Badge>
-            <Badge variant="outline" className="h-5 text-[10px] font-bold uppercase">Ciclo {lote.ciclo}</Badge>
-          </div>
-        </div>
-        <div className="flex-1 max-w-[240px] sm:text-right space-y-1.5">
-          <div className="flex items-center justify-between sm:justify-end gap-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Progreso General</p>
-            {autoSaveStatus === 'saving' && <span className="text-[9px] text-muted-foreground flex items-center gap-1 animate-pulse"><Clock className="h-2.5 w-2.5" /> Guardando...</span>}
-            {autoSaveStatus === 'saved' && <span className="text-[9px] text-success flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5" /> Guardado</span>}
-          </div>
-          <Progress value={getTotalControles() > 0 ? (getControlesTerminados() / getTotalControles()) * 100 : 0} className="h-2" />
-          <p className="text-sm font-bold">
-            {getControlesTerminados()}/{getTotalControles()} <span className="text-muted-foreground font-normal">controles realizados</span>
-          </p>
-        </div>
-      </div>
-
       {/* Auditores */}
       <div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -475,146 +433,145 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
       </div>
 
       {/* Verticales con sus Controles */}
-      <div>
-        <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-          <FileCheck className="h-4 w-4" />
-          Verticales y Controles
-        </h3>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <FileCheck className="h-4 w-4 text-primary" />
+            Verticales y controles
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Cada vertical agrupa sus controles asociados. Los controles se muestran como filas simples para mantener el foco en lo importante.
+          </p>
+        </div>
 
-        <Accordion type="multiple" defaultValue={loteVerticales.map((lv) => lv.id)} className="space-y-3">
+        <div className="space-y-5">
           {loteVerticales.map((loteVertical) => {
             const vertical = modelo?.verticales.find((v) => v.id === loteVertical.verticalId)
             if (!vertical) return null
 
             const controlesTerminados = loteVertical.controles.filter((c) => c.estado === "terminado").length
             const controlesTotal = loteVertical.controles.length
+            const progressWidth = controlesTotal > 0 ? (controlesTerminados / controlesTotal) * 100 : 0
 
             return (
-              <AccordionItem
+              <section
                 key={loteVertical.id}
-                value={loteVertical.id}
-                className="bg-card border border-border rounded-lg overflow-hidden"
+                className="overflow-hidden rounded-lg border border-border/70 bg-card"
               >
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/50">
-                  <div className="flex items-center justify-between w-full pr-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-lg bg-primary/20 flex items-center justify-center">
-                        <span className="text-primary font-bold text-sm">
+                <div className="border-b border-border/60 px-4 py-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-sm font-semibold text-primary">
                           {vertical.peso}%
                         </span>
                       </div>
-                      <div className="text-left">
-                        <p className="font-medium">{vertical.nombre}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="min-w-0 text-left">
+                        <p className="truncate text-sm font-semibold">{vertical.nombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">
                           {vertical.parametros.length} parámetros a evaluar
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Controles</p>
-                        <p className="font-medium">{controlesTerminados}/{controlesTotal}</p>
+                    <div className="w-full shrink-0 md:w-44">
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Avance</span>
+                        <span className="font-semibold text-foreground">{controlesTerminados}/{controlesTotal}</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressWidth}%` }} />
                       </div>
                     </div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  {/* Lista de controles */}
-                  <div className="space-y-2 mb-4">
+                </div>
+                <div className="px-4 py-3">
+                  <div className="relative mb-3 pl-5">
+                    <div className="absolute bottom-1 left-1.5 top-1 w-px bg-border" />
                     {loteVertical.controles.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground border border-dashed border-border rounded-lg">
-                        <p>No hay controles agregados</p>
-                        <p className="text-sm">Agrega controles para comenzar las evaluaciones</p>
+                      <div className="rounded-md border border-dashed border-border/80 bg-secondary/20 px-4 py-5 text-center text-muted-foreground">
+                        <p className="text-sm font-medium text-foreground">Sin controles agregados</p>
+                        <p className="text-xs">Agrega controles para comenzar las evaluaciones.</p>
                       </div>
                     ) : (
                       loteVertical.controles.map((control) => {
                         const auditor = data.users.find((u) => u.id === control.auditorId)
                         const subprocesosCount = control.correspondeProceso ? getSubprocesosCount(control) : 0
                         const subprocesosLabel = control.correspondeProceso ? getSubprocesosLabel(control) : ""
+                        const displayEstado = getControlDisplayEstado(control, answeredControlIds)
+                        const isFinishedControl = displayEstado === "terminado"
+                        const canManageThisControl =
+                          lote.estado === "abierto" &&
+                          (canManageLots || (appUser?.role === "auditor" && !isFinishedControl))
                         
                         return (
-                          <div 
-                            key={control.id} 
-                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border/40 bg-secondary/20 hover:bg-secondary/40 hover:border-primary/20 transition-all duration-200"
+                          <div
+                            key={control.id}
+                            className="group relative flex flex-col gap-2 rounded-md px-3 py-2.5 transition-colors hover:bg-secondary/35 sm:flex-row sm:items-center sm:justify-between"
                           >
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-semibold text-foreground">
+                            <span className="absolute -left-[1.05rem] top-4 h-2.5 w-2.5 rounded-full border-2 border-card bg-primary/70" />
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                                <span className="min-w-0 truncate text-sm font-medium text-foreground">
                                   {control.identificador}
                                 </span>
                                 {control.etiqueta && (
-                                  <Badge variant="outline" className="h-5 text-[10px] font-medium">
+                                  <Badge variant="outline" className="h-5 rounded-full border-border/80 bg-background text-[10px] font-medium text-muted-foreground">
                                     {control.etiqueta}
                                   </Badge>
                                 )}
-                                <Badge className={cn("text-[10px] h-5 px-1.5 uppercase font-bold", getEstadoBadgeColor(control.estado))}>
-                                  {formatEstado(control.estado)}
-                                </Badge>
                                 {subprocesosCount > 0 && (
-                                  <Badge variant="outline" className="h-5 gap-1 border-primary/20 bg-primary/5 text-primary text-[10px] font-bold">
+                                  <Badge variant="outline" className="h-5 gap-1 rounded-full border-primary/20 bg-primary/5 text-[10px] font-semibold text-primary">
                                     <LayoutList className="h-2.5 w-2.5" />
-                                    {subprocesosCount} Subprocesos
+                                    {subprocesosCount} subprocesos
                                   </Badge>
                                 )}
                               </div>
                               {subprocesosLabel && (
-                                <p className="text-xs text-muted-foreground">{subprocesosLabel}</p>
+                                <p className="line-clamp-1 text-xs text-muted-foreground">{subprocesosLabel}</p>
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-6 sm:gap-8">
-                              <div className="flex items-center gap-2">
-                                <div className="h-7 w-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                                  <span className="text-[10px] font-bold text-primary uppercase">
-                                    {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground truncate max-w-[100px] hidden md:inline">
-                                  {auditor ? auditor.name : "Sin analista o especialista"}
+                            <div className="flex min-w-0 items-center gap-2 sm:w-52">
+                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-background">
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">
+                                  {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
                                 </span>
                               </div>
+                              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                {auditor ? auditor.name : "Sin analista"}
+                              </span>
+                            </div>
 
-                              <div className="flex flex-col items-end min-w-[50px]">
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold">Logrado</span>
-                                <span className={cn(
-                                  "text-sm font-bold",
-                                  control.scoreControl !== undefined ? getScoreColor(control.scoreControl) : "text-muted-foreground"
-                                )}>
-                                  {control.scoreControl ?? "--"}
-                                </span>
-                              </div>
-
-                              <div className="flex justify-end">
-                                {canManageControls && control.estado === "pendiente" && lote.estado === "abierto" ? (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => openEditControl(loteVertical.id, control)}>
-                                        <Pencil className="h-4 w-4 mr-2" />
-                                        Editar
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        className="text-destructive"
-                                        onClick={() => handleDeleteControl(loteVertical.id, control.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Borrar
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                ) : (
-                                  <div className="h-8 w-8" />
-                                )}
-                              </div>
+                            <div className="flex justify-end sm:w-8">
+                              {canManageControls && canManageThisControl ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditControl(loteVertical.id, control)}>
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => handleDeleteControl(loteVertical.id, control.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Borrar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : (
+                                <div className="h-8 w-8" />
+                              )}
                             </div>
                           </div>
                         )
@@ -626,7 +583,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full border-dashed"
+                    className="ml-5 h-8 border-dashed bg-background px-3 text-xs"
                     disabled={!canManageControls || lote.estado !== "abierto"}
                     onClick={() => {
                       setNewControl(initialNewControl)
@@ -636,14 +593,14 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Agregar Control
+                    Agregar control
                   </Button>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
+              </section>
             )
           })}
-        </Accordion>
-      </div>
+        </div>
+      </section>
 
       {/* Dialogo para agregar control */}
       <Dialog
@@ -654,7 +611,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
           setShowAddControl(null)
         }}
       >
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-border bg-card sm:w-[90vw] lg:w-[70vw]">
+        <DialogContent className="!w-[min(calc(100vw-2rem),42rem)] !max-w-[42rem] border-border bg-card">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Control</DialogTitle>
           </DialogHeader>
