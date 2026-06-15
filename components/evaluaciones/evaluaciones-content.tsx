@@ -49,6 +49,7 @@ import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { fetchAnswersForControl } from "@/lib/supabase-data"
 import { getErrorMessage } from "@/lib/error-message"
+import { downloadPptx, downloadXlsx } from "@/lib/export"
 import { cn } from "@/lib/utils"
 
 const YEAR_KEY = "a\u00f1o"
