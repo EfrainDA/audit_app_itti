@@ -42,6 +42,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
+import { supabase } from "@/lib/supabase"
 import {
   fetchAnswersForControl,
   finalizeEvaluation,
