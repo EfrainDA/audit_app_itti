@@ -274,14 +274,15 @@ function normalizeAuditStatus(status: DbAudit["status"]): Auditoria["estado"] {
   return status
 }
 
-async function fetchCyclesData() {
-  let result = await supabase.from("cycles").select("id,year,bimester,start_date,end_date,status").order("year").order("bimester")
+async function fetchCyclesData(): Promise<{ data: DbCycle[] | null; error: unknown }> {
+  const result = await supabase.from("cycles").select("id,year,bimester,start_date,end_date,status").order("year").order("bimester")
 
   if (isMissingCycleStatusColumn(result.error)) {
-    result = await supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester")
+    const fallbackResult = await supabase.from("cycles").select("id,year,bimester,start_date,end_date").order("year").order("bimester")
+    return { data: fallbackResult.data as DbCycle[] | null, error: fallbackResult.error }
   }
 
-  return result
+  return { data: result.data as DbCycle[] | null, error: result.error }
 }
 
 export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status">): Promise<AppData> {
@@ -345,9 +346,12 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       .order("created_at", { ascending: false }),
   ])
 
-  let normalizedAnswersResult = answersResult
+  let normalizedAnswersResult: { data: DbAnswer[] | null; error: unknown } = {
+    data: answersResult.data as DbAnswer[] | null,
+    error: answersResult.error,
+  }
   if (isMissingAuditedAreasColumn(answersResult.error)) {
-    normalizedAnswersResult = currentProfile.role === "auditor"
+    const fallbackResult = currentProfile.role === "auditor"
       ? await supabase
           .from("answers")
           .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
@@ -355,6 +359,11 @@ export async function fetchAppData(profile?: Pick<User, "id" | "role" | "status"
       : await supabase
           .from("answers")
           .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+
+    normalizedAnswersResult = {
+      data: fallbackResult.data as DbAnswer[] | null,
+      error: fallbackResult.error,
+    }
   }
 
   const firstError = [
@@ -1676,24 +1685,26 @@ export async function deleteControl(id: string) {
 
 export async function fetchAnswersForControl(controlId: string) {
   await assertCanReadControl(controlId)
-  let { data, error } = await supabase
+  const result = await supabase
     .from("answers")
     .select("id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
     .eq("control_id", controlId)
+  let answersData = result.data as DbAnswer[] | null
+  let answersError: unknown = result.error
 
-  if (isMissingAuditedAreasColumn(error)) {
+  if (isMissingAuditedAreasColumn(result.error)) {
     const fallbackResult = await supabase
       .from("answers")
       .select("id,parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
       .eq("control_id", controlId)
 
-    data = fallbackResult.data
-    error = fallbackResult.error
+    answersData = fallbackResult.data as DbAnswer[] | null
+    answersError = fallbackResult.error
   }
 
-  if (error) throw error
+  if (answersError) throw answersError
 
-  return (data ?? []).map((answer) => ({
+  return (answersData ?? []).map((answer) => ({
     id: answer.id as string,
     parametroId: answer.parameter_id as string,
     valor: answer.value as EvaluationAnswerInput["valor"],
