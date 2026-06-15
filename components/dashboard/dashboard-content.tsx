@@ -991,7 +991,7 @@ function SupervisorCycleMeta({
   daysToClose,
 }: {
   cycleNumber: string
-  cycleYear: number
+  cycleYear: string | number
   daysToClose: number
 }) {
   return (
