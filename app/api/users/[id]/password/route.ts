@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { createServerAdminClient, readJsonBody, requireAppRole } from "@/lib/server-auth"
 
@@ -12,7 +11,7 @@ function errorResponse(message: string, status: number) {
 }
 
 async function findAuthUserByEmail(
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: ReturnType<typeof createServerAdminClient>,
   email: string,
 ) {
   const perPage = 1000
