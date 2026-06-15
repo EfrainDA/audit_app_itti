@@ -189,7 +189,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
     })
 
     return Array.from(options.values()).sort((first, second) => {
-        if (first[YEAR_KEY] !== second[YEAR_KEY]) return Number(second[YEAR_KEY]) - Number(first[YEAR_KEY])
+      if (first.year !== second.year) return second.year - first.year
       return second.cycle - first.cycle
     })
   }, [lotesConDatos])
