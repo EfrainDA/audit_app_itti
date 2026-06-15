@@ -25,7 +25,6 @@ import {
   Paperclip,
   Play,
   Plus,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react"
@@ -42,7 +41,6 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { supabase } from "@/lib/supabase"
 import {
   fetchAnswersForControl,
   finalizeEvaluation,
@@ -59,21 +57,6 @@ interface EvaluacionDetailProps {
 }
 
 type RespuestaValor = 'cumple' | 'intermedio' | 'no_cumple' | 'na' | null
-
-type AiEvaluationSuggestion = {
-  suggested_status: Exclude<RespuestaValor, null>
-  confidence: number
-  summary: string
-  reasoning: string
-  missing_evidence: string[]
-  recommended_comment: string
-}
-
-type EvidenceSummary = {
-  summary: string
-  key_points: string[]
-  limitations: string[]
-}
 
 interface Respuesta {
   id?: string
@@ -150,17 +133,6 @@ const isAcceptedEvidenceFile = (file: File) => {
   return file.type.startsWith("image/") || evidenceFileExtensions.has(extension)
 }
 
-const canReadEvidenceText = (file: File) => {
-  const extension = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`
-  return file.type.startsWith("text/") || [".txt", ".csv", ".json", ".md"].includes(extension)
-}
-
-const readEvidenceText = async (file: File) => {
-  if (!canReadEvidenceText(file)) return ""
-  const text = await file.text()
-  return text.slice(0, 12000)
-}
-
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const { data, refresh } = useAppData()
   const { appUser } = useAuth()
@@ -192,10 +164,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const [auditedComments, setAuditedComments] = useState<Record<string, string>>({})
   const [auditedEvidenceFiles, setAuditedEvidenceFiles] = useState<Record<string, File[]>>({})
   const [savingAuditedAnswerId, setSavingAuditedAnswerId] = useState<string | null>(null)
-  const [aiSuggestions, setAiSuggestions] = useState<Record<string, AiEvaluationSuggestion>>({})
-  const [evidenceSummaries, setEvidenceSummaries] = useState<Record<string, EvidenceSummary>>({})
-  const [aiLoadingParametroId, setAiLoadingParametroId] = useState<string | null>(null)
-  const [summaryLoadingParametroId, setSummaryLoadingParametroId] = useState<string | null>(null)
   const [activeParametroIndex, setActiveParametroIndex] = useState(0)
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [formError, setFormError] = useState<string | null>(null)
@@ -656,135 +624,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     }))
   }
 
-  const buildEvidencePayload = async (parametroId: string) => {
-    const files = evidenceFiles[parametroId] ?? []
-
-    return Promise.all(
-      files.map(async (file) => ({
-        name: file.name,
-        type: file.type || "sin tipo",
-        size: file.size,
-        text: await readEvidenceText(file),
-      })),
-    )
-  }
-
-  const handleSuggestEvaluation = async (parametroId: string) => {
-    const parametro = vertical.parametros.find((item) => item.id === parametroId)
-    if (!parametro || !canEditEvaluation) return
-
-    setFormError(null)
-    setAiLoadingParametroId(parametroId)
-
-    try {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (!token) throw new Error("No se encontro una sesion valida.")
-
-      const response = await fetch("/api/ai/evaluate-control", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          control: {
-            id: currentControl.id,
-            identificador: currentControl.identificador,
-            descripcion: currentControl.descripcion,
-            etiqueta: currentControl.etiqueta,
-            proceso: currentControl.proceso,
-            subproceso: currentControl.subproceso,
-            producto: currentControl.producto,
-          },
-          unidad: unidad?.nombre,
-          modelo: modelo.nombre,
-          vertical: {
-            nombre: vertical.nombre,
-            peso: vertical.peso,
-          },
-          parametro: {
-            nombre: parametro.nombre,
-            descripcion: parametro.descripcion,
-            puntosBase: parametro.puntosBase,
-            permiteIntermedio: parametro.permiteIntermedio,
-          },
-          currentAnswer: respuestas[parametroId] ?? createEmptyRespuesta(parametroId),
-          evidenceSummary: evidenceSummaries[parametroId],
-          evidenceFiles: await buildEvidencePayload(parametroId),
-        }),
-      })
-
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "No se pudo generar la sugerencia.")
-
-      const suggestion = payload as AiEvaluationSuggestion
-      setAiSuggestions((prev) => ({ ...prev, [parametroId]: suggestion }))
-      setRespuestas((prev) => ({
-        ...prev,
-        [parametroId]: {
-          ...createEmptyRespuesta(parametroId),
-          ...prev[parametroId],
-          valor: suggestion.suggested_status,
-          comentario: suggestion.recommended_comment,
-          fechaRespuesta: new Date().toISOString(),
-        },
-      }))
-    } catch (suggestError) {
-      setFormError(getErrorMessage(suggestError, "No se pudo generar la sugerencia con IA."))
-    } finally {
-      setAiLoadingParametroId(null)
-    }
-  }
-
-  const handleSummarizeEvidence = async (parametroId: string) => {
-    const parametro = vertical.parametros.find((item) => item.id === parametroId)
-    if (!parametro) return
-
-    const files = evidenceFiles[parametroId] ?? []
-    if (!files.length) {
-      setFormError("Adjunta al menos una evidencia para resumir.")
-      return
-    }
-
-    setFormError(null)
-    setSummaryLoadingParametroId(parametroId)
-
-    try {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (!token) throw new Error("No se encontro una sesion valida.")
-
-      const response = await fetch("/api/ai/summarize-evidence", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          parametro: {
-            nombre: parametro.nombre,
-            descripcion: parametro.descripcion,
-          },
-          control: {
-            identificador: currentControl.identificador,
-            descripcion: currentControl.descripcion,
-          },
-          evidenceFiles: await buildEvidencePayload(parametroId),
-        }),
-      })
-
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "No se pudo resumir la evidencia.")
-
-      setEvidenceSummaries((prev) => ({ ...prev, [parametroId]: payload as EvidenceSummary }))
-    } catch (summaryError) {
-      setFormError(getErrorMessage(summaryError, "No se pudo resumir la evidencia."))
-    } finally {
-      setSummaryLoadingParametroId(null)
-    }
-  }
-
   const handleSaveDraft = async () => {
     if (!canEditEvaluation) return
     setFormError(null)
@@ -1091,17 +930,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                     <span className="rounded-md border border-border/60 bg-background px-2 py-1 text-xs font-semibold text-foreground">
                       {currentParametro.puntosBase} pts
                     </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => handleSuggestEvaluation(currentParametro.id)}
-                      disabled={!canEditEvaluation || aiLoadingParametroId === currentParametro.id}
-                    >
-                      <Sparkles className="mr-1 h-3.5 w-3.5" />
-                      {aiLoadingParametroId === currentParametro.id ? "Sugiriendo" : "Sugerir evaluación"}
-                    </Button>
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-lg font-semibold leading-6 text-foreground">{currentParametro.nombre}</h3>
@@ -1198,26 +1026,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         <span>El comentario / hallazgo es obligatorio para este parámetro.</span>
                       </div>
                     )}
-                    {aiSuggestions[currentParametro.id] && (
-                      <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Sparkles className="h-3.5 w-3.5 text-primary" />
-                          <p className="font-semibold text-primary">Sugerencia IA</p>
-                          <Badge variant="outline" className="h-5 px-2 text-[10px]">
-                            {respuestaValorLabels[aiSuggestions[currentParametro.id].suggested_status]}
-                          </Badge>
-                          <span className="text-muted-foreground">
-                            {Math.round(aiSuggestions[currentParametro.id].confidence * 100)}% confianza
-                          </span>
-                        </div>
-                        <p className="mt-1.5 text-muted-foreground">{aiSuggestions[currentParametro.id].reasoning}</p>
-                        {aiSuggestions[currentParametro.id].missing_evidence.length > 0 && (
-                          <p className="mt-1.5 text-[11px] text-warning">
-                            Falta evidencia: {aiSuggestions[currentParametro.id].missing_evidence.join("; ")}
-                          </p>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex min-h-9 items-center justify-between gap-3 rounded-md border border-border/40 bg-secondary/10 px-3 py-1.5">
@@ -1255,17 +1063,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                         />
                       </label>
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 shrink-0 px-2 text-[11px] text-primary hover:bg-primary/10 hover:text-primary"
-                      onClick={() => handleSummarizeEvidence(currentParametro.id)}
-                      disabled={summaryLoadingParametroId === currentParametro.id || currentParametroEvidenceFiles.length === 0}
-                    >
-                      <Sparkles className="mr-1 h-3.5 w-3.5" />
-                      {summaryLoadingParametroId === currentParametro.id ? "Resumiendo" : "Resumir evidencia"}
-                    </Button>
                   </div>
 
                   {currentRespuesta.evidencias.length > 0 && (
@@ -1302,32 +1099,6 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                           </Button>
                         </div>
                       ))}
-                    </div>
-                  )}
-
-                  {evidenceSummaries[currentParametro.id] && (
-                    <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-primary">Resumen de evidencia</p>
-                          <p className="mt-1 text-muted-foreground">{evidenceSummaries[currentParametro.id].summary}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 shrink-0 px-2 text-[11px]"
-                          onClick={() => handleSetComentario(currentParametro.id, evidenceSummaries[currentParametro.id].summary)}
-                          disabled={!canEditEvaluation}
-                        >
-                          Usar
-                        </Button>
-                      </div>
-                      {evidenceSummaries[currentParametro.id].limitations.length > 0 && (
-                        <p className="mt-1.5 text-[11px] text-muted-foreground">
-                          Limitaciones: {evidenceSummaries[currentParametro.id].limitations.join("; ")}
-                        </p>
-                      )}
                     </div>
                   )}
 
