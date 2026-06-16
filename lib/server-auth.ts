@@ -18,11 +18,18 @@ export function getServerSupabaseConfig() {
   return { supabaseUrl, supabaseAnonKey, supabaseServiceRoleKey }
 }
 
-export function createServerAuthClient() {
+export function createServerAuthClient(accessToken?: string) {
   const config = getServerSupabaseConfig()
 
   return createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      : undefined,
   })
 }
 
@@ -46,19 +53,21 @@ export async function requireAppRole(request: Request, allowedRoles: AppRole[]) 
   if (!token) return { error: jsonError("No se encontro una sesion valida.", 401) }
 
   const authClient = createServerAuthClient()
-  const adminClient = createServerAdminClient()
+  const dbClient = createServerAuthClient(token)
   const { data: requester, error: requesterError } = await authClient.auth.getUser(token)
   if (requesterError || !requester.user) {
     return { error: jsonError("La sesion ya no es valida.", 401) }
   }
 
-  const { data: profile, error: profileError } = await adminClient
+  const { data: profile, error: profileError } = await dbClient
     .from("users")
     .select("id,role,status")
     .eq("auth_user_id", requester.user.id)
     .maybeSingle()
 
-  if (profileError) return { error: jsonError("No se pudo validar el perfil.", 500) }
+  if (profileError) {
+    return { error: jsonError(`No se pudo validar el perfil: ${profileError.message}`, 500) }
+  }
   if (!profile || profile.status !== "activo") {
     return { error: jsonError("El usuario no esta activo.", 403) }
   }
@@ -66,7 +75,8 @@ export async function requireAppRole(request: Request, allowedRoles: AppRole[]) 
     return { error: jsonError("No tenes permisos para realizar esta accion.", 403) }
   }
 
-  return { user: requester.user, profile: profile as { id: string; role: AppRole; status: string }, adminClient }
+  const adminClient = createServerAdminClient()
+  return { user: requester.user, profile: profile as { id: string; role: AppRole; status: string }, adminClient, dbClient }
 }
 
 export async function readJsonBody<T>(request: Request, maxBytes: number) {

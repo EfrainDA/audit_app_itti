@@ -48,14 +48,15 @@ export async function POST(
   if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
     return errorResponse("La contrasena debe tener al menos 12 caracteres, mayusculas, minusculas y numeros.", 400)
   }
-  const adminClient = createServerAdminClient()
+  const adminClient = auth.adminClient
+  const dbClient = auth.dbClient
 
   const { id } = await params
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     return errorResponse("Usuario invalido.", 400)
   }
 
-  const { data: profile, error: profileError } = await adminClient
+  const { data: profile, error: profileError } = await dbClient
     .from("users")
     .select("auth_user_id,email,name")
     .eq("id", id)
@@ -72,7 +73,7 @@ export async function POST(
 
       if (existingAuthUser) {
         authUserId = existingAuthUser.id
-        const { error } = await adminClient
+        const { error } = await dbClient
           .from("users")
           .update({ auth_user_id: authUserId })
           .eq("id", id)
