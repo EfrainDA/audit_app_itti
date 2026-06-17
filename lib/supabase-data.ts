@@ -219,10 +219,6 @@ function isMissingAuditedAreasColumn(error: unknown) {
   return record.code === "42703" || (typeof record.message === "string" && record.message.includes("audited_areas"))
 }
 
-function getMissingAuditedAreasError() {
-  return new Error("No se pudo guardar el area auditada porque falta la columna audited_areas en Supabase. Aplica la migracion 20260601100000_add_answer_audited_areas.sql.")
-}
-
 function isMissingCycleStatusColumn(error: unknown) {
   if (!error || typeof error !== "object") return false
   const record = error as Record<string, unknown>
@@ -1918,7 +1914,21 @@ export async function saveEvaluationDraft(controlId: string, answers: Evaluation
   )
 
   if (isMissingAuditedAreasColumn(error)) {
-    throw getMissingAuditedAreasError()
+    const fallbackRows = rows.map((row) => ({
+      control_id: row.control_id,
+      parameter_id: row.parameter_id,
+      value: row.value,
+      comment: row.comment,
+      audited_people: row.audited_people,
+      audited_roles: row.audited_roles,
+      auditor_id: row.auditor_id,
+      answered_at: row.answered_at,
+    }))
+    const fallbackResult = await supabase.from("answers").upsert(
+      fallbackRows,
+      { onConflict: "control_id,parameter_id" },
+    )
+    error = fallbackResult.error
   }
 
   if (error) throw error
