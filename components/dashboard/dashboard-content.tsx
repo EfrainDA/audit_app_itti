@@ -777,7 +777,9 @@ function AuditedDashboard({
                   <div key={answer.id} className="rounded-md border border-border/60 bg-background px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md border border-border/60 bg-secondary/40 px-2 py-1 text-xs font-semibold">Parámetro {index + 1}</span>
-                      <Badge variant="outline" className="h-5 px-2 text-[10px]">{formatEstado(answer.valor)}</Badge>
+                      <Badge variant="outline" className="h-5 px-2 text-[10px]">
+                        {answer.valor ? formatEstado(answer.valor) : "Sin responder"}
+                      </Badge>
                     </div>
                     {answer.comentario && (
                       <div className="mt-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2 text-sm">

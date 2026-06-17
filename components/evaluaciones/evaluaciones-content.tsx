@@ -326,7 +326,7 @@ export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesConte
           })
         }),
       ]
-      const answerLabel = (value?: string) => value ? formatEstado(value) : "Sin responder"
+      const answerLabel = (value?: string | null) => value ? formatEstado(value) : "Sin responder"
       const getAuditorName = (control: Control) =>
         control.auditorId ? users.find((user) => user.id === control.auditorId)?.name ?? "Sin asignar" : "Sin asignar"
       const getVerticalForControl = (control: Control) => {

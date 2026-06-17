@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@/lib/data"
@@ -15,6 +15,8 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+const TAB_AWAY_TIMEOUT_MS = 60 * 60 * 1000
+const TAB_AWAY_STARTED_AT_KEY = "audit_app_tab_away_started_at"
 
 function mapProfile(row: {
   id: string
@@ -89,6 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [appUser, setAppUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const signOut = useCallback(async () => {
+    window.sessionStorage.removeItem(TAB_AWAY_STARTED_AT_KEY)
+    await supabase.auth.signOut()
+    setSession(null)
+    setAppUser(null)
+  }, [])
+
   const refreshProfile = async () => {
     const { data } = await supabase.auth.getSession()
     const currentSession = data.session
@@ -158,6 +167,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!session) {
+      window.sessionStorage.removeItem(TAB_AWAY_STARTED_AT_KEY)
+      return
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const clearAwayTimer = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    }
+
+    const getAwayStartedAt = () => {
+      const value = window.sessionStorage.getItem(TAB_AWAY_STARTED_AT_KEY)
+      const timestamp = Number(value)
+      return Number.isFinite(timestamp) ? timestamp : null
+    }
+
+    const checkAwayTimeout = async () => {
+      const startedAt = getAwayStartedAt()
+      if (!startedAt) return
+
+      const elapsed = Date.now() - startedAt
+      if (elapsed >= TAB_AWAY_TIMEOUT_MS) {
+        clearAwayTimer()
+        await signOut()
+      }
+    }
+
+    const startAwayTimer = () => {
+      if (getAwayStartedAt() === null) {
+        window.sessionStorage.setItem(TAB_AWAY_STARTED_AT_KEY, String(Date.now()))
+      }
+
+      clearAwayTimer()
+      const startedAt = getAwayStartedAt()
+      const remaining = Math.max(TAB_AWAY_TIMEOUT_MS - (Date.now() - (startedAt ?? Date.now())), 0)
+      timeoutId = setTimeout(() => {
+        checkAwayTimeout()
+      }, remaining)
+    }
+
+    const markActive = () => {
+      checkAwayTimeout()
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        window.sessionStorage.removeItem(TAB_AWAY_STARTED_AT_KEY)
+        clearAwayTimer()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        startAwayTimer()
+        return
+      }
+
+      markActive()
+    }
+
+    const handleFocus = () => markActive()
+    const handleBlur = () => startAwayTimer()
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleFocus)
+    window.addEventListener("blur", handleBlur)
+
+    if (document.visibilityState === "hidden" || !document.hasFocus()) {
+      startAwayTimer()
+    }
+
+    return () => {
+      clearAwayTimer()
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleFocus)
+      window.removeEventListener("blur", handleBlur)
+    }
+  }, [session, signOut])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -165,13 +255,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       appUser,
       isLoading,
       refreshProfile,
-      signOut: async () => {
-        await supabase.auth.signOut()
-        setSession(null)
-        setAppUser(null)
-      },
+      signOut,
     }),
-    [appUser, isLoading, session],
+    [appUser, isLoading, session, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

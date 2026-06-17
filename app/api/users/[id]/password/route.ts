@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server"
-import { createServerAdminClient, readJsonBody, requireAppRole } from "@/lib/server-auth"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey =
-  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+import { createServerAdminClient, getServerSupabaseConfig, readJsonBody, requireAppRole } from "@/lib/server-auth"
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
+}
+
+function getAuthAdminErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) return "No se pudo asignar la contrasena."
+
+  if (/invalid api key/i.test(error.message) || /bad_jwt/i.test(error.message)) {
+    return "La clave administrativa de Supabase Auth no es valida. Configura SUPABASE_AUTH_ADMIN_KEY con la service_role key JWT en .env.local y reinicia el servidor."
+  }
+
+  return error.message
 }
 
 async function findAuthUserByEmail(
@@ -30,14 +35,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-    return errorResponse("Falta configurar SUPABASE_SECRET_KEY en el servidor.", 500)
-  }
-  if (supabaseServiceRoleKey.startsWith("sb_service_role_")) {
-    return errorResponse(
-      "La clave administrativa no es valida. Usa la Secret key con prefijo sb_secret_ desde Supabase > Settings > API Keys.",
-      500,
-    )
+  const config = getServerSupabaseConfig()
+  if (!config.supabaseServiceRoleKey) {
+    return errorResponse("Falta configurar SUPABASE_AUTH_ADMIN_KEY en el servidor.", 500)
   }
 
   const auth = await requireAppRole(request, ["admin"])
@@ -95,7 +95,6 @@ export async function POST(
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo asignar la contrasena."
-    return errorResponse(message, 500)
+    return errorResponse(getAuthAdminErrorMessage(error), 500)
   }
 }

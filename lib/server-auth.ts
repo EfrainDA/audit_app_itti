@@ -4,7 +4,11 @@ type AppRole = "admin" | "supervisor" | "auditor" | "auditado"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_AUTH_ADMIN_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_JWT ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY
 
 export function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status })
@@ -36,7 +40,7 @@ export function createServerAuthClient(accessToken?: string) {
 export function createServerAdminClient() {
   const config = getServerSupabaseConfig()
   if (!config.supabaseServiceRoleKey) {
-    throw new Error("Falta configurar SUPABASE_SECRET_KEY en el servidor.")
+    throw new Error("Falta configurar SUPABASE_AUTH_ADMIN_KEY en el servidor.")
   }
 
   return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {

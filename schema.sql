@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS "public"."answers" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "control_id" "uuid" NOT NULL,
     "parameter_id" "uuid" NOT NULL,
-    "value" "public"."answer_value" NOT NULL,
+    "value" "public"."answer_value",
     "comment" "text",
     "audited_people" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
     "audited_roles" "text"[] DEFAULT '{}'::"text"[] NOT NULL,

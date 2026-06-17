@@ -82,6 +82,16 @@ const createEmptyRespuesta = (parametroId: string): Respuesta => ({
   descargosAuditado: [],
 })
 
+const toAnswerPayload = (respuesta: Respuesta): EvaluationAnswerInput => ({
+  parametroId: respuesta.parametroId,
+  valor: respuesta.valor,
+  comentario: respuesta.comentario,
+  personasAuditadas: respuesta.personasAuditadas,
+  cargos: respuesta.cargos,
+  areas: respuesta.areas,
+  fechaRespuesta: respuesta.fechaRespuesta,
+})
+
 const respuestaValorLabels: Record<Exclude<RespuestaValor, null>, string> = {
   cumple: "Cumple",
   intermedio: "Intermedio",
@@ -225,18 +235,9 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
     setAutoSaveStatus("saving")
 
     const timer = setTimeout(() => {
-      const answers = Object.values(respuestas).filter((respuesta): respuesta is Respuesta & { valor: Exclude<RespuestaValor, null> } => respuesta.valor !== null)
       saveEvaluationDraft(
         controlId,
-        answers.map((respuesta) => ({
-          parametroId: respuesta.parametroId,
-          valor: respuesta.valor,
-          comentario: respuesta.comentario,
-          personasAuditadas: respuesta.personasAuditadas,
-          cargos: respuesta.cargos,
-          areas: respuesta.areas,
-          fechaRespuesta: respuesta.fechaRespuesta,
-        })),
+        Object.values(respuestas).map(toAnswerPayload),
       )
         .then(() => setAutoSaveStatus("saved"))
         .catch((saveError) => {
@@ -555,16 +556,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
 
   const getAnswersPayload = (): EvaluationAnswerInput[] =>
     Object.values(respuestas)
-      .filter((respuesta): respuesta is Respuesta & { valor: Exclude<RespuestaValor, null> } => respuesta.valor !== null)
-      .map((respuesta) => ({
-        parametroId: respuesta.parametroId,
-        valor: respuesta.valor,
-        comentario: respuesta.comentario,
-        personasAuditadas: respuesta.personasAuditadas,
-        cargos: respuesta.cargos,
-        areas: respuesta.areas,
-        fechaRespuesta: respuesta.fechaRespuesta,
-      }))
+      .map(toAnswerPayload)
 
   const getAnsweredParamsWithoutComment = () =>
     vertical.parametros.filter((parametro) => {

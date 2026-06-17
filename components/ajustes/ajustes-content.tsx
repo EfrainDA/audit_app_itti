@@ -107,6 +107,7 @@ export function AjustesContent() {
   const [unidadError, setUnidadError] = useState<string | null>(null)
   const [isSavingUnidad, setIsSavingUnidad] = useState(false)
   const [isUserOpen, setIsUserOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<typeof users[number] | null>(null)
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [userCargo, setUserCargo] = useState("")
@@ -224,6 +225,7 @@ export function AjustesContent() {
   }
 
   const resetUserForm = () => {
+    setEditingUser(null)
     setUserName("")
     setUserEmail("")
     setUserCargo("")
@@ -232,17 +234,37 @@ export function AjustesContent() {
     setUserError(null)
   }
 
-  const handleCreateUser = async () => {
+  const openEditUser = (user: typeof users[number]) => {
+    setEditingUser(user)
+    setUserName(user.name)
+    setUserEmail(user.email)
+    setUserCargo(user.cargo ?? "")
+    setUserArea(user.area ?? "")
+    setUserRole(user.role)
+    setUserError(null)
+    setIsUserOpen(true)
+  }
+
+  const handleSaveUser = async () => {
     setUserError(null)
     setIsSavingUser(true)
 
     try {
-      await createUserProfile({ name: userName, email: userEmail, role: userRole, cargo: userCargo, area: userArea })
+      if (editingUser) {
+        await updateUserProfile(editingUser.id, {
+          name: userName,
+          role: userRole,
+          cargo: userCargo,
+          area: userArea,
+        })
+      } else {
+        await createUserProfile({ name: userName, email: userEmail, role: userRole, cargo: userCargo, area: userArea })
+      }
       await refresh()
       resetUserForm()
       setIsUserOpen(false)
     } catch (submitError) {
-      setUserError(getErrorMessage(submitError, "No se pudo crear el usuario."))
+      setUserError(getErrorMessage(submitError, "No se pudo guardar el usuario."))
     } finally {
       setIsSavingUser(false)
     }
@@ -445,16 +467,21 @@ export function AjustesContent() {
                   }}
                 >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90 sm:w-auto" disabled={!canManageUsers}>
+                    <Button
+                      size="sm"
+                      className="w-full bg-primary hover:bg-primary/90 sm:w-auto"
+                      disabled={!canManageUsers}
+                      onClick={resetUserForm}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Nuevo Usuario
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="!w-[min(calc(100vw-2rem),42rem)] !max-w-[42rem]">
                     <DialogHeader>
-                      <DialogTitle>Crear Usuario</DialogTitle>
+                      <DialogTitle>{editingUser ? "Editar usuario" : "Crear Usuario"}</DialogTitle>
                       <DialogDescription>
-                        Agrega un nuevo usuario al sistema
+                        {editingUser ? "Actualiza los datos del usuario" : "Agrega un nuevo usuario al sistema"}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
@@ -464,7 +491,7 @@ export function AjustesContent() {
                       </div>
                       <div className="space-y-2">
                         <Label>Correo Electronico</Label>
-                        <Input value={userEmail} disabled={!canManageUsers} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-card" />
+                        <Input value={userEmail} disabled={!canManageUsers || Boolean(editingUser)} onChange={(event) => setUserEmail(event.target.value)} type="email" placeholder="usuario@empresa.com" className="bg-card" />
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
@@ -493,8 +520,8 @@ export function AjustesContent() {
                       {userError && <p className="text-sm text-destructive">{userError}</p>}
                       <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end">
                         <Button variant="outline" onClick={() => setIsUserOpen(false)}>Cancelar</Button>
-                        <Button className="bg-primary" onClick={handleCreateUser} disabled={!canManageUsers || isSavingUser || !userName.trim() || !userEmail.trim()}>
-                          {isSavingUser ? "Creando..." : "Crear Usuario"}
+                        <Button className="bg-primary" onClick={handleSaveUser} disabled={!canManageUsers || isSavingUser || !userName.trim() || !userEmail.trim()}>
+                          {isSavingUser ? "Guardando..." : editingUser ? "Guardar cambios" : "Crear Usuario"}
                         </Button>
                       </div>
                     </div>
@@ -547,6 +574,11 @@ export function AjustesContent() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem disabled={!canManageUsers} onClick={() => openEditUser(user)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar datos
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem disabled={!canManageUsers} onClick={() => handleUpdateUserRole(user.id, user.role === "admin" ? "auditor" : "admin")}>
                             <Edit className="h-4 w-4 mr-2" />
                             {user.role === "admin" ? "Quitar admin" : "Hacer admin"}

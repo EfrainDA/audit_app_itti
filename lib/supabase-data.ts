@@ -52,7 +52,7 @@ export type ControlModelInput = {
 
 export type EvaluationAnswerInput = {
   parametroId: string
-  valor: "cumple" | "no_cumple" | "intermedio" | "na"
+  valor: "cumple" | "no_cumple" | "intermedio" | "na" | null
   comentario?: string
   personasAuditadas: string[]
   cargos: string[]
@@ -217,6 +217,10 @@ function isMissingAuditedAreasColumn(error: unknown) {
   if (!error || typeof error !== "object") return false
   const record = error as Record<string, unknown>
   return record.code === "42703" || (typeof record.message === "string" && record.message.includes("audited_areas"))
+}
+
+function getMissingAuditedAreasError() {
+  return new Error("No se pudo guardar el area auditada porque falta la columna audited_areas en Supabase. Aplica la migracion 20260601100000_add_answer_audited_areas.sql.")
 }
 
 function isMissingCycleStatusColumn(error: unknown) {
@@ -943,9 +947,19 @@ export async function deleteBusinessUnit(id: string) {
   if (error) throw error
 }
 
-export async function updateUserProfile(id: string, input: { role?: User["role"]; status?: User["status"] }) {
+export async function updateUserProfile(
+  id: string,
+  input: { name?: string; role?: User["role"]; status?: User["status"]; cargo?: string; area?: string },
+) {
   await requireAdmin()
-  const { error } = await supabase.from("users").update(input).eq("id", id)
+  const payload = {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.role !== undefined ? { role: input.role } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.cargo !== undefined ? { cargo: input.cargo.trim() || null } : {}),
+    ...(input.area !== undefined ? { area: input.area.trim() || null } : {}),
+  }
+  const { error } = await supabase.from("users").update(payload).eq("id", id)
   if (error) throw error
 }
 
@@ -1886,30 +1900,25 @@ export async function saveEvaluationDraft(controlId: string, answers: Evaluation
 
   if (!answers.length) return
 
-  const buildRows = (includeAreas: boolean) =>
-    answers.map((answer) => ({
-      control_id: controlId,
-      parameter_id: answer.parametroId,
-      value: answer.valor,
-      comment: answer.comentario?.trim() || null,
-      audited_people: answer.personasAuditadas.map((item) => item.trim()).filter(Boolean),
-      audited_roles: answer.cargos.map((item) => item.trim()).filter(Boolean),
-      ...(includeAreas ? { audited_areas: answer.areas.map((item) => item.trim()).filter(Boolean) } : {}),
-      auditor_id: auditorId,
-      answered_at: answer.fechaRespuesta ?? new Date().toISOString(),
-    }))
+  const rows = answers.map((answer) => ({
+    control_id: controlId,
+    parameter_id: answer.parametroId,
+    value: answer.valor,
+    comment: answer.comentario?.trim() || null,
+    audited_people: answer.personasAuditadas.map((item) => item.trim()).filter(Boolean),
+    audited_roles: answer.cargos.map((item) => item.trim()).filter(Boolean),
+    audited_areas: answer.areas.map((item) => item.trim()).filter(Boolean),
+    auditor_id: auditorId,
+    answered_at: answer.fechaRespuesta ?? new Date().toISOString(),
+  }))
 
   let { error } = await supabase.from("answers").upsert(
-    buildRows(true),
+    rows,
     { onConflict: "control_id,parameter_id" },
   )
 
   if (isMissingAuditedAreasColumn(error)) {
-    const fallbackResult = await supabase.from("answers").upsert(
-      buildRows(false),
-      { onConflict: "control_id,parameter_id" },
-    )
-    error = fallbackResult.error
+    throw getMissingAuditedAreasError()
   }
 
   if (error) throw error

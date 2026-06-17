@@ -121,7 +121,7 @@ export interface Respuesta {
   id: string
   controlId: string
   parametroId: string
-  valor: "cumple" | "no_cumple" | "intermedio" | "na"
+  valor: "cumple" | "no_cumple" | "intermedio" | "na" | null
   comentario?: string
   evidencias: string[]
   personasAuditadas?: string[]
