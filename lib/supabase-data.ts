@@ -219,6 +219,22 @@ function isMissingAuditedAreasColumn(error: unknown) {
   return record.code === "42703" || (typeof record.message === "string" && record.message.includes("audited_areas"))
 }
 
+function isAnswerValueNotNullConstraint(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const record = error as Record<string, unknown>
+  const message = typeof record.message === "string" ? record.message : ""
+  const details = typeof record.details === "string" ? record.details : ""
+  const errorText = `${message} ${details}`.toLowerCase()
+
+  return (
+    (record.code === "23502" || errorText.includes("violates not-null constraint")) &&
+    errorText.includes("value") &&
+    errorText.includes("answers")
+  )
+}
+
+let canPersistNullAnswerValues: boolean | null = null
+
 function isMissingCycleStatusColumn(error: unknown) {
   if (!error || typeof error !== "object") return false
   const record = error as Record<string, unknown>
@@ -1908,30 +1924,52 @@ export async function saveEvaluationDraft(controlId: string, answers: Evaluation
     answered_at: answer.fechaRespuesta ?? new Date().toISOString(),
   }))
 
-  let { error } = await supabase.from("answers").upsert(
-    rows,
-    { onConflict: "control_id,parameter_id" },
-  )
+  let includeAuditedAreas = true
+  let skipNullValues = canPersistNullAnswerValues === false
+  let remainingAttempts = 4
 
-  if (isMissingAuditedAreasColumn(error)) {
-    const fallbackRows = rows.map((row) => ({
-      control_id: row.control_id,
-      parameter_id: row.parameter_id,
-      value: row.value,
-      comment: row.comment,
-      audited_people: row.audited_people,
-      audited_roles: row.audited_roles,
-      auditor_id: row.auditor_id,
-      answered_at: row.answered_at,
-    }))
-    const fallbackResult = await supabase.from("answers").upsert(
-      fallbackRows,
+  while (remainingAttempts > 0) {
+    remainingAttempts -= 1
+    const attemptedRows = skipNullValues ? rows.filter((row) => row.value !== null) : rows
+    if (!attemptedRows.length) return
+
+    const payloadRows = includeAuditedAreas
+      ? attemptedRows
+      : attemptedRows.map((row) => ({
+          control_id: row.control_id,
+          parameter_id: row.parameter_id,
+          value: row.value,
+          comment: row.comment,
+          audited_people: row.audited_people,
+          audited_roles: row.audited_roles,
+          auditor_id: row.auditor_id,
+          answered_at: row.answered_at,
+        }))
+    const { error } = await supabase.from("answers").upsert(
+      payloadRows,
       { onConflict: "control_id,parameter_id" },
     )
-    error = fallbackResult.error
-  }
 
-  if (error) throw error
+    if (!error) {
+      if (rows.some((row) => row.value === null)) {
+        canPersistNullAnswerValues = !skipNullValues
+      }
+      return
+    }
+
+    if (includeAuditedAreas && isMissingAuditedAreasColumn(error)) {
+      includeAuditedAreas = false
+      continue
+    }
+
+    if (!skipNullValues && isAnswerValueNotNullConstraint(error)) {
+      canPersistNullAnswerValues = false
+      skipNullValues = true
+      continue
+    }
+
+    throw error
+  }
 }
 
 export async function finalizeEvaluation(input: {

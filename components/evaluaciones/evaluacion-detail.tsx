@@ -10,6 +10,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   ArrowLeft,
   Building2,
   CheckCircle2,
@@ -168,6 +175,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const selectedLoteVerticales = selectedLote
     ? data.loteVerticales.filter((item) => item.loteId === selectedLote.id)
     : []
+  const auditedUsers = data.users.filter((user) => user.role === "auditado" && user.status === "activo")
 
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
   const [evidenceFiles, setEvidenceFiles] = useState<Record<string, File[]>>({})
@@ -510,6 +518,35 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
         [parametroId]: {
           ...current,
           [field]: nextValues,
+        },
+      }
+    })
+  }
+
+  const handleSelectAuditedUser = (parametroId: string, index: number, userId: string) => {
+    const auditedUser = auditedUsers.find((user) => user.id === userId)
+    if (!auditedUser) return
+
+    setRespuestas((prev) => {
+      const current = {
+        ...createEmptyRespuesta(parametroId),
+        ...prev[parametroId],
+      }
+      const personasAuditadas = [...current.personasAuditadas]
+      const cargos = [...current.cargos]
+      const areas = [...current.areas]
+
+      personasAuditadas[index] = auditedUser.name
+      cargos[index] = auditedUser.cargo ?? ""
+      areas[index] = auditedUser.area ?? ""
+
+      return {
+        ...prev,
+        [parametroId]: {
+          ...current,
+          personasAuditadas,
+          cargos,
+          areas,
         },
       }
     })
@@ -958,13 +995,22 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
                     <div className="space-y-1.5">
                       {currentRespuesta.personasAuditadas.map((persona, personIndex) => (
                         <div key={`persona-row-${currentParametro.id}-${personIndex}`} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_30px] md:items-center">
-                          <Input
-                            placeholder="Persona auditada"
-                            className="h-8 border-border bg-background text-xs"
-                            value={persona}
-                            onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "personasAuditadas", personIndex, e.target.value)}
-                            disabled={!canEditEvaluation}
-                          />
+                          <Select
+                            value={auditedUsers.find((user) => user.name === persona)?.id}
+                            onValueChange={(value) => handleSelectAuditedUser(currentParametro.id, personIndex, value)}
+                            disabled={!canEditEvaluation || auditedUsers.length === 0}
+                          >
+                            <SelectTrigger className="h-8 w-full border-border bg-background text-xs">
+                              <SelectValue placeholder={persona || (auditedUsers.length ? "Persona auditada" : "Sin auditados activos")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {auditedUsers.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Input
                             placeholder="Cargo"
                             className="h-8 border-border bg-background text-xs"
