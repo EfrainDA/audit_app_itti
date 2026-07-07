@@ -43,47 +43,25 @@ function mapProfile(row: {
 }
 
 async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
-  const email = authUser.email ?? ""
-  const company = authUser.user_metadata?.company || authUser.user_metadata?.empresa || null
-  const cargo = authUser.user_metadata?.cargo || null
-  const area = authUser.user_metadata?.area || null
+  const { data } = await supabase.auth.getSession()
+  const accessToken = data.session?.access_token
+  if (!accessToken) throw new Error("No se encontro una sesion valida.")
+  if (data.session.user.id !== authUser.id) throw new Error("La sesion cambio mientras se cargaba el perfil.")
 
-  const { data: existingByAuthId, error: authIdError } = await supabase
-    .from("users")
-    .select("id,name,email,role,status,avatar,company,cargo,area")
-    .eq("auth_user_id", authUser.id)
-    .maybeSingle()
+  const response = await fetch("/api/auth/profile", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  const body = (await response.json().catch(() => null)) as { profile?: Parameters<typeof mapProfile>[0]; error?: string } | null
 
-  if (authIdError) throw authIdError
-  if (existingByAuthId) return mapProfile(existingByAuthId)
-
-  const { data: existingByEmail, error: emailError } = await supabase
-    .from("users")
-    .select("id,name,email,role,status,avatar,company,cargo,area")
-    .eq("email", email)
-    .maybeSingle()
-
-  if (emailError) throw emailError
-
-  if (existingByEmail) {
-    const { data: linkedProfile, error: updateError } = await supabase
-      .from("users")
-      .update({
-        auth_user_id: authUser.id,
-        company: company ?? existingByEmail.company,
-        cargo: cargo ?? existingByEmail.cargo,
-        area: area ?? existingByEmail.area,
-      })
-      .eq("id", existingByEmail.id)
-      .select("id,name,email,role,status,avatar,company,cargo,area")
-      .single()
-
-    if (updateError) throw updateError
-    return mapProfile(linkedProfile)
+  if (!response.ok || !body?.profile) {
+    await supabase.auth.signOut()
+    throw new Error(body?.error ?? "No se pudo cargar el perfil del usuario.")
   }
 
-  await supabase.auth.signOut()
-  throw new Error("Tu cuenta no tiene un perfil habilitado. Solicita acceso al administrador.")
+  return mapProfile(body.profile)
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
