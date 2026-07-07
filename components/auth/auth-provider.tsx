@@ -44,14 +44,14 @@ function mapProfile(row: {
 
 async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
   const { data } = await supabase.auth.getSession()
-  const accessToken = data.session?.access_token
-  if (!accessToken) throw new Error("No se encontro una sesion valida.")
-  if (data.session.user.id !== authUser.id) throw new Error("La sesion cambio mientras se cargaba el perfil.")
+  const currentSession = data.session
+  if (!currentSession?.access_token) throw new Error("No se encontro una sesion valida.")
+  if (currentSession.user.id !== authUser.id) throw new Error("La sesion cambio mientras se cargaba el perfil.")
 
   const response = await fetch("/api/auth/profile", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${currentSession.access_token}`,
     },
   })
   const body = (await response.json().catch(() => null)) as { profile?: Parameters<typeof mapProfile>[0]; error?: string } | null
