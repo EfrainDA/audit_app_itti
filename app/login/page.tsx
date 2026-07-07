@@ -107,7 +107,7 @@ function LoginContent() {
         window.location.href = data.url
       }
     } catch (googleError) {
-      setError(googleError instanceof Error ? googleError.message : "No se pudo iniciar sesion con Gmail.")
+      setError(googleError instanceof Error ? googleError.message : "No se pudo iniciar sesión con Gmail.")
     } finally {
       if (typeof window !== "undefined") {
         setIsGoogleSubmitting(false)
@@ -121,7 +121,7 @@ function LoginContent() {
 
     const cleanEmail = email.trim()
     if (!cleanEmail) {
-      setError("Ingresa tu correo para enviarte el enlace de recuperacion.")
+      setError("Ingresa tu correo para enviarte el enlace de recuperación.")
       return
     }
 
@@ -132,9 +132,9 @@ function LoginContent() {
       })
 
       if (resetError) throw resetError
-      setMessage("Te enviamos un enlace para recuperar tu contrasena.")
+      setMessage("Te enviamos un enlace para recuperar tu contraseña.")
     } catch (resetError) {
-      setError(resetError instanceof Error ? resetError.message : "No se pudo enviar el enlace de recuperacion.")
+      setError(resetError instanceof Error ? resetError.message : "No se pudo enviar el enlace de recuperación.")
     } finally {
       setIsResettingPassword(false)
     }
@@ -142,7 +142,7 @@ function LoginContent() {
 
   const toggleMode = (nextMode: AuthMode) => {
     if (nextMode === "register" && !ALLOW_PUBLIC_SIGNUP) {
-      setError("El registro publico esta deshabilitado. Solicita acceso al administrador.")
+      setError("El registro público esta deshabilitado. Solicita acceso al administrador.")
       return
     }
 
@@ -170,17 +170,17 @@ function LoginContent() {
 
             <div className="mb-8 [@media(max-height:740px)]:mb-5">
               <h1 className="text-3xl font-semibold tracking-tight text-slate-950 [@media(max-height:740px)]:text-2xl">
-                {mode === "login" ? "Iniciar Sesion" : "Crear cuenta"}
+                {mode === "login" ? "Iniciar Sesi\u00f3n" : "Crear cuenta"}
               </h1>
               <p className="mt-4 text-base text-slate-500 [@media(max-height:740px)]:mt-2 [@media(max-height:740px)]:text-sm">
-                {mode === "login" ? "Bienvenido." : "Completa tus datos para habilitar el acceso."}
+                {mode === "login" ? "¡Bienvenido de nuevo!" : "Completa tus datos para habilitar el acceso."}
               </p>
             </div>
 
             <form className="space-y-5 [@media(max-height:740px)]:space-y-3.5" onSubmit={handleSubmit}>
               {mode === "register" && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">Nombre y apellido</Label>
+                  <Label htmlFor="name">Nombre y Apellido</Label>
                   <div className="relative">
                     <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -223,7 +223,7 @@ function LoginContent() {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="usuario@empresa.com"
+                    placeholder="Ingresa tu correo"
                     autoComplete="email"
                     required
                     className="h-12 rounded-md border-slate-200 bg-white pl-10"
@@ -232,7 +232,7 @@ function LoginContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password">Contrasena</Label>
+                <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -240,7 +240,7 @@ function LoginContent() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder={mode === "login" ? "Contrasena" : "Minimo 12 caracteres"}
+                    placeholder={mode === "login" ? "Contrase\u00f1a" : "M\u00ednimo 12 caracteres"}
                     autoComplete={mode === "login" ? "current-password" : "new-password"}
                     minLength={mode === "login" ? 6 : 12}
                     required
@@ -265,7 +265,7 @@ function LoginContent() {
                       disabled={isResettingPassword}
                       onClick={handlePasswordReset}
                     >
-                      {isResettingPassword ? "Enviando..." : "Olvidaste tu contrasena?"}
+                      {isResettingPassword ? "Enviando..." : "Olvidaste tu contrase\u00f1a?"}
                     </Button>
                   </div>
                 )}
@@ -285,7 +285,7 @@ function LoginContent() {
               <div className="grid gap-3 pt-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <Button type="submit" className="h-11 w-full rounded-md" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {mode === "login" ? "Ingresar" : "Crear cuenta"}
+                  {mode === "login" ? "Iniciar Sesi\u00f3n" : "Crear Cuenta"}
                 </Button>
                 <Button
                   type="button"
@@ -322,13 +322,13 @@ function LoginContent() {
 
               {ALLOW_PUBLIC_SIGNUP && (
                 <p className="text-center text-sm text-slate-500 [@media(max-height:740px)]:text-xs">
-                  {mode === "login" ? "No tienes una cuenta?" : "Ya tienes una cuenta?"}{" "}
+                  {mode === "login" ? "¿No tienes una cuenta?" : "¿Ya tienes una cuenta?"}{" "}
                   <button
                     type="button"
                     className="font-semibold text-primary underline-offset-4 hover:underline"
                     onClick={() => toggleMode(mode === "login" ? "register" : "login")}
                   >
-                    {mode === "login" ? "Registrate aqui" : "Ingresa aqui"}
+                    {mode === "login" ? "Registrate aquí" : "Ingresa aquí"}
                   </button>
                 </p>
               )}
@@ -409,7 +409,7 @@ export default function LoginPage() {
       fallback={
         <main className="login-light flex min-h-screen items-center justify-center bg-[#f6f8fb]">
           <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-medium text-slate-600 shadow-none">
-            Preparando acceso...
+            Cargando...
           </div>
         </main>
       }

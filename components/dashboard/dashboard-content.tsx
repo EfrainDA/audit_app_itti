@@ -478,6 +478,10 @@ function formatCompactList(values: string[], emptyLabel = "Sin datos") {
   return `${uniqueValues.slice(0, 3).join(", ")} +${uniqueValues.length - 3}`
 }
 
+function formatCycleLabel(cycle: Ciclo) {
+  return `Ciclo ${cycle.bimestre} - ${cycle[YEAR_KEY]}`
+}
+
 function getControlDetailLabel(control: SupervisorVerticalScore["controls"][number], verticalName: string) {
   const category = getSummaryControlCategory(control, verticalName)
 
@@ -588,7 +592,7 @@ function AnalystProgressPanel({
         <div className="min-w-0 space-y-3">
           <div className="min-w-0">
             <p className="text-base font-semibold leading-tight">Progreso General de Controles</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Asignaciones activas del ciclo.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Asignaciones activas del ciclo</p>
           </div>
           <div className="grid max-w-[31rem] gap-2 text-sm">
             <div className="grid items-baseline gap-2 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
@@ -632,7 +636,7 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
             <TableHead>Unidad de Negocio</TableHead>
             <TableHead>Vertical</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="text-left">Accion</TableHead>
+            <TableHead className="text-left">Acción</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -668,6 +672,42 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
           No hay controles en curso o pendientes asignados
         </div>
       )}
+    </div>
+  )
+}
+
+function DashboardCycleFilter({
+  cycles,
+  activeCycle,
+  value,
+  onValueChange,
+}: {
+  cycles: Ciclo[]
+  activeCycle: Ciclo
+  value: string
+  onValueChange: (value: string) => void
+}) {
+  const cycleOptions = cycles
+    .sort((first, second) => {
+      const yearDiff = second[YEAR_KEY] - first[YEAR_KEY]
+      return yearDiff || second.bimestre - first.bimestre
+    })
+
+  return (
+    <div className="flex justify-end">
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger className="h-8 w-full border-border/70 bg-background px-2.5 text-xs shadow-none sm:w-[12rem]">
+          <SelectValue placeholder="Ciclo" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="active">Ciclo vigente ({activeCycle.bimestre} - {activeCycle[YEAR_KEY]})</SelectItem>
+          {cycleOptions.map((cycle) => (
+            <SelectItem key={cycle.id} value={cycle.id}>
+              {formatCycleLabel(cycle)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }
@@ -734,7 +774,7 @@ function AuditedDashboard({
       <section className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
         <Card className="border-border/70 bg-card py-0 shadow-none">
           <CardHeader className="px-4 pb-2 pt-4">
-            <CardTitle className="text-base font-semibold">Controles asignados</CardTitle>
+            <CardTitle className="text-base font-semibold">Controles Asignados</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 px-4 pb-4 pt-0">
             {controls.map((control) => (
@@ -754,7 +794,7 @@ function AuditedDashboard({
             ))}
             {controls.length === 0 && (
               <div className="rounded-md border border-dashed border-border/70 px-3 py-8 text-center text-sm text-muted-foreground">
-                No tenes controles recibidos por replica.
+                No hay controles recibidos por replica.
               </div>
             )}
           </CardContent>
@@ -783,14 +823,14 @@ function AuditedDashboard({
                     </div>
                     {answer.comentario && (
                       <div className="mt-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2 text-sm">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Comentario del auditor</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Comentario del Auditor</p>
                         <p className="mt-1 text-foreground">{answer.comentario}</p>
                       </div>
                     )}
                     <div className="mt-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2">
                       <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                         <Paperclip className="h-3.5 w-3.5" />
-                        Evidencia del auditor
+                        Evidencia del Auditor
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-foreground">
                         {answer.evidencias.length ? answer.evidencias.map((evidence) => (
@@ -1989,6 +2029,7 @@ function CeoParameterDistribution({ distribution }: { distribution: ParameterDis
 
 export function DashboardContent() {
   const [activeView, setActiveView] = useState<DashboardView>("auditado")
+  const [selectedCycleId, setSelectedCycleId] = useState("active")
   const [ceoUnitFilter, setCeoUnitFilter] = useState("all")
   const [ceoChartUnitFilter, setCeoChartUnitFilter] = useState("all")
   const [ceoChartVerticalFilter, setCeoChartVerticalFilter] = useState("all")
@@ -2012,8 +2053,25 @@ export function DashboardContent() {
     if (isSupervisor) setActiveView("supervisor")
   }, [isAuditado, isAuditor, isSupervisor])
 
+  const activeCycleOption = useMemo(() => getActiveCycle(ciclos), [ciclos])
+  const dashboardCycleFilter = (
+    <DashboardCycleFilter
+      cycles={ciclos}
+      activeCycle={activeCycleOption}
+      value={selectedCycleId}
+      onValueChange={(value) => {
+        setSelectedCycleId(value)
+        setCeoUnitFilter("all")
+        setCeoChartUnitFilter("all")
+        setCeoChartVerticalFilter("all")
+      }}
+    />
+  )
+
   const metrics = useMemo(() => {
-    const activeCycle = getActiveCycle(ciclos)
+    const activeCycle = selectedCycleId === "active"
+      ? activeCycleOption
+      : ciclos.find((cycle) => cycle.id === selectedCycleId) ?? activeCycleOption
     const activeLotes = lotes.filter((lote) => lote.ciclo === activeCycle.bimestre && lote[YEAR_KEY] === activeCycle[YEAR_KEY] && isCountableLote(lote))
     const activeLoteIds = new Set(activeLotes.map((lote) => lote.id))
     const verticalMap = new Map<string, { id: string; name: string; weight: number }>()
@@ -2418,11 +2476,11 @@ export function DashboardContent() {
       supervisorAnalystSummaries,
       daysToCycleClose: getDaysUntil(activeCycle.fechaFin),
       coveragePct,
-      activeCycleYear: activeCycle.fechaInicio.slice(0, 4),
+      activeCycleYear: String(activeCycle[YEAR_KEY]),
       progressLabel: `${globalCounts.started}/${globalCounts.total || 0}`,
       cycleSummaries: lastCycleSummaries,
     }
-  }, [appUser?.id, auditorias, ciclos, isAuditado, isAuditor, loteVerticales, lotes, modelos, respuestas, unidades, users])
+  }, [activeCycleOption, appUser?.id, auditorias, ciclos, isAuditado, isAuditor, loteVerticales, lotes, modelos, respuestas, selectedCycleId, unidades, users])
 
   const roleDashboards = useMemo<Record<DashboardView, RoleDashboard>>(() => {
     const supervisorCounts = metrics.globalCounts
@@ -2557,6 +2615,7 @@ export function DashboardContent() {
             </TabsList>
           </Tabs>
         )}
+        {dashboardCycleFilter}
         <AuditedDashboardInbox
           controls={metrics.auditedControls}
           activeCycle={metrics.activeCycle}
@@ -2591,6 +2650,7 @@ export function DashboardContent() {
             </TabsList>
           </Tabs>
         )}
+        {dashboardCycleFilter}
 
         <section className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_24rem]">
           <AnalystProgressPanel counts={metrics.assignedLotCounts} lotes={metrics.supervisorLoteSummaries.filter((lote) =>
@@ -2626,7 +2686,7 @@ export function DashboardContent() {
         <Card className="border-border/70 bg-card py-0 shadow-none hover:shadow-none">
           <CardHeader className="px-4 pb-1 pt-3">
             <div className="min-w-0">
-              <CardTitle className="text-base font-semibold">Seguimiento de controles de ser</CardTitle>
+              <CardTitle className="text-base font-semibold">Seguimiento de Controles</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0">
@@ -2675,6 +2735,7 @@ export function DashboardContent() {
             </TabsList>
           </Tabs>
         )}
+        {dashboardCycleFilter}
 
         <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_15rem]">
           <SupervisorCycleProgress counts={metrics.globalCounts} />
@@ -2785,13 +2846,14 @@ export function DashboardContent() {
           </TabsList>
         </Tabs>
       )}
+      {dashboardCycleFilter}
 
       <Card className="border-border/70 bg-card py-0 shadow-none hover:shadow-none">
         <CardContent className="flex flex-col gap-2 px-3 py-2 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-primary" />
             <div>
-              <p className="text-sm font-semibold">Filtro ejecutivo</p>
+              <p className="text-sm font-semibold">Filtro Ejecutivo</p>
             </div>
           </div>
           <Select value={ceoUnitFilter} onValueChange={(value) => {
