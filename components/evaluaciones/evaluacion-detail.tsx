@@ -164,6 +164,7 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   })
 
   const lote = data.lotes.find((l) => l.id === loteVertical?.loteId)
+  const cicloLote = data.ciclos.find((item) => item.año === lote?.año && item.bimestre === lote?.ciclo)
   const unidad = data.unidades.find((u) => u.id === lote?.unidadNegocioId)
   const modelo = data.modelos.find((m) => m.id === lote?.modeloControlId)
   const vertical = modelo?.verticales.find((v) => v.id === loteVertical?.verticalId)
@@ -186,10 +187,21 @@ export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
-  const evaluationBlockedReason = lote?.estado === "cerrado"
-    ? "El lote ya fue cerrado por el supervisor."
-    : null
-  const canEditEvaluation = appUser?.role === "auditor" && control?.auditorId === appUser.id && Boolean(lote) && lote?.estado !== "cerrado"
+  const nowTime = Date.now()
+  const cycleStartsAt = cicloLote ? new Date(`${cicloLote.fechaInicio}T00:00:00`).getTime() : null
+  const cycleEndsAt = cicloLote ? new Date(`${cicloLote.fechaFin}T23:59:59`).getTime() : null
+  const cycleIsEnabled = (cicloLote?.estado ?? "habilitado") === "habilitado"
+  const cycleIsInForce = cycleIsEnabled && cycleStartsAt !== null && cycleEndsAt !== null && nowTime >= cycleStartsAt && nowTime <= cycleEndsAt
+  const evaluationBlockedReason = !cicloLote
+    ? "No se pudo validar el ciclo del lote."
+    : !cycleIsEnabled
+      ? "El ciclo del lote está deshabilitado."
+      : cycleStartsAt !== null && nowTime < cycleStartsAt
+        ? "La evaluación estará disponible cuando el ciclo del lote entre en vigor."
+        : cycleEndsAt !== null && nowTime > cycleEndsAt
+          ? "El ciclo del lote ya finalizó."
+          : null
+  const canEditEvaluation = appUser?.role === "auditor" && control?.auditorId === appUser.id && cycleIsInForce
   const answeredControlIds = new Set(data.respuestas.map((answer) => answer.controlId))
   const hasLocalAnswers = Object.values(respuestas).some((respuesta) => respuesta.valor !== null)
   if (control && hasLocalAnswers) answeredControlIds.add(control.id)

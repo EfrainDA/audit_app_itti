@@ -772,7 +772,7 @@ async function assertCanEvaluateControl(controlId: string) {
 
   const { data, error } = await supabase
     .from("controls")
-    .select("auditor_id,lot_verticals(lots(status))")
+    .select("auditor_id,lot_verticals(lots(cycles(start_date,end_date,status)))")
     .eq("id", controlId)
     .maybeSingle()
 
@@ -782,17 +782,28 @@ async function assertCanEvaluateControl(controlId: string) {
   }
 
   const lotVerticalRelation = data.lot_verticals as unknown as
-    | { lots?: Pick<DbLot, "status"> | Pick<DbLot, "status">[] | null }
-    | { lots?: Pick<DbLot, "status"> | Pick<DbLot, "status">[] | null }[]
+    | { lots?: { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null } | { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null }[] | null }
+    | { lots?: { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null } | { cycles?: Pick<DbCycle, "start_date" | "end_date" | "status"> | Pick<DbCycle, "start_date" | "end_date" | "status">[] | null }[] | null }[]
     | null
   const lotVertical = Array.isArray(lotVerticalRelation) ? lotVerticalRelation[0] : lotVerticalRelation
   const lotRelation = Array.isArray(lotVertical?.lots) ? lotVertical?.lots[0] : lotVertical?.lots
+  const cycleRelation = Array.isArray(lotRelation?.cycles) ? lotRelation?.cycles[0] : lotRelation?.cycles
 
-  if (!lotRelation) {
-    throw new Error("No se pudo validar el lote.")
+  if (!cycleRelation) {
+    throw new Error("No se pudo validar el ciclo del lote.")
   }
-  if (lotRelation.status === "cerrado") {
-    throw new Error("El lote ya fue cerrado por el supervisor.")
+
+  const now = Date.now()
+  const startsAt = new Date(`${cycleRelation.start_date}T00:00:00`).getTime()
+  const endsAt = new Date(`${cycleRelation.end_date}T23:59:59`).getTime()
+  if ((cycleRelation.status ?? "habilitado") !== "habilitado") {
+    throw new Error("El ciclo del lote esta deshabilitado.")
+  }
+  if (now < startsAt) {
+    throw new Error("La evaluacion estara disponible cuando el ciclo del lote entre en vigor.")
+  }
+  if (now > endsAt) {
+    throw new Error("El ciclo del lote ya finalizo.")
   }
 
   return profile
