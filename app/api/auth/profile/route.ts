@@ -62,7 +62,25 @@ export async function POST(request: Request) {
 
   if (emailError) return errorResponse(emailError.message, 500)
   if (!profileByEmail) {
-    return errorResponse("Tu cuenta no tiene un perfil habilitado. Solicita acceso al administrador.", 403)
+    const metadata = authUser.user_metadata ?? {}
+    const displayName = metadataValue(metadata.name) ?? metadataValue(metadata.full_name) ?? email.split("@")[0] ?? "Usuario"
+    const { data: createdProfile, error: insertError } = await adminClient
+      .from("users")
+      .insert({
+        auth_user_id: authUser.id,
+        name: displayName,
+        email,
+        company: metadataValue(metadata.company) ?? metadataValue(metadata.empresa),
+        cargo: metadataValue(metadata.cargo),
+        area: metadataValue(metadata.area),
+        role: "auditor",
+        status: "activo",
+      })
+      .select(selectColumns)
+      .single<UserProfile>()
+
+    if (insertError) return errorResponse(insertError.message, 500)
+    return NextResponse.json({ profile: createdProfile })
   }
 
   if (profileByEmail.status !== "activo") return errorResponse("El usuario no esta activo.", 403)
