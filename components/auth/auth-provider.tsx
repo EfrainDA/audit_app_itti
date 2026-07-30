@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@/lib/data"
@@ -14,10 +14,14 @@ type AuthContextValue = {
   refreshProfile: () => Promise<void>
 }
 
+// Contexto global que expone la sesión y el perfil a toda la aplicación.
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+
+// Configuración del cierre de sesión cuando la pestaña permanece inactiva.
 const TAB_AWAY_TIMEOUT_MS = 60 * 60 * 1000
 const TAB_AWAY_STARTED_AT_KEY = "audit_app_tab_away_started_at"
 
+// Convierte el perfil recibido desde la base de datos al modelo usado por la UI.
 function mapProfile(row: {
   id: string
   name: string
@@ -42,14 +46,16 @@ function mapProfile(row: {
   }
 }
 
-async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
+// Valida la sesión actual y obtiene o crea el perfil de la aplicación.
+async function ensureProfile(authUser: SupabaseUser, signal: AbortSignal): Promise<User | null> {
   const { data } = await supabase.auth.getSession()
   const currentSession = data.session
-  if (!currentSession?.access_token) throw new Error("No se encontro una sesion valida.")
-  if (currentSession.user.id !== authUser.id) throw new Error("La sesion cambio mientras se cargaba el perfil.")
+  if (!currentSession?.access_token) throw new Error("No se encontró una sesión válida.")
+  if (currentSession.user.id !== authUser.id) throw new Error("La sesión cambió mientras se cargaba el perfil.")
 
   const response = await fetch("/api/auth/profile", {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${currentSession.access_token}`,
     },
@@ -65,20 +71,32 @@ async function ensureProfile(authUser: SupabaseUser): Promise<User | null> {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Estado central de autenticación.
   const [session, setSession] = useState<Session | null>(null)
   const [appUser, setAppUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const profileGenerationRef = useRef(0)
+  const profileAbortRef = useRef<AbortController | null>(null)
 
+  // Cierra la sesión tanto en Supabase como en el estado local.
   const signOut = useCallback(async () => {
+    profileGenerationRef.current += 1
+    profileAbortRef.current?.abort()
     window.sessionStorage.removeItem(TAB_AWAY_STARTED_AT_KEY)
     await supabase.auth.signOut()
     setSession(null)
     setAppUser(null)
   }, [])
 
+  // Vuelve a consultar la sesión y actualiza el perfil visible en la aplicación.
   const refreshProfile = async () => {
+    const generation = ++profileGenerationRef.current
+    profileAbortRef.current?.abort()
+    const controller = new AbortController()
+    profileAbortRef.current = controller
     const { data } = await supabase.auth.getSession()
     const currentSession = data.session
+    if (generation !== profileGenerationRef.current || controller.signal.aborted) return
     setSession(currentSession)
 
     if (!currentSession?.user) {
@@ -86,22 +104,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const profile = await ensureProfile(currentSession.user)
-    setAppUser(profile)
+    const profile = await ensureProfile(currentSession.user, controller.signal)
+    if (generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
   }
 
+  // Carga la sesión guardada al iniciar la aplicación y escucha cambios de Supabase.
   useEffect(() => {
     let isMounted = true
 
     async function hydrateSession() {
+      const generation = ++profileGenerationRef.current
+      profileAbortRef.current?.abort()
+      const controller = new AbortController()
+      profileAbortRef.current = controller
       try {
         const { data } = await supabase.auth.getSession()
-        if (!isMounted) return
+        if (!isMounted || generation !== profileGenerationRef.current || controller.signal.aborted) return
 
         setSession(data.session)
         if (data.session?.user) {
-          const profile = await ensureProfile(data.session.user)
-          if (isMounted) setAppUser(profile)
+          const profile = await ensureProfile(data.session.user, controller.signal)
+          if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         }
       } catch {
         if (isMounted) {
@@ -109,14 +132,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAppUser(null)
         }
       } finally {
-        if (isMounted) setIsLoading(false)
+        if (isMounted && generation === profileGenerationRef.current) setIsLoading(false)
       }
     }
 
     hydrateSession()
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const generation = ++profileGenerationRef.current
+      profileAbortRef.current?.abort()
+      const controller = new AbortController()
+      profileAbortRef.current = controller
       setSession(nextSession)
+      setAppUser(null)
 
       if (!nextSession?.user) {
         setAppUser(null)
@@ -124,27 +152,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      ensureProfile(nextSession.user)
+      ensureProfile(nextSession.user, controller.signal)
         .then((profile) => {
-          if (isMounted) setAppUser(profile)
+          if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         })
         .catch(() => {
-          if (isMounted) {
+          if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) {
             setSession(null)
             setAppUser(null)
           }
         })
         .finally(() => {
-          if (isMounted) setIsLoading(false)
+          if (isMounted && generation === profileGenerationRef.current) setIsLoading(false)
         })
     })
 
     return () => {
       isMounted = false
+      profileGenerationRef.current += 1
+      profileAbortRef.current?.abort()
       listener.subscription.unsubscribe()
     }
   }, [])
 
+  // Controla el cierre de sesión cuando la pestaña pierde el foco durante una hora.
   useEffect(() => {
     if (!session) {
       window.sessionStorage.removeItem(TAB_AWAY_STARTED_AT_KEY)
@@ -226,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, signOut])
 
+  // Memoriza el valor del contexto para evitar renders innecesarios de sus consumidores.
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -241,6 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// Hook de acceso al contexto con una validación de uso dentro de AuthProvider.
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {

@@ -1,3 +1,4 @@
+// Modelos de dominio compartidos por la capa de datos y la interfaz.
 export interface User {
   id: string
   name: string
@@ -5,7 +6,7 @@ export interface User {
   company?: string
   cargo?: string
   area?: string
-  role: "admin" | "supervisor" | "auditor" | "auditado"
+  role: "admin" | "ceo" | "supervisor" | "auditor" | "auditado"
   status: "activo" | "inactivo"
   avatar?: string
 }
@@ -14,9 +15,6 @@ export interface UnidadNegocio {
   id: string
   nombre: string
   ecosistema: string
-  codigo: string
-  zona: string
-  responsable: string
   logo?: string
 }
 
@@ -24,6 +22,8 @@ export interface Ciclo {
   id: string
   año: number
   bimestre: number
+  mesInicio: number
+  mesFin: number
   fechaInicio: string
   fechaFin: string
   estado?: "habilitado" | "deshabilitado"
@@ -35,6 +35,21 @@ export interface Umbral {
   min: number
   max: number
   color: "rojo" | "amarillo" | "verde"
+}
+
+export type CatalogItemCategory = "producto" | "proceso" | "otro" | "area_transversal"
+
+export interface CatalogItem {
+  id: string
+  categoria: CatalogItemCategory
+  nombre: string
+  descripcion?: string
+  subprocesos: string[]
+  unidadNegocioId?: string
+  productoVinculadoId?: string
+  productosVinculadosIds: string[]
+  estado: "activo" | "inactivo"
+  fechaCreacion: string
 }
 
 export interface Vertical {
@@ -78,6 +93,7 @@ export interface Lote {
   auditores: string[]
 }
 
+// Un lote deprecado se conserva para historial, pero no participa en métricas.
 export function isCountableLote(lote: Pick<Lote, "estado">): boolean {
   return lote.estado === "abierto" || lote.estado === "cerrado"
 }
@@ -96,7 +112,8 @@ export interface Control {
   descripcion?: string
   estado: "pendiente" | "en_curso" | "en_replica" | "terminado"
   scoreControl?: number
-  etiqueta?: "Unidad de Negocio" | "Producto" | "Proceso" | "Proceso de apoyo"
+  etiqueta?: "Unidad de Negocio" | "Producto" | "Proceso" | "Proceso de apoyo" | "Otro" | "Área transversal"
+  catalogItemId?: string
   proceso?: string
   subproceso?: string
   subprocesos?: string[]
@@ -152,16 +169,17 @@ export interface Notificacion {
   fecha: string
 }
 
+// Presentación consistente de puntajes y estados en todos los módulos.
 export function getScoreColor(score: number): string {
-  if (score >= 90) return "text-success"
-  if (score >= 71) return "text-warning"
-  return "text-destructive"
+  if (score >= 90) return "text-status-success-text"
+  if (score >= 71) return "text-status-warning-text"
+  return "text-status-danger-text"
 }
 
 export function getScoreBgColor(score: number): string {
-  if (score >= 90) return "border-success/25 bg-success/10"
-  if (score >= 71) return "border-warning/25 bg-warning/10"
-  return "border-destructive/25 bg-destructive/10"
+  if (score >= 90) return "border-status-success-border bg-status-success-surface"
+  if (score >= 71) return "border-status-warning-border bg-status-warning-surface"
+  return "border-status-danger-border bg-status-danger-surface"
 }
 
 export function getEstadoBadgeColor(estado: string): string {
@@ -170,9 +188,9 @@ export function getEstadoBadgeColor(estado: string): string {
     case "terminado":
     case "publicado":
     case "activo":
-      return "border-success/25 bg-success/10 text-success"
+      return "border-status-success-border bg-status-success-surface text-status-success-text"
     case "abierto":
-      return "border-success/25 bg-success/10 text-success"
+      return "border-status-success-border bg-status-success-surface text-status-success-text"
     case "cerrado":
       return "border-border bg-muted text-muted-foreground"
     case "en_curso":
@@ -181,10 +199,10 @@ export function getEstadoBadgeColor(estado: string): string {
     case "borrador":
       return "border-border bg-muted text-muted-foreground"
     case "en_replica":
-      return "border-warning/25 bg-warning/10 text-warning"
+      return "border-status-warning-border bg-status-warning-surface text-status-warning-text"
     case "deprecado":
     case "inactivo":
-      return "border-destructive/25 bg-destructive/10 text-destructive"
+      return "border-status-danger-border bg-status-danger-surface text-status-danger-text"
     default:
       return "border-border bg-muted text-muted-foreground"
   }

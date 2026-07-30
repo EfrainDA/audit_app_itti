@@ -5,13 +5,13 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold outline-none transition-[color,border-color,background,box-shadow] duration-200 focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold outline-none transition-[color,border-color,background,box-shadow] duration-200 focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-status-danger-border aria-invalid:ring-status-danger-solid/45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: 'border border-primary/20 bg-primary text-primary-foreground shadow-none hover:bg-primary/90',
         destructive:
-          'border border-destructive/30 bg-destructive text-white shadow-none hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
+          'border border-status-danger-solid bg-status-danger-solid text-white shadow-none hover:brightness-95 focus-visible:ring-status-danger-solid/45',
         outline:
           'border border-border/70 bg-card shadow-none hover:border-border hover:bg-muted/40 hover:text-foreground dark:hover:bg-muted/45',
         secondary:

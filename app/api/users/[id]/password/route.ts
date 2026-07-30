@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server"
 import { createServerAdminClient, getServerSupabaseConfig, readJsonBody, requireAppRole } from "@/lib/server-auth"
+import { consumeRateLimit } from "@/lib/server-rate-limit"
+import { validatePassword } from "@/lib/domain/password-policy"
+import { getRequestId, logServerEvent } from "@/lib/server-observability"
 
 function errorResponse(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status })
+  return NextResponse.json({ error: message }, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  })
 }
 
 function getAuthAdminErrorMessage(error: unknown) {
-  if (!(error instanceof Error)) return "No se pudo asignar la contrasena."
+  if (!(error instanceof Error)) return "No se pudo asignar la contraseña."
 
   if (/invalid api key/i.test(error.message) || /bad_jwt/i.test(error.message)) {
-    return "La clave administrativa de Supabase Auth no es valida. Configura SUPABASE_AUTH_ADMIN_KEY con la service_role key JWT en .env.local y reinicia el servidor."
+    return "La clave administrativa de Supabase Auth no es válida. Configura SUPABASE_AUTH_ADMIN_KEY con la clave JWT service_role en .env.local y reinicia el servidor."
   }
 
-  return error.message
+  return "No se pudo asignar la contraseña."
 }
 
 async function findAuthUserByEmail(
@@ -31,10 +37,12 @@ async function findAuthUserByEmail(
   }
 }
 
+// Verifica rol e identidad objetivo antes de actualizar la contraseña en Auth.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const requestId = getRequestId(request)
   const config = getServerSupabaseConfig()
   if (!config.supabaseServiceRoleKey) {
     return errorResponse("Falta configurar SUPABASE_AUTH_ADMIN_KEY en el servidor.", 500)
@@ -43,10 +51,27 @@ export async function POST(
   const auth = await requireAppRole(request, ["admin"])
   if ("error" in auth) return auth.error
 
+  const rateLimit = consumeRateLimit(`admin-password:${auth.profile.id}`, {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiados cambios de contraseña. Intenta nuevamente más tarde." },
+      {
+        status: 429,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+        },
+      },
+    )
+  }
+
   const body = await readJsonBody<{ password?: unknown }>(request, 4096).catch(() => null)
   const password = typeof body?.password === "string" ? body.password : ""
-  if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-    return errorResponse("La contrasena debe tener al menos 12 caracteres, mayusculas, minusculas y numeros.", 400)
+  if (!validatePassword(password).valid) {
+    return errorResponse("La contraseña debe tener entre 12 y 128 caracteres, mayúsculas, minúsculas y números.", 400)
   }
   const adminClient = auth.adminClient
   const dbClient = auth.dbClient
@@ -62,8 +87,8 @@ export async function POST(
     .eq("id", id)
     .maybeSingle()
 
-  if (profileError) return errorResponse(profileError.message, 500)
-  if (!profile) return errorResponse("No se encontro el usuario.", 404)
+  if (profileError) return errorResponse("No se pudo consultar el usuario.", 500)
+  if (!profile) return errorResponse("No se encontró el usuario.", 404)
 
   try {
     let authUserId = profile.auth_user_id as string | null
@@ -87,14 +112,36 @@ export async function POST(
         })
         if (error) throw error
         authUserId = data.user.id
+        const { error: linkError } = await dbClient
+          .from("users")
+          .update({ auth_user_id: authUserId })
+          .eq("id", id)
+        if (linkError) {
+          await adminClient.auth.admin.deleteUser(authUserId)
+          throw linkError
+        }
       }
     }
 
     const { error } = await adminClient.auth.admin.updateUserById(authUserId, { password })
     if (error) throw error
 
-    return NextResponse.json({ ok: true })
+    logServerEvent("info", "admin_password_changed", {
+      requestId,
+      actorProfileId: auth.profile.id,
+      targetProfileId: id,
+    })
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store" } },
+    )
   } catch (error) {
+    logServerEvent("error", "admin_password_change_failed", {
+      requestId,
+      actorProfileId: auth.profile.id,
+      targetProfileId: id,
+      error,
+    })
     return errorResponse(getAuthAdminErrorMessage(error), 500)
   }
 }

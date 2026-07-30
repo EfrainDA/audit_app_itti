@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { FileText, Layers3, Plus, Trash2 } from "lucide-react"
-import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/supabase-data"
+import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/repositories/supabase/models"
 import { getErrorMessage } from "@/lib/error-message"
 import type { ModeloControl } from "@/lib/data"
 
@@ -45,6 +45,7 @@ interface ParametroForm {
   permiteIntermedio: boolean
 }
 
+// Fábricas del editor jerárquico de verticales y parámetros.
 function createEmptyParametro(id = Date.now().toString(), puntosBase = 100): ParametroForm {
   return {
     id,
@@ -85,6 +86,7 @@ function getInitialVerticales(modelo?: ModeloControl): VerticalForm[] {
   }))
 }
 
+// Valida pesos y puntajes antes de persistir la estructura completa del modelo.
 export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHref }: ModeloFormProps) {
   const router = useRouter()
   const isEditing = Boolean(modelo)
@@ -244,7 +246,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="descripcion">Descripcion</Label>
+            <Label htmlFor="descripcion">Descripción</Label>
             <Textarea
               id="descripcion"
               value={descripcion}
@@ -265,10 +267,10 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
             </span>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold">Estructura del modelo</h3>
-              <p className="text-xs text-muted-foreground">Verticales, peso relativo y parametros evaluables.</p>
+              <p className="text-xs text-muted-foreground">Verticales, peso relativo y parámetros evaluables.</p>
             </div>
           </div>
-          <Badge className={pesoCompleto ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}>
+          <Badge className={pesoCompleto ? "bg-status-success-surface text-status-success-text" : "bg-status-danger-surface text-status-danger-text"}>
             Peso total: {totalPeso}%
           </Badge>
         </div>
@@ -279,7 +281,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-2 h-7 w-7 text-destructive hover:text-destructive"
+                className="absolute right-2 top-2 h-7 w-7 text-status-danger-text hover:text-status-danger-text"
                 onClick={() => removeVertical(vertical.id)}
                 disabled={verticales.length === 1}
               >
@@ -295,7 +297,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
                         <p className="text-sm font-semibold">{vertical.nombre || "Nueva vertical"}</p>
                         <p className="text-xs text-muted-foreground">
                           {vertical.parametros.length}{" "}
-                          {vertical.parametros.length === 1 ? "parametro configurado" : "parametros configurados"}
+                          {vertical.parametros.length === 1 ? "parámetro configurado" : "parámetros configurados"}
                         </p>
                       </div>
                   </div>
@@ -339,7 +341,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
 
                   <div className="border-t border-border/60 pt-2.5">
                     <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-sm font-medium text-foreground">Parametros</p>
+                      <p className="text-sm font-medium text-foreground">Parámetros</p>
                       <Badge variant="outline" className="text-xs">
                         Total: {vertical.parametros.reduce((acc, parametro) => acc + parametro.puntosBase, 0)} / 100 pts
                       </Badge>
@@ -351,13 +353,13 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
                             <Input
                               value={parametro.nombre}
                               onChange={(event) => updateParametro(vertical.id, parametro.id, "nombre", event.target.value)}
-                              placeholder="Nombre del parametro"
+                              placeholder="Nombre del parámetro"
                               className="h-9 border-border bg-card text-sm"
                             />
                             <Textarea
                               value={parametro.descripcion}
                               onChange={(event) => updateParametro(vertical.id, parametro.id, "descripcion", event.target.value)}
-                              placeholder="Descripcion del parametro"
+                              placeholder="Descripción del parámetro"
                               className="min-h-9 border-border bg-card py-2 text-sm"
                               rows={1}
                             />
@@ -398,7 +400,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
                     </div>
                     <Button variant="outline" size="sm" className="mt-2 h-8" onClick={() => addParametro(vertical.id)}>
                       <Plus className="h-3 w-3" />
-                      Agregar Parametro
+                      Agregar parámetro
                     </Button>
                   </div>
                 </div>
@@ -414,7 +416,7 @@ export function ModeloForm({ onClose, onSaved, modelo, redirectOnSaved, cancelHr
       </section>
 
       <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
-        {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
+        {error && <p className="mr-auto text-sm text-status-danger-text">{error}</p>}
         <Button variant="outline" onClick={handleCancel}>
           {cancelHref ? "Volver" : "Cancelar"}
         </Button>

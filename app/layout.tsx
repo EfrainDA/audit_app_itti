@@ -6,13 +6,13 @@ import './globals.css'
 
 const roboto = Roboto({
   subsets: ['latin'],
-  weight: ['400', '500', '700'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-google',
 })
 
 export const metadata: Metadata = {
-  title: 'Qualittyx - Sistema de Gestion y Control de Calidad',
-  description: 'Sistema de auditorias y control de calidad empresarial',
+  title: "Qualittyx - Sistema de Gestión y Control de Calidad",
+  description: "Sistema de auditorías y control de calidad empresarial",
   icons: {
     icon: [
       {

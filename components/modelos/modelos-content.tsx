@@ -44,14 +44,16 @@ import {
 import { getEstadoBadgeColor, formatEstado, type ModeloControl } from "@/lib/data"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { cloneControlModel, deleteControlModel, updateControlModelStatus } from "@/lib/supabase-data"
+import { cloneControlModel, deleteControlModel, updateControlModelStatus } from "@/lib/repositories/supabase/models"
 import { getErrorMessage } from "@/lib/error-message"
 import { ModeloDetail } from "./modelo-detail"
 import { ModeloForm } from "./modelo-form"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 
+// Catálogo de modelos con filtros y acciones de alta, clonación y estado.
 export function ModelosContent() {
   const router = useRouter()
-  const { data, error: dataError, refresh } = useAppData()
+  const { data, error: dataError, refresh } = useAppData({ domains: ["users", "settings", "models"] })
   const { appUser } = useAuth()
   const canManageModels = appUser?.role === "admin" || appUser?.role === "supervisor"
   const canDeleteModels = appUser?.role === "admin"
@@ -61,6 +63,8 @@ export function ModelosContent() {
   const [selectedModelo, setSelectedModelo] = useState<ModeloControl | null>(null)
   const [editingModelo, setEditingModelo] = useState<ModeloControl | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const [modelToDelete, setModelToDelete] = useState<ModeloControl | null>(null)
 
   const filteredModelos = modelos.filter((modelo) => {
     const matchesEstado =
@@ -79,40 +83,41 @@ export function ModelosContent() {
       await action()
       await refresh()
     } catch (error) {
-      setActionError(getErrorMessage(error, "No se pudo completar la accion."))
+      setActionError(getErrorMessage(error, "No se pudo completar la acción."))
     }
   }
 
   return (
     <div className="space-y-4">
-      {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
-      {actionError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p>}
+      {dataError && <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-3 py-2 text-sm text-status-danger-text">{dataError}</p>}
+      {actionError && <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-3 py-2 text-sm text-status-danger-text">{actionError}</p>}
+      {actionSuccess && <p role="status" className="rounded-lg border border-status-success-border bg-status-success-surface px-3 py-2 text-sm text-status-success-text">{actionSuccess}</p>}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+        <Card variant="surface" className="h-20 gap-0 py-0">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="success" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'publicado').length}</p>
+              <p className="text-3xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'publicado').length}</p>
               <p className="text-xs text-muted-foreground">Activos</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+        <Card variant="surface" className="h-20 gap-0 py-0">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={FileCheck} tone="primary" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'borrador').length}</p>
+              <p className="text-3xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'borrador').length}</p>
               <p className="text-xs text-muted-foreground">En Borrador</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+        <Card variant="surface" className="h-20 gap-0 py-0">
           <CardContent className="flex h-full items-center gap-3 px-4 py-0">
             <RealisticIcon icon={Archive} tone="neutral" size="md" />
             <div>
-              <p className="text-2xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'deprecado').length}</p>
+              <p className="text-3xl font-semibold leading-none tracking-tight">{modelos.filter(m => m.estado === 'deprecado').length}</p>
               <p className="text-xs text-muted-foreground">Dados de baja</p>
             </div>
           </CardContent>
@@ -160,8 +165,17 @@ export function ModelosContent() {
         {filteredModelos.map((modelo) => (
           <Card
             key={modelo.id}
-            className="min-w-0 bg-card border-border cursor-pointer transition-colors hover:border-primary/35"
+            variant="interactive"
+            className="min-w-0"
             onClick={() => setSelectedModelo(modelo)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                setSelectedModelo(modelo)
+              }
+            }}
           >
             <CardContent className="p-4">
               <div className="mb-2 flex min-w-0 items-start justify-between gap-3">
@@ -173,7 +187,7 @@ export function ModelosContent() {
                     </Badge>
                   </div>
                   <p className="line-clamp-1 text-sm leading-5 text-muted-foreground">
-                    {modelo.descripcion || "Sin descripcion"}
+                    {modelo.descripcion || "Sin descripción"}
                   </p>
                 </div>
                 <DropdownMenu>
@@ -200,7 +214,7 @@ export function ModelosContent() {
                     {modelo.estado === 'borrador' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "publicado")); }} className="text-success">
+                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "publicado")); }} className="text-status-success-text">
                           Publicar
                         </DropdownMenuItem>
                       </>
@@ -208,7 +222,7 @@ export function ModelosContent() {
                     {modelo.estado === 'publicado' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "deprecado")); }} className="text-destructive">
+                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "deprecado")); }} className="text-status-danger-text">
                           <Archive className="h-4 w-4 mr-2" />
                           Dar de baja
                         </DropdownMenuItem>
@@ -217,11 +231,11 @@ export function ModelosContent() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       disabled={!canDeleteModels}
-                      className="text-destructive"
+                      className="text-status-danger-text"
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (!window.confirm(`Eliminar el modelo "${modelo.nombre}"? Esta accion no se puede deshacer.`)) return
-                        handleModelAction(() => deleteControlModel(modelo.id))
+                        setActionSuccess(null)
+                        setModelToDelete(modelo)
                       }}
                     >
                       <Archive className="h-4 w-4 mr-2" />
@@ -251,7 +265,7 @@ export function ModelosContent() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {modelo.verticales.map((vertical) => (
-                        <Badge key={vertical.id} variant="outline" className="max-w-full truncate px-2 py-0.5 text-[11px]">
+                        <Badge key={vertical.id} variant="outline" className="max-w-full truncate px-2 py-0.5 text-xs">
                           {vertical.nombre} ({vertical.peso}%)
                         </Badge>
                       ))}
@@ -263,6 +277,23 @@ export function ModelosContent() {
           </Card>
         ))}
       </div>
+
+      <ConfirmDestructiveDialog
+        open={Boolean(modelToDelete)}
+        onOpenChange={(next) => {
+          if (!next) setModelToDelete(null)
+        }}
+        title="Eliminar modelo de control"
+        description={`Se eliminará el modelo “${modelToDelete?.nombre ?? ""}”. Esta acción no se puede deshacer.`}
+        errorMessage="No se pudo eliminar el modelo."
+        onConfirm={async () => {
+          if (!modelToDelete) return
+          const name = modelToDelete.nombre
+          await deleteControlModel(modelToDelete.id)
+          await refresh()
+          setActionSuccess(`El modelo “${name}” fue eliminado.`)
+        }}
+      />
 
       {/* Modelo Detail Dialog */}
       {selectedModelo && (

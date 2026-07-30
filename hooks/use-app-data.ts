@@ -1,15 +1,22 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { fetchAppData, type AppData } from "@/lib/supabase-data"
-import { getErrorMessage } from "@/lib/error-message"
+import { useEffect, useMemo, useRef } from "react"
+import useSWR from "swr"
+import {
+  fetchAppData,
+  type AppData,
+  type AppDataDomain,
+  type AppDataScope,
+} from "@/lib/repositories/supabase/app-data"
 import { useAuth } from "@/components/auth/auth-provider"
+import { getAppDataScopeKey } from "@/lib/domain/app-data-scope"
 
 const emptyData: AppData = {
   users: [],
   unidades: [],
   ciclos: [],
   umbrales: [],
+  catalogItems: [],
   modelos: [],
   lotes: [],
   loteVerticales: [],
@@ -19,103 +26,87 @@ const emptyData: AppData = {
   notificaciones: [],
 }
 
-type AppDataState = {
-  data: AppData
-  isLoading: boolean
-  error: string | null
-  hasLoaded: boolean
+const ALL_DOMAINS: AppDataDomain[] = ["users", "settings", "models", "planning", "evaluations"]
+
+type UseAppDataOptions = {
+  domains?: AppDataDomain[]
+  enabled?: boolean
+  scope?: AppDataScope
 }
 
-const CACHE_TTL_MS = 60_000
-
-let cachedState: AppDataState = {
-  data: emptyData,
-  isLoading: false,
-  error: null,
-  hasLoaded: false,
-}
-let lastLoadedAt = 0
-let cacheUserId: string | null = null
-let inFlightRequest: Promise<void> | null = null
-const listeners = new Set<(state: AppDataState) => void>()
-
-function notify() {
-  listeners.forEach((listener) => listener(cachedState))
-}
-
-function setCachedState(nextState: Partial<AppDataState>) {
-  cachedState = { ...cachedState, ...nextState }
-  notify()
-}
-
-async function loadAppData(profile?: Parameters<typeof fetchAppData>[0], force = false) {
-  const profileId = profile?.id ?? null
-  if (cacheUserId !== profileId) {
-    cacheUserId = profileId
-    lastLoadedAt = 0
-    cachedState = {
-      data: emptyData,
-      isLoading: false,
-      error: null,
-      hasLoaded: false,
-    }
-    notify()
-  }
-
-  const isCacheFresh = cachedState.hasLoaded && Date.now() - lastLoadedAt < CACHE_TTL_MS
-
-  if (!force && isCacheFresh) return
-  if (inFlightRequest) return inFlightRequest
-
-  setCachedState({
-    isLoading: !cachedState.hasLoaded,
-    error: null,
-  })
-
-  inFlightRequest = fetchAppData(profile)
-    .then((supabaseData) => {
-      lastLoadedAt = Date.now()
-      setCachedState({
-        data: supabaseData,
-        isLoading: false,
-        error: null,
-        hasLoaded: true,
-      })
-    })
-    .catch((loadError) => {
-      setCachedState({
-        data: cachedState.hasLoaded ? cachedState.data : emptyData,
-        isLoading: false,
-        error: getErrorMessage(loadError, "No se pudieron cargar los datos de Supabase."),
-        hasLoaded: cachedState.hasLoaded,
-      })
-    })
-    .finally(() => {
-      inFlightRequest = null
-    })
-
-  return inFlightRequest
-}
-
-export function useAppData() {
+// Caché por usuario y conjunto de dominios. SWR deduplica consumidores con la
+// misma clave y cada feature solo se re-renderiza cuando cambia su propia consulta.
+export function useAppData(options: UseAppDataOptions = {}) {
   const { appUser } = useAuth()
-  const [state, setState] = useState<AppDataState>(() => ({
-    ...cachedState,
-    isLoading: cachedState.isLoading || !cachedState.hasLoaded,
-  }))
+  const enabled = options.enabled ?? true
+  const domainsKey = useMemo(
+    () => [...new Set(options.domains ?? ALL_DOMAINS)].sort().join(","),
+    [options.domains],
+  )
+  const controllerRef = useRef<AbortController | null>(null)
+  const generationRef = useRef(0)
+  const lifecycleRef = useRef(0)
+  const profile = appUser
+    ? { id: appUser.id, role: appUser.role, status: appUser.status }
+    : null
+  const scopeKey = getAppDataScopeKey(options.scope)
+  const key = enabled && profile ? ["app-data", profile.id, domainsKey, scopeKey] as const : null
 
-  const refresh = useCallback(async () => {
-    await loadAppData(appUser ? { id: appUser.id, role: appUser.role, status: appUser.status } : undefined, true)
-  }, [appUser])
+  const query = useSWR(
+    key,
+    async ([, requestedUserId, requestedDomains]) => {
+      const generation = ++generationRef.current
+      controllerRef.current?.abort()
+      const controller = new AbortController()
+      controllerRef.current = controller
+
+      if (!profile || profile.id !== requestedUserId) {
+        throw new DOMException("La sesión cambió durante la carga.", "AbortError")
+      }
+
+      const result = await fetchAppData(
+        profile,
+        controller.signal,
+        requestedDomains.split(",").filter(Boolean) as AppDataDomain[],
+        options.scope,
+      )
+      if (generation !== generationRef.current || controller.signal.aborted) {
+        throw new DOMException("Respuesta obsoleta descartada.", "AbortError")
+      }
+      return result
+    },
+    {
+      dedupingInterval: 60_000,
+      keepPreviousData: false,
+      revalidateOnFocus: false,
+      shouldRetryOnError: (error) => error?.name !== "AbortError",
+    },
+  )
 
   useEffect(() => {
-    listeners.add(setState)
-    void loadAppData(appUser ? { id: appUser.id, role: appUser.role, status: appUser.status } : undefined)
+    const lifecycle = ++lifecycleRef.current
 
     return () => {
-      listeners.delete(setState)
+      // React Strict Mode ejecuta setup -> cleanup -> setup al montar en
+      // desarrollo. Esperar un microtask permite que el segundo setup invalide
+      // esta limpieza; un desmontaje real conserva el mismo identificador.
+      queueMicrotask(() => {
+        // Se lee el valor actual deliberadamente para distinguir el segundo setup.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (lifecycleRef.current !== lifecycle) return
+        generationRef.current += 1
+        controllerRef.current?.abort()
+      })
     }
-  }, [appUser])
+  }, [profile?.id, domainsKey, scopeKey])
 
-  return { data: state.data, isLoading: state.isLoading, source: "supabase" as const, error: state.error, refresh }
+  return {
+    data: query.data ?? emptyData,
+    isLoading: Boolean(key) && query.isLoading,
+    source: "supabase" as const,
+    error: query.error?.name === "AbortError" ? null : query.error?.message ?? null,
+    refresh: async () => {
+      await query.mutate()
+    },
+  }
 }

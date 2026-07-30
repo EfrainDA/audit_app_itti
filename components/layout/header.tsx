@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Bell, LogOut, Search, Settings2 } from "lucide-react"
+import { Bell, BellOff, LogOut, Search, Settings2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SafeImage } from "@/components/ui/safe-image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +15,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAppData } from "@/hooks/use-app-data"
+import { useNotifications } from "@/hooks/use-notifications"
+import { useSearchIndex } from "@/hooks/use-search-index"
 import { useAuth } from "@/components/auth/auth-provider"
-import { markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-data"
 import { formatEstado } from "@/lib/data"
 import type { Notificacion } from "@/lib/data"
+import { getAllowedRoutes, hasCapability } from "@/lib/domain/capabilities"
 
+// Normaliza textos para que la búsqueda ignore mayúsculas y tildes.
 function normalizeSearch(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -47,20 +50,21 @@ function getNotificationHref(notification: Notificacion) {
 
 interface HeaderProps {
   title: string
+  subtitle?: string
 }
 
-const YEAR_KEY = "a\u00f1o" as const
-
-export function Header({ title }: HeaderProps) {
-  const { data, refresh } = useAppData()
-  const { appUser, signOut } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
+// Encabezado global con búsqueda, ciclo, notificaciones y menú de usuario.
+export function Header({ title, subtitle }: HeaderProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+  const { data: searchIndex } = useSearchIndex(isSearchExpanded)
+  const { notifications, markRead, markAllRead } = useNotifications()
+  const { appUser, signOut } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const notifications = data.notificaciones
   const unreadCount = notifications.filter(n => !n.leida).length
   const normalizedSearch = normalizeSearch(searchTerm)
   const userName = appUser?.name ?? "Usuario"
@@ -78,81 +82,97 @@ export function Header({ title }: HeaderProps) {
     window.setTimeout(() => searchInputRef.current?.focus(), 0)
   }, [isSearchExpanded])
 
+  useEffect(() => {
+    const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setIsSearchExpanded(true)
+        setIsSearchOpen(true)
+      }
+
+      if (event.key === "Escape") {
+        setIsSearchOpen(false)
+        setIsSearchExpanded(false)
+        setSearchTerm("")
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalSearchShortcut)
+    return () => window.removeEventListener("keydown", handleGlobalSearchShortcut)
+  }, [])
+
   const searchResults = useMemo(() => {
     if (!normalizedSearch) return []
 
-    const canSeeSettings = appUser?.role === "admin" || appUser?.role === "supervisor"
-    const canSeeModels = appUser?.role !== "auditor"
-    const pages = [
-      { title: "Dashboard", subtitle: "Vista general del sistema", href: "/", keywords: "inicio metricas resumen" },
-      { title: "Planificacion", subtitle: "Lotes, ciclos y asignaciones", href: "/planificacion", keywords: "lotes ciclos unidades auditores" },
-      { title: "Evaluaciones", subtitle: "Evaluaciones de control", href: "/evaluaciones", keywords: "controles auditorias auditor" },
-      { title: "Calificaciones", subtitle: "Resultados y calificaciones", href: "/calificaciones", keywords: "scores resultados notas" },
-      ...(canSeeModels ? [{ title: "Modelos de Control", subtitle: "Modelos, verticales y parametros", href: "/modelos", keywords: "metodologia parametros verticales" }] : []),
-      ...(canSeeSettings ? [{ title: "Ajustes", subtitle: "Usuarios, unidades, ciclos y umbrales", href: "/ajustes", keywords: "configuracion usuarios unidades negocio" }] : []),
-      { title: "Preferencias", subtitle: "Perfil, cargo, area, empresa y tema", href: "/preferencias", keywords: "perfil contrasena cargo area empresa" },
-    ]
+    const canSeeSettings = hasCapability(appUser?.role, "settings:view")
+    const canSeeModels = hasCapability(appUser?.role, "models:view")
+    const canSeePlanning = hasCapability(appUser?.role, "planning:view")
+    const pages = getAllowedRoutes(appUser?.role).map((route) => ({
+      ...route,
+      keywords: `${route.title} ${route.subtitle}`,
+    }))
 
     const pageResults = pages
       .filter((page) => matchesSearch(normalizedSearch, page.title, page.subtitle, page.keywords))
-      .map((page) => ({ ...page, type: "Pagina" }))
+      .map((page) => ({ ...page, type: "Página" }))
 
-    const unitResults = data.unidades
-      .filter((unit) => matchesSearch(normalizedSearch, unit.nombre, unit.ecosistema, unit.codigo, unit.zona, unit.responsable))
+    const unitResults = canSeePlanning ? searchIndex.units
+      .filter((unit) => matchesSearch(normalizedSearch, unit.name, unit.ecosystem))
       .map((unit) => ({
         type: "Unidad",
-        title: unit.nombre,
-        subtitle: [unit.ecosistema, unit.codigo].filter(Boolean).join(" - "),
+        title: unit.name,
+        subtitle: unit.ecosystem,
         href: "/planificacion",
       }))
+      : []
 
     const modelResults = canSeeModels
-      ? data.modelos
-          .filter((model) => matchesSearch(normalizedSearch, model.nombre, model.descripcion, formatEstado(model.estado)))
+      ? searchIndex.models
+          .filter((model) => matchesSearch(normalizedSearch, model.name, model.description, model.status))
           .map((model) => ({
             type: "Modelo",
-            title: model.nombre,
-            subtitle: `${formatEstado(model.estado)} - ${model.verticales.length} verticales`,
+            title: model.name,
+            subtitle: formatEstado(model.status as never),
             href: "/modelos",
           }))
       : []
 
-    const lotResults = data.lotes
+    const lotResults = canSeePlanning ? searchIndex.lots
       .map((lote) => {
-        const unidad = data.unidades.find((unit) => unit.id === lote.unidadNegocioId)
-        const modelo = data.modelos.find((model) => model.id === lote.modeloControlId)
+        const unidad = searchIndex.units.find((unit) => unit.id === lote.businessUnitId)
+        const modelo = searchIndex.models.find((model) => model.id === lote.modelId)
         return {
           type: "Lote",
-          title: `${unidad?.nombre ?? "Unidad"} - Ciclo ${lote.ciclo}`,
-          subtitle: `${modelo?.nombre ?? "Modelo"} - ${formatEstado(lote.estado)}`,
+          title: `${unidad?.name ?? "Unidad"} - Ciclo ${lote.bimester}`,
+          subtitle: `${modelo?.name ?? "Modelo"} - ${formatEstado(lote.status as never)}`,
           href: "/planificacion",
-          text: [unidad?.nombre, modelo?.nombre, `ciclo ${lote.ciclo}`, String(lote[YEAR_KEY]), lote.estado],
+          text: [unidad?.name, modelo?.name, `ciclo ${lote.bimester}`, String(lote.year), lote.status],
         }
       })
       .filter((result) => matchesSearch(normalizedSearch, result.title, result.subtitle, ...result.text))
+      : []
 
-    const controlResults = data.loteVerticales
-      .flatMap((loteVertical) => loteVertical.controles)
+    const controlResults = searchIndex.controls
       .filter((control) =>
         matchesSearch(
           normalizedSearch,
-          control.identificador,
-          control.descripcion,
-          control.proceso,
-          control.subproceso,
-          control.producto,
-          formatEstado(control.estado),
+          control.identifier,
+          control.description,
+          control.process,
+          control.subprocess,
+          control.product,
+          control.status,
         ),
       )
       .map((control) => ({
         type: "Control",
-        title: control.identificador,
-        subtitle: [control.proceso, control.subproceso, formatEstado(control.estado)].filter(Boolean).join(" - "),
+        title: control.identifier,
+        subtitle: [control.process, control.subprocess, formatEstado(control.status as never)].filter(Boolean).join(" - "),
         href: `/evaluaciones/${control.id}`,
       }))
 
     const userResults = canSeeSettings
-      ? data.users
+      ? searchIndex.users
           .filter((user) => matchesSearch(normalizedSearch, user.name, user.email, user.company, user.cargo, user.area, user.role))
           .map((user) => ({
             type: "Usuario",
@@ -163,18 +183,16 @@ export function Header({ title }: HeaderProps) {
       : []
 
     return [...pageResults, ...controlResults, ...lotResults, ...unitResults, ...modelResults, ...userResults].slice(0, 8)
-  }, [appUser?.role, data.loteVerticales, data.lotes, data.modelos, data.unidades, data.users, normalizedSearch])
+  }, [appUser?.role, normalizedSearch, searchIndex])
 
   const handleNotificationClick = async (notification: Notificacion) => {
-    await markNotificationRead(notification.id)
-    await refresh()
+    await markRead(notification.id)
     const href = getNotificationHref(notification)
     if (href !== pathname) router.push(href)
   }
 
   const handleMarkAllNotificationsRead = async () => {
-    await markAllNotificationsRead(notifications.filter((notification) => !notification.leida).map((notification) => notification.id))
-    await refresh()
+    await markAllRead()
   }
 
   const handleSignOut = async () => {
@@ -191,10 +209,20 @@ export function Header({ title }: HeaderProps) {
     }
   }
 
-  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" && searchResults[0]) {
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" && searchResults.length) {
       event.preventDefault()
-      handleSelectResult(searchResults[0].href)
+      setIsSearchOpen(true)
+      setActiveSearchIndex((current) => (current + 1) % searchResults.length)
+    }
+    if (event.key === "ArrowUp" && searchResults.length) {
+      event.preventDefault()
+      setIsSearchOpen(true)
+      setActiveSearchIndex((current) => (current - 1 + searchResults.length) % searchResults.length)
+    }
+    if (event.key === "Enter" && searchResults[activeSearchIndex]) {
+      event.preventDefault()
+      handleSelectResult(searchResults[activeSearchIndex].href)
     }
 
     if (event.key === "Escape") {
@@ -208,47 +236,88 @@ export function Header({ title }: HeaderProps) {
     <header className="relative flex h-16 min-h-16 items-center justify-between gap-2 border-b border-border/70 bg-white px-3 shadow-none dark:bg-background sm:gap-3 sm:px-5 md:px-6">
       <div className="min-w-0 flex-1 pr-1">
         <h1 className="truncate text-lg font-semibold leading-none text-foreground sm:text-xl">{title}</h1>
+        {subtitle && <p className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">{subtitle}</p>}
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
-        <div className="relative flex items-center">
+        <div className={`relative flex items-center ${isSearchExpanded ? "max-sm:static" : ""}`}>
           {isSearchExpanded ? (
-            <div className="relative w-48 lg:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
-              <Input
-                ref={searchInputRef}
-                placeholder="Buscar..."
-                value={searchTerm}
-                onChange={(event) => {
-                  setSearchTerm(event.target.value)
-                  setIsSearchOpen(true)
-                }}
-                onFocus={() => setIsSearchOpen(true)}
-                onBlur={() => {
-                  window.setTimeout(() => {
+            <div
+              role="search"
+              aria-label="Búsqueda global"
+              className="fixed inset-0 z-[60] flex flex-col bg-background p-4 sm:relative sm:inset-auto sm:z-auto sm:block sm:w-64 sm:bg-transparent sm:p-0 lg:w-72"
+            >
+              <div className="mb-3 flex items-center justify-between sm:hidden">
+                <div>
+                  <p className="text-base font-semibold text-foreground">Buscar</p>
+                  <p className="text-xs text-muted-foreground">Páginas, controles, lotes y usuarios</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Cerrar búsqueda"
+                  onClick={() => {
+                    setSearchTerm("")
                     setIsSearchOpen(false)
-                    if (!searchTerm.trim()) setIsSearchExpanded(false)
-                  }, 120)
-                }}
-                onKeyDown={handleSearchKeyDown}
-                className="h-9 border-border/80 bg-card pl-9"
-              />
+                    setIsSearchExpanded(false)
+                  }}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
+                <Input
+                  ref={searchInputRef}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={isSearchOpen && Boolean(searchTerm.trim())}
+                  aria-controls="global-search-results"
+                  aria-activedescendant={searchResults[activeSearchIndex] ? `global-search-option-${activeSearchIndex}` : undefined}
+                  placeholder="Buscar..."
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value)
+                    setIsSearchOpen(true)
+                    setActiveSearchIndex(0)
+                  }}
+                  onFocus={() => setIsSearchOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      setIsSearchOpen(false)
+                      if (!searchTerm.trim() && window.matchMedia("(min-width: 640px)").matches) {
+                        setIsSearchExpanded(false)
+                      }
+                    }, 120)
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  className="h-11 border-border/80 bg-card pl-9 sm:h-9"
+                />
+              </div>
 
               {isSearchOpen && searchTerm.trim() && (
-                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
+                <div
+                  id="global-search-results"
+                  role="listbox"
+                  className="elevation-2 absolute inset-x-4 bottom-4 top-[5.25rem] z-50 overflow-hidden rounded-lg border border-border/80 bg-popover sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-[calc(100%+0.5rem)] sm:w-[min(22rem,calc(100vw-2rem))]"
+                >
                   {searchResults.length > 0 ? (
-                    <div className="max-h-96 overflow-y-auto py-1">
+                    <div className="h-full overflow-y-auto py-1 sm:max-h-96">
                       {searchResults.map((result, index) => (
                         <button
+                          id={`global-search-option-${index}`}
+                          role="option"
+                          aria-selected={index === activeSearchIndex}
                           key={`${result.type}-${result.href}-${result.title}-${index}`}
                           type="button"
-                          className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/80 focus:bg-secondary/80 focus:outline-none"
+                          className={`flex min-h-14 w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/80 focus:bg-secondary/80 focus:outline-none ${index === activeSearchIndex ? "bg-secondary/80" : ""}`}
+                          onMouseEnter={() => setActiveSearchIndex(index)}
                           onMouseDown={(event) => {
                             event.preventDefault()
                             handleSelectResult(result.href)
                           }}
                         >
-                          <span className="mt-0.5 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-normal text-muted-foreground">
+                          <span className="mt-0.5 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-bold uppercase tracking-normal text-muted-foreground">
                             {result.type}
                           </span>
                           <span className="min-w-0 flex-1">
@@ -265,19 +334,30 @@ export function Header({ title }: HeaderProps) {
                   )}
                 </div>
               )}
+
+              {!searchTerm.trim() && (
+                <div className="mt-10 flex flex-1 flex-col items-center justify-center text-center sm:hidden">
+                  <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground">
+                    <Search className="h-5 w-5" />
+                  </span>
+                  <p className="text-sm font-semibold text-foreground">Encuentra cualquier elemento</p>
+                  <p className="mt-1 max-w-64 text-xs text-muted-foreground">Escribe un nombre, código, ciclo o estado.</p>
+                </div>
+              )}
             </div>
           ) : (
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Abrir busqueda"
+              className="text-muted-foreground hover:text-foreground sm:w-auto sm:px-3"
+              aria-label="Abrir búsqueda"
               onClick={() => {
                 setIsSearchExpanded(true)
                 setIsSearchOpen(true)
               }}
             >
               <Search className="h-5 w-5" />
+              <span className="hidden lg:inline">Buscar</span>
             </Button>
           )}
         </div>
@@ -287,7 +367,7 @@ export function Header({ title }: HeaderProps) {
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/60 bg-destructive text-xs font-bold text-destructive-foreground shadow-none">
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/60 bg-status-danger-solid text-xs font-bold text-destructive-foreground shadow-none">
                   {unreadCount}
                 </span>
               )}
@@ -296,25 +376,41 @@ export function Header({ title }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-[calc(100vw-1.5rem)] max-w-80">
             <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {notifications.slice(0, 5).map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className="flex flex-col items-start gap-1 py-3 cursor-pointer"
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className="flex items-center gap-2 w-full">
-                  {!notification.leida && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                  <span className="font-medium text-sm">{notification.titulo}</span>
-                </div>
-                <span className="text-xs text-muted-foreground line-clamp-2 pl-4">
-                  {notification.mensaje}
+            {notifications.length > 0 ? (
+              <>
+                {notifications.slice(0, 5).map((notification) => (
+                  <DropdownMenuItem
+                    key={notification.id}
+                    className="flex cursor-pointer flex-col items-start gap-1 py-3"
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <div className="flex w-full items-center gap-2">
+                      {!notification.leida && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                      <span className="text-sm font-medium">{notification.titulo}</span>
+                    </div>
+                    <span className="line-clamp-2 pl-4 text-xs text-muted-foreground">
+                      {notification.mensaje}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+                {unreadCount > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="cursor-pointer justify-center text-primary" onClick={handleMarkAllNotificationsRead}>
+                      Marcar todas como leídas
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center px-5 py-8 text-center">
+                <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground">
+                  <BellOff className="h-4 w-4" />
                 </span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-primary cursor-pointer" onClick={handleMarkAllNotificationsRead}>
-              Marcar todas como leidas
-            </DropdownMenuItem>
+                <p className="text-sm font-semibold text-foreground">Sin notificaciones</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cuando haya novedades, aparecerán aquí.</p>
+              </div>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -328,7 +424,7 @@ export function Header({ title }: HeaderProps) {
             >
               <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-none">
                 {appUser?.avatar ? (
-                  <img src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
+                  <SafeImage src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs font-bold text-primary">{userInitials}</span>
                 )}
@@ -339,7 +435,7 @@ export function Header({ title }: HeaderProps) {
             <DropdownMenuLabel className="flex items-center gap-3 py-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
                 {appUser?.avatar ? (
-                  <img src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
+                  <SafeImage src={appUser.avatar} alt={userName} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs font-bold text-primary">{userInitials}</span>
                 )}
@@ -351,17 +447,21 @@ export function Header({ title }: HeaderProps) {
                 )}
               </span>
             </DropdownMenuLabel>
+            {appUser?.role !== "ceo" && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/preferencias" className="cursor-pointer">
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Preferencias
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/preferencias" className="cursor-pointer">
-                <Settings2 className="mr-2 h-4 w-4" />
-                Preferencias
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
+            <DropdownMenuItem className="cursor-pointer text-status-danger-text focus:text-status-danger-text" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
-              Cerrar sesion
+              Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

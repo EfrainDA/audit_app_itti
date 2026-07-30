@@ -1,27 +1,9 @@
 "use client"
 
-function escapeCsvValue(value: unknown) {
-  const text = value === null || value === undefined ? "" : String(value)
-  return `"${text.replace(/"/g, '""')}"`
-}
+// Generadores de archivos ejecutados en el navegador. Construyen CSV, hojas de
+// cálculo y presentaciones en memoria sin enviar los datos a otro servicio.
 
-export function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
-  if (!rows.length) {
-    const blob = new Blob([""], { type: "text/csv;charset=utf-8;" })
-    triggerDownload(filename, blob)
-    return
-  }
-
-  const headers = Object.keys(rows[0])
-  const csv = [
-    headers.map(escapeCsvValue).join(","),
-    ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(",")),
-  ].join("\n")
-
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-  triggerDownload(filename, blob)
-}
-
+// Estructuras neutrales que los paneles entregan antes de serializar el archivo.
 type ExcelCellValue = string | number | boolean | null | undefined
 type ExcelCell = ExcelCellValue | {
   value: ExcelCellValue
@@ -185,6 +167,7 @@ export function downloadPptx(filename: string, slides: PresentationSlide[]) {
   triggerDownload(filename, blob)
 }
 
+// Conversión de hojas y celdas a los documentos XML utilizados por Excel.
 function getCellValue(cell: ExcelCell) {
   return typeof cell === "object" && cell !== null && "value" in cell ? cell.value : cell
 }
@@ -296,6 +279,7 @@ function getXlsxStylesXml() {
 </styleSheet>`
 }
 
+// Primitivas Open XML para dibujar textos, tarjetas y tablas en diapositivas.
 function pptxEmu(value: number) {
   return Math.round(value)
 }
@@ -429,6 +413,7 @@ function getPptxThemeXml() {
 </a:theme>`
 }
 
+// Empaquetador ZIP mínimo requerido por los formatos modernos de Office.
 function createZip(files: Record<string, string>) {
   const encoder = new TextEncoder()
   const localParts: Uint8Array[] = []
@@ -502,6 +487,7 @@ const crcTable = Array.from({ length: 256 }, (_, index) => {
   return value >>> 0
 })
 
+// Entrega el archivo terminado al mecanismo de descarga del navegador.
 function triggerDownload(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")

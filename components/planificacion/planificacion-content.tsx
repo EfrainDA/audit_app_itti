@@ -1,13 +1,15 @@
 "use client"
 
+// Pantalla maestra que filtra lotes y abre sus flujos de creación y detalle.
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
+import { SafeImage } from "@/components/ui/safe-image"
 import {
   Plus,
   Search,
@@ -45,17 +47,18 @@ import {
 import {
   getEstadoBadgeColor,
   formatEstado,
-  isCountableLote,
 } from "@/lib/data"
 import { LoteForm } from "./lote-form"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { downloadCsv, downloadXlsx } from "@/lib/export"
-import { updateLotStatus } from "@/lib/supabase-data"
+import { downloadXlsx } from "@/lib/export"
+import { updateLotStatus } from "@/lib/repositories/supabase/planning"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 
+// Centraliza filtros y acciones permitidas para el rol autenticado.
 export function PlanificacionContent() {
   const router = useRouter()
-  const { data, error: dataError, refresh } = useAppData()
+  const { data, error: dataError, refresh } = useAppData({ domains: ["users", "settings", "models", "planning", "evaluations"] })
   const { appUser } = useAuth()
   const isAuditor = appUser?.role === "auditor"
   const canManageLots = appUser?.role === "admin" || appUser?.role === "supervisor"
@@ -71,8 +74,9 @@ export function PlanificacionContent() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("lotes")
   const [statusError, setStatusError] = useState<string | null>(null)
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
+  const [lotToDeprecate, setLotToDeprecate] = useState<{ id: string; name: string } | null>(null)
   const unidades = data.unidades
-  const lotesComputables = lotes.filter(isCountableLote)
   const lotesDadosDeBaja = lotes.filter((lote) => lote.estado === "deprecado")
 
   const lotesConDatos = lotes.map((lote) => {
@@ -135,22 +139,6 @@ export function PlanificacionContent() {
 
     return matchesSearch && matchesCiclo && matchesAnio && matchesEstado && matchesAuditor
   })
-
-  const exportLotes = () => {
-    downloadCsv(
-      "planificacion-lotes.csv",
-      lotesConDatos.map((lote) => ({
-        unidad: lote.unidadNombre,
-        ciclo: lote.ciclo,
-        año: lote.año,
-        estado: lote.estado,
-        auditores: lote.auditoresNombres,
-        auditorias: lote.totalAuditorias,
-        terminadas: lote.auditoriasTerminadas,
-        calificacion: lote.calificacionFinal ?? "",
-      })),
-    )
-  }
 
   const exportSingleLote = (lote: (typeof lotesConDatos)[number]) => {
     const unidad = unidades.find((item) => item.id === lote.unidadNegocioId)
@@ -233,17 +221,6 @@ export function PlanificacionContent() {
     }
   }
 
-  const handleDeprecateLote = async (loteId: string) => {
-    if (!window.confirm("Dar de baja este lote? Quedara fuera de metricas y evaluaciones.")) return
-    setStatusError(null)
-    try {
-      await updateLotStatus(loteId, "deprecado")
-      await refresh()
-    } catch (error) {
-      setStatusError(error instanceof Error ? error.message : "No se pudo dar de baja el lote.")
-    }
-  }
-
   const handleReactivateLote = async (loteId: string) => {
     setStatusError(null)
     try {
@@ -256,44 +233,44 @@ export function PlanificacionContent() {
 
   return (
     <div className="space-y-4">
-      {dataError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{dataError}</p>}
-      {statusError && <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">{statusError}</p>}
+      {dataError && <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-3 py-2 text-sm text-status-danger-text">{dataError}</p>}
+      {statusError && <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-3 py-2 text-sm text-status-danger-text">{statusError}</p>}
       <Tabs value={isAuditor ? "lotes" : activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsContent value="lotes" className="space-y-4">
           {/* Stats */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+            <Card variant="surface" className="h-20 gap-0 py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Calendar} tone="primary" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.length}</p>
+                  <p className="text-3xl font-semibold leading-none tracking-tight">{lotes.length}</p>
                   <p className="text-xs text-muted-foreground">Total de Lotes</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+            <Card variant="surface" className="h-20 gap-0 py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Unlock} tone="success" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "abierto").length}</p>
+                  <p className="text-3xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "abierto").length}</p>
                   <p className="text-xs text-muted-foreground">Abiertos</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+            <Card variant="surface" className="h-20 gap-0 py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Lock} tone="neutral" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "cerrado").length}</p>
+                  <p className="text-3xl font-semibold leading-none tracking-tight">{lotes.filter((l) => l.estado === "cerrado").length}</p>
                   <p className="text-xs text-muted-foreground">Cerrados</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="h-20 gap-0 border-border/70 bg-card py-0">
+            <Card variant="surface" className="h-20 gap-0 py-0">
               <CardContent className="flex h-full items-center gap-3 px-4 py-0">
                 <RealisticIcon icon={Lock} tone="danger" size="md" />
                 <div>
-                  <p className="text-2xl font-semibold leading-none tracking-tight">{lotesDadosDeBaja.length}</p>
+                  <p className="text-3xl font-semibold leading-none tracking-tight">{lotesDadosDeBaja.length}</p>
                   <p className="text-xs text-muted-foreground">Dados de baja</p>
                 </div>
               </CardContent>
@@ -362,7 +339,7 @@ export function PlanificacionContent() {
                   <DialogHeader>
                     <DialogTitle>Crear Nuevo Lote</DialogTitle>
                     <DialogDescription>
-                      Define el ciclo de auditoria para una unidad de negocio
+                      Define el ciclo de auditoría para una unidad de negocio
                     </DialogDescription>
                   </DialogHeader>
                   <LoteForm onClose={() => setIsCreateOpen(false)} onSaved={refresh} />
@@ -376,15 +353,23 @@ export function PlanificacionContent() {
             {filteredLotes.map((lote) => (
               <Card
                 key={lote.id}
+                role="link"
+                tabIndex={0}
                 className="min-w-0 cursor-pointer overflow-hidden rounded-lg border border-border/60 bg-card shadow-none transition-colors hover:border-primary/50"
                 onClick={() => router.push(`/planificacion/${lote.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    router.push(`/planificacion/${lote.id}`)
+                  }
+                }}
               >
                 <CardContent className="px-3 py-3 sm:px-4">
                   <div className="grid min-w-0 w-full grid-cols-1 gap-3 text-left md:grid-cols-[1.35fr_0.8fr_1fr_auto] md:items-center">
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="flex h-7 w-12 shrink-0 items-center justify-center overflow-hidden rounded">
                         {lote.unidadLogo ? (
-                          <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
+                          <SafeImage src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center rounded border border-primary/20 bg-primary/10">
                             <Building2 className="h-4 w-4 text-primary" />
@@ -418,7 +403,7 @@ export function PlanificacionContent() {
                           {canManageLots && lote.estado === "abierto" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-warning">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-status-warning-text">
                                 <Lock className="h-4 w-4 mr-2" />
                                 Cerrar Lote
                               </DropdownMenuItem>
@@ -427,7 +412,7 @@ export function PlanificacionContent() {
                           {canManageLots && lote.estado !== "deprecado" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeprecateLote(lote.id); }} className="text-destructive">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setStatusSuccess(null); setLotToDeprecate({ id: lote.id, name: lote.unidadNombre || `Ciclo ${lote.ciclo}` }); }} className="text-status-danger-text">
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Dar de baja
                               </DropdownMenuItem>
@@ -436,7 +421,7 @@ export function PlanificacionContent() {
                           {canManageLots && lote.estado === "deprecado" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-success">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-status-success-text">
                                 <RotateCcw className="h-4 w-4 mr-2" />
                                 Reactivar lote
                               </DropdownMenuItem>
@@ -452,99 +437,26 @@ export function PlanificacionContent() {
           </div>
         </TabsContent>
 
-        <TabsContent value="auditorias" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Calificación por Unidad de Negocio</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                La calificación final es calculada a partir de la suma de los porcentajes obtenidos en cada vertical, ponderados por el peso asignado a cada una en el modelo de control.
-              </p>
-              <div className="responsive-scroll overflow-x-auto">
-                <table className="w-full min-w-[760px]">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Unidad de Negocio</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Ciclo de Control</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Estado</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Auditores Asignados</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Calificación General</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lotesConDatos.map((lote) => (
-                      <tr key={lote.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-6 w-10 items-center justify-center overflow-hidden rounded">
-                              {lote.unidadLogo ? (
-                                <img src={lote.unidadLogo} alt={lote.unidadNombre} className="h-full w-full object-contain" />
-                              ) : (
-                                <Building2 className="h-4 w-4 text-accent" />
-                              )}
-                            </div>
-                            <span>{lote.unidadNombre}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm">Ciclo {lote.ciclo} - {lote.año}</td>
-                        <td className="py-3 px-4">
-                          <Badge className={getEstadoBadgeColor(lote.estado)}>{formatEstado(lote.estado)}</Badge>
-                        </td>
-                        <td className="py-3 px-4 text-sm">{lote.auditoresNombres || "Sin asignar"}</td>
-                        <td className="py-3 px-4 text-right font-semibold">
-                          {lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="calendario" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Ciclos del Año 2026</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                {[1, 2, 3, 4, 5, 6].map((bimestre) => {
-                  const lotesBimestre = lotes.filter((l) => l.ciclo === bimestre && l.año === 2026 && isCountableLote(l))
-                  const isActive = bimestre === 3
-                  const isPast = bimestre < 3
-
-                  return (
-                    <Card
-                      key={bimestre}
-                      className={`border ${isActive ? "border-primary bg-primary/5" : isPast ? "border-border bg-muted/50" : "border-border"}`}
-                    >
-                      <CardContent className="p-4 text-center">
-                        <p className="text-sm text-muted-foreground mb-1">Bimestre</p>
-                        <p className="text-2xl font-bold mb-2">{bimestre}</p>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          {bimestre === 1 && "Enero - Febrero"}
-                          {bimestre === 2 && "Marzo - Abril"}
-                          {bimestre === 3 && "Mayo - Junio"}
-                          {bimestre === 4 && "Julio - Agosto"}
-                          {bimestre === 5 && "Septiembre - Octubre"}
-                          {bimestre === 6 && "Noviembre - Diciembre"}
-                        </p>
-                        <Badge className={isActive ? "bg-primary text-primary-foreground" : isPast ? "bg-muted text-muted-foreground" : "bg-card"}>
-                          {lotesBimestre.length} lotes
-                        </Badge>
-                        {isActive && <p className="text-xs text-primary mt-2 font-medium">Activo</p>}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+
+      {statusSuccess && <p role="status" className="rounded-lg border border-status-success-border bg-status-success-surface px-3 py-2 text-sm text-status-success-text">{statusSuccess}</p>}
+      <ConfirmDestructiveDialog
+        open={Boolean(lotToDeprecate)}
+        onOpenChange={(next) => {
+          if (!next) setLotToDeprecate(null)
+        }}
+        title="Dar de baja el lote"
+        description={`El lote “${lotToDeprecate?.name ?? ""}” quedará fuera de métricas y evaluaciones.`}
+        confirmLabel="Dar de baja"
+        pendingLabel="Dando de baja..."
+        errorMessage="No se pudo dar de baja el lote."
+        onConfirm={async () => {
+          if (!lotToDeprecate) return
+          await updateLotStatus(lotToDeprecate.id, "deprecado")
+          await refresh()
+          setStatusSuccess("El lote fue dado de baja correctamente.")
+        }}
+      />
 
     </div>
   )

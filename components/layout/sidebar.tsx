@@ -12,16 +12,24 @@ import {
   ChevronLeft,
   ChevronRight,
   House,
+  MoreHorizontal,
   SlidersHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { getAllowedRoutes } from "@/lib/domain/capabilities"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: House },
   { name: "Modelos de Control", href: "/modelos", icon: SlidersHorizontal },
-  { name: "Planificacion", href: "/planificacion", icon: CalendarDays },
+  { name: "Planificación", href: "/planificacion", icon: CalendarDays },
   { name: "Evaluaciones", href: "/evaluaciones", icon: ClipboardCheck },
   { name: "Calificaciones", href: "/calificaciones", icon: ChartColumn },
   { name: "Ajustes", href: "/ajustes", icon: Settings2 },
@@ -29,6 +37,12 @@ const navigation = [
 
 const SIDEBAR_COLLAPSED_KEY = "audit-app-sidebar-collapsed"
 
+function navigationForRole(role?: Parameters<typeof getAllowedRoutes>[0]) {
+  const allowed = new Set<string>(getAllowedRoutes(role).map((route) => route.href))
+  return navigation.filter((item) => allowed.has(item.href))
+}
+
+// Navegación de escritorio que conserva localmente su estado contraído.
 export function Sidebar() {
   const pathname = usePathname()
   const { appUser } = useAuth()
@@ -36,11 +50,7 @@ export function Sidebar() {
     if (typeof window === "undefined") return false
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true"
   })
-  const visibleNavigation = appUser?.role === "auditado"
-    ? navigation.filter((item) => item.href === "/" || item.href === "/evaluaciones")
-    : appUser?.role === "auditor"
-    ? navigation.filter((item) => item.href !== "/modelos" && item.href !== "/ajustes")
-    : navigation
+  const visibleNavigation = navigationForRole(appUser?.role)
 
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed))
@@ -123,27 +133,38 @@ export function Sidebar() {
   )
 }
 
+// Variante de navegación adaptada a pantallas pequeñas.
 export function MobileNav() {
   const pathname = usePathname()
   const { appUser } = useAuth()
-  const visibleNavigation = appUser?.role === "auditado"
-    ? navigation.filter((item) => item.href === "/" || item.href === "/evaluaciones")
-    : appUser?.role === "auditor"
-    ? navigation.filter((item) => item.href !== "/modelos" && item.href !== "/ajustes")
-    : navigation
+  const visibleNavigation = navigationForRole(appUser?.role)
+  const activeItem = visibleNavigation.find(
+    (item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)),
+  )
+  const primaryNavigation = visibleNavigation.length <= 5
+    ? visibleNavigation
+    : activeItem && !visibleNavigation.slice(0, 4).some((item) => item.href === activeItem.href)
+      ? [...visibleNavigation.slice(0, 3), activeItem]
+      : visibleNavigation.slice(0, 4)
+  const primaryHrefs = new Set(primaryNavigation.map((item) => item.href))
+  const overflowNavigation = visibleNavigation.filter((item) => !primaryHrefs.has(item.href))
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-none lg:hidden">
-      <div className="responsive-scroll grid auto-cols-[minmax(4.75rem,1fr)] grid-flow-col gap-1 overflow-x-auto pb-1 sm:grid-flow-row sm:grid-cols-6 sm:overflow-visible sm:pb-0">
-        {visibleNavigation.map((item) => {
+    <nav aria-label="Navegación principal" className="elevation-1 fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 lg:hidden">
+      <div
+        className="grid gap-1 pb-1"
+        style={{ gridTemplateColumns: `repeat(${primaryNavigation.length + (overflowNavigation.length ? 1 : 0)}, minmax(0, 1fr))` }}
+      >
+        {primaryNavigation.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 
           return (
             <Link
               key={item.name}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex min-w-[4.75rem] flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors sm:min-w-0",
+                "flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-semibold transition-colors",
                 isActive ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/62 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
               )}
             >
@@ -159,6 +180,33 @@ export function MobileNav() {
             </Link>
           )
         })}
+
+        {overflowNavigation.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-semibold text-sidebar-foreground/72 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-foreground focus-visible:outline-none"
+                aria-label="Mostrar más destinos"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-sidebar-border bg-transparent">
+                  <MoreHorizontal className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <span className="w-full truncate text-center leading-tight">Más</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" sideOffset={8} className="min-w-52">
+              {overflowNavigation.map((item) => (
+                <DropdownMenuItem key={item.name} asChild>
+                  <Link href={item.href} className="flex cursor-pointer items-center gap-3">
+                    <item.icon className="h-4 w-4" strokeWidth={1.8} />
+                    {item.name}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </nav>
   )

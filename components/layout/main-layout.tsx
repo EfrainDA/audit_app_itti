@@ -5,16 +5,15 @@ import { usePathname, useRouter } from "next/navigation"
 import { MobileNav, Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
-
-const PREFETCH_ROUTES = ["/", "/planificacion", "/evaluaciones", "/calificaciones", "/modelos", "/ajustes", "/preferencias"]
+import { AppShellSkeleton } from "@/components/ui/async-state"
+import { canAccessPath, getAllowedRoutes, getRouteDefinition } from "@/lib/domain/capabilities"
 
 interface MainLayoutProps {
   children: React.ReactNode
-  title: string
-  subtitle?: string
 }
 
-export function MainLayout({ children, title }: MainLayoutProps) {
+// Marco privado que protege rutas y compone navegación, encabezado y contenido.
+export function MainLayout({ children }: MainLayoutProps) {
   const { session, appUser, isLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -25,55 +24,35 @@ export function MainLayout({ children, title }: MainLayoutProps) {
     }
   }, [isLoading, pathname, router, session])
 
-  const isAuditorBlockedPath =
-    appUser?.role === "auditor" && (pathname.startsWith("/modelos") || pathname.startsWith("/ajustes"))
-  const isAuditadoBlockedPath =
-    appUser?.role === "auditado" &&
-    !(
-      pathname === "/" ||
-      pathname.startsWith("/evaluaciones") ||
-      pathname.startsWith("/preferencias")
-    )
-
+  const isRoleBlockedPath = Boolean(appUser && !canAccessPath(appUser.role, pathname))
+  const routeDefinition = getRouteDefinition(pathname)
   useEffect(() => {
-    if (!isLoading && session && (isAuditorBlockedPath || isAuditadoBlockedPath)) {
-      router.replace(isAuditorBlockedPath && pathname.startsWith("/ajustes") ? "/preferencias" : "/")
+    if (!isLoading && session && isRoleBlockedPath) {
+      router.replace("/")
     }
-  }, [isAuditadoBlockedPath, isAuditorBlockedPath, isLoading, pathname, router, session])
+  }, [isLoading, isRoleBlockedPath, router, session])
 
   useEffect(() => {
     if (isLoading || !session) return
 
-    PREFETCH_ROUTES.forEach((route) => {
-      if (route !== pathname) router.prefetch(route)
+    getAllowedRoutes(appUser?.role).forEach((route) => {
+      if (route.href !== pathname) router.prefetch(route.href)
     })
-  }, [isLoading, pathname, router, session])
+  }, [appUser?.role, isLoading, pathname, router, session])
 
   if (isLoading || !session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
-          Preparando sesion...
-        </div>
-      </div>
-    )
+    return <AppShellSkeleton label="Preparando sesión" />
   }
 
-  if (isAuditorBlockedPath || isAuditadoBlockedPath) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-xl border border-border/70 bg-card px-5 py-4 text-sm font-medium text-muted-foreground">
-          Redirigiendo...
-        </div>
-      </div>
-    )
+  if (isRoleBlockedPath) {
+    return <AppShellSkeleton label="Redirigiendo a una sección autorizada" />
   }
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background">
       <Sidebar />
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header title={title} />
+        <Header title={routeDefinition?.title ?? "Qualittyx"} subtitle={routeDefinition?.subtitle} />
         <main className="min-w-0 flex-1 overflow-auto scroll-smooth px-3 pb-20 pt-3 [scrollbar-gutter:stable] sm:px-5 sm:py-3 md:px-6 lg:px-6 lg:pb-5">
           <div className="mx-auto w-full max-w-[1520px]">
             {children}

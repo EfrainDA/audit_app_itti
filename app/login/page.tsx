@@ -14,6 +14,7 @@ type AuthMode = "login" | "register"
 const LOGIN_DESTINATION = "/"
 const ALLOW_PUBLIC_SIGNUP = process.env.NEXT_PUBLIC_ALLOW_PUBLIC_SIGNUP === "true"
 
+// Gestiona acceso, registro opcional y redirección mediante Supabase Auth.
 function LoginContent() {
   const router = useRouter()
   const { session, refreshProfile } = useAuth()
@@ -55,7 +56,7 @@ function LoginContent() {
       }
 
       if (!ALLOW_PUBLIC_SIGNUP) {
-        throw new Error("El registro publico esta deshabilitado. Solicita acceso al administrador.")
+        throw new Error("El registro público está deshabilitado. Solicita acceso al administrador.")
       }
 
       const cleanName = name.trim()
@@ -142,7 +143,7 @@ function LoginContent() {
 
   const toggleMode = (nextMode: AuthMode) => {
     if (nextMode === "register" && !ALLOW_PUBLIC_SIGNUP) {
-      setError("El registro público esta deshabilitado. Solicita acceso al administrador.")
+      setError("El registro público está deshabilitado. Solicita acceso al administrador.")
       return
     }
 
@@ -272,12 +273,12 @@ function LoginContent() {
               </div>
 
               {error && (
-                <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p className="rounded-lg border border-status-danger-border bg-status-danger-surface px-3 py-2 text-sm text-status-danger-text">
                   {error}
                 </p>
               )}
               {message && (
-                <p className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm text-success">
+                <p className="rounded-lg border border-status-success-border bg-status-success-surface px-3 py-2 text-sm text-status-success-text">
                   {message}
                 </p>
               )}
@@ -367,7 +368,7 @@ function LoginContent() {
                 <div className="mt-7 space-y-4">
                   {["Matriz auditada", "Evidencia validada", "Riesgo controlado"].map((item) => (
                     <div key={item} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15 text-[9px] font-bold text-success">OK</span>
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-status-success-surface text-xs font-bold text-status-success-text">OK</span>
                       <span className="h-2 flex-1 rounded-full bg-slate-200" />
                     </div>
                   ))}
@@ -375,19 +376,19 @@ function LoginContent() {
                 <div className="mt-7 h-9 rounded-md bg-primary" />
               </div>
               <div className="absolute bottom-16 right-20 h-36 w-72 rounded-lg border border-cyan-200/30 bg-[#071733]/50 p-5 text-white backdrop-blur">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100">Control de Calidad</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Control de Calidad</p>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   <div>
                     <p className="text-2xl font-semibold">98%</p>
-                    <p className="mt-1 text-[10px] text-cyan-100/70">calidad</p>
+                    <p className="mt-1 text-xs text-cyan-100/70">calidad</p>
                   </div>
                   <div>
                     <p className="text-2xl font-semibold">100</p>
-                    <p className="mt-1 text-[10px] text-cyan-100/70">controles</p>
+                    <p className="mt-1 text-xs text-cyan-100/70">controles</p>
                   </div>
                   <div>
                     <p className="text-2xl font-semibold">AI</p>
-                    <p className="mt-1 text-[10px] text-cyan-100/70">evidencia</p>
+                    <p className="mt-1 text-xs text-cyan-100/70">evidencia</p>
                   </div>
                 </div>
               </div>

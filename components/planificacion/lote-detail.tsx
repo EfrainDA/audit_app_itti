@@ -1,5 +1,8 @@
 "use client"
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+// Detalle del lote: equipo auditor, verticales y controles planificados.
 import { useMemo, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,344 +46,34 @@ import {
 import { cn } from "@/lib/utils"
 import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/supabase-data"
+import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/repositories/supabase/planning"
 import { getErrorMessage } from "@/lib/error-message"
-
-const CONTROL_TAGS: NonNullable<Control["etiqueta"]>[] = [
-  "Unidad de Negocio",
-  "Producto",
-  "Proceso",
-  "Proceso de apoyo",
-]
-
-const isProcessTag = (tag: Control["etiqueta"]) => tag === "Proceso" || tag === "Proceso de apoyo"
-const isBusinessUnitTag = (tag: Control["etiqueta"]) => tag === "Unidad de Negocio"
-
-const buildBusinessUnitControlName = (recibe: string, presta: string) => {
-  if (!recibe || !presta) return ""
-  return `${recibe} - ${presta}`
-}
-
-const splitBusinessUnitControlName = (name: string) => {
-  const [recibe = "", presta = ""] = name.split(" - ")
-  return { recibe, presta }
-}
+import { canEditAssignedControl, canManageControls as roleCanManageControls, isManager } from "@/lib/domain/permissions"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
+import {
+  buildBusinessUnitControlName,
+  CONTROL_TAGS,
+  isBusinessUnitTag,
+  isProcessTag,
+  splitBusinessUnitControlName,
+  createEmptyControlDraft,
+  getControlDraftError,
+  toggleListValue,
+} from "@/features/planning/domain/control-naming"
 
 interface LoteDetailProps {
   lote: Lote
   onChanged?: () => Promise<void> | void
 }
 
+// Mantiene formularios, permisos y mutaciones del lote seleccionado.
+import { useLoteDetailController } from "./use-lote-detail-controller"
+import { LoteControlDialogs } from "./lote-control-dialogs"
 export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
-  const { data, refresh } = useAppData()
-  const { appUser } = useAuth()
-  const canManageLots = appUser?.role === "admin" || appUser?.role === "supervisor"
-  const canManageControls = appUser?.role === "admin" || appUser?.role === "supervisor" || appUser?.role === "auditor"
-  const currentLote = data.lotes.find((item) => item.id === lote.id) ?? lote
-  const modelo = data.modelos.find((m) => m.id === currentLote.modeloControlId)
-  const auditores = currentLote.auditores
-    .map((id) => data.users.find((u) => u.id === id))
-    .filter((auditor): auditor is (typeof data.users)[number] => Boolean(auditor))
-  const auditoresDisponibles = data.users.filter(
-    (user) => user.role === "auditor" && user.status === "activo" && !currentLote.auditores.includes(user.id),
-  )
-  
-  // Estado local para simular agregar controles
-  const [loteVerticales, setLoteVerticales] = useState<LoteVertical[]>(() => {
-    // Obtener verticales existentes del lote o crear nuevas basadas en el modelo
-    const existentes = data.loteVerticales.filter((lv) => lv.loteId === lote.id)
-    
-    // Crear verticales vacías basadas en el modelo
-    return modelo?.verticales.map((v, idx) => ({
-      id: existentes.find((lv) => lv.verticalId === v.id)?.id ?? `lv-new-${idx}`,
-      loteId: lote.id,
-      verticalId: v.id,
-      controles: existentes.find((lv) => lv.verticalId === v.id)?.controles ?? []
-    })) || []
-  })
-
-  useEffect(() => {
-    const existentes = data.loteVerticales.filter((lv) => lv.loteId === lote.id)
-    setLoteVerticales(
-      modelo?.verticales.map((v, idx) => ({
-        id: existentes.find((lv) => lv.verticalId === v.id)?.id ?? `lv-new-${idx}`,
-        loteId: lote.id,
-        verticalId: v.id,
-        controles: existentes.find((lv) => lv.verticalId === v.id)?.controles ?? [],
-      })) || [],
-    )
-  }, [data.loteVerticales, lote.id, modelo])
-
-  const initialNewControl = {
-    identificador: "",
-    etiqueta: "Unidad de Negocio" as NonNullable<Control["etiqueta"]>,
-    auditorId: "",
-    correspondeProceso: false,
-    proceso: "",
-    subprocesos: [] as string[],
-    subprocesoTemp: "",
-    productosVinculados: [] as string[],
-    unidadPrestaServicio: "",
-    unidadRecibeServicio: "",
-  }
-
-  const [showAddControl, setShowAddControl] = useState<string | null>(null)
-  const [newControl, setNewControl] = useState(initialNewControl)
-  const [editingControl, setEditingControl] = useState<{ loteVerticalId: string; controlId: string } | null>(null)
-  const [editControl, setEditControl] = useState(initialNewControl)
-  const [isControlSuggestionsOpen, setIsControlSuggestionsOpen] = useState(false)
-  const [isProcessSuggestionsOpen, setIsProcessSuggestionsOpen] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [isSavingControl, setIsSavingControl] = useState(false)
-  const [auditorToAdd, setAuditorToAdd] = useState("")
-  const [isAddingAuditor, setIsAddingAuditor] = useState(false)
-
-  const controlsForCurrentUnit = useMemo(() => {
-    const loteIdsForUnidad = data.lotes
-      .filter((unitLot) => unitLot.unidadNegocioId === lote.unidadNegocioId)
-      .map((unitLot) => unitLot.id)
-
-    const persistedControls = data.loteVerticales
-      .filter((lv) => loteIdsForUnidad.includes(lv.loteId))
-      .flatMap((lv) => lv.controles)
-
-    const localControls = loteVerticales.flatMap((lv) => lv.controles)
-
-    return [...persistedControls, ...localControls]
-  }, [data.lotes, data.loteVerticales, lote.unidadNegocioId, loteVerticales])
-
-  const existingControlNames = useMemo(() => {
-    const names = controlsForCurrentUnit
-      .filter((control) => (control.etiqueta ?? "Unidad de Negocio") === newControl.etiqueta)
-      .map((control) => control.identificador)
-      .filter((name) => name.trim().length > 0)
-    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
-  }, [controlsForCurrentUnit, newControl.etiqueta])
-
-  const filteredControlNames = existingControlNames.filter((name) =>
-    name.toLowerCase().includes(newControl.identificador.trim().toLowerCase())
-  )
-  const hasExactControlMatch = existingControlNames.some(
-    (name) => name.toLowerCase() === newControl.identificador.trim().toLowerCase()
-  )
-
-  const existingProcessNames = useMemo(() => {
-    const names = controlsForCurrentUnit
-      .filter((control) => (control.etiqueta ?? "Unidad de Negocio") === newControl.etiqueta)
-      .map((control) => control.proceso || (control.correspondeProceso ? control.identificador : undefined))
-      .filter((process): process is string => Boolean(process?.trim()))
-    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
-  }, [controlsForCurrentUnit, newControl.etiqueta])
-
-  const filteredProcessNames = existingProcessNames.filter((name) =>
-    name.toLowerCase().includes(newControl.proceso.trim().toLowerCase())
-  )
-  const hasExactProcessMatch = existingProcessNames.some(
-    (name) => name.toLowerCase() === newControl.proceso.trim().toLowerCase()
-  )
-
-  const productControls = useMemo(() => {
-    return loteVerticales
-      .flatMap((lv) => lv.controles)
-      .filter((control) => control.etiqueta === "Producto")
-      .map((control) => control.producto || control.identificador)
-      .filter((name): name is string => Boolean(name?.trim()))
-      .filter((name, index, items) => items.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index)
-      .sort((a, b) => a.localeCompare(b))
-  }, [loteVerticales])
-  const businessUnitOptions = data.unidades.map((unit) => unit.nombre).sort((a, b) => a.localeCompare(b))
-
-  const toggleLinkedProduct = (
-    current: string[],
-    product: string,
-    onChange: (nextProducts: string[]) => void,
-  ) => {
-    onChange(
-      current.includes(product)
-        ? current.filter((item) => item !== product)
-        : [...current, product],
-    )
-  }
-
-  const getControlValidationError = (control: typeof initialNewControl) => {
-    if (!control.etiqueta) return "Selecciona una etiqueta."
-    if (!control.auditorId) return "Selecciona un analista o especialista de Control de Calidad."
-
-    if (isBusinessUnitTag(control.etiqueta)) {
-      if (!control.unidadRecibeServicio) return "Selecciona la unidad de negocio que recibe el servicio."
-      if (!control.unidadPrestaServicio) return "Selecciona la unidad de negocio que presta el servicio."
-      if (!buildBusinessUnitControlName(control.unidadRecibeServicio, control.unidadPrestaServicio).trim()) {
-        return "Completa las unidades de negocio para generar el nombre del control."
-      }
-      return null
-    }
-
-    if (isProcessTag(control.etiqueta)) {
-      if (!control.proceso.trim()) return "Completa el nombre del proceso."
-      if (control.subprocesos.length === 0) return "Agrega al menos un subproceso."
-      if (control.etiqueta !== "Proceso de apoyo" && productControls.length > 0 && control.productosVinculados.length === 0) {
-        return "Selecciona al menos un producto vinculado."
-      }
-      return null
-    }
-
-    if (!control.identificador.trim()) return "Completa el nombre del control."
-    return null
-  }
-
-  const handleAddControl = async (loteVerticalId: string) => {
-    const validationError = getControlValidationError(newControl)
-    if (validationError) {
-      setFormError(validationError)
-      return
-    }
-
-    const correspondeProceso = isProcessTag(newControl.etiqueta)
-    const identificador = correspondeProceso
-      ? newControl.proceso.trim()
-      : isBusinessUnitTag(newControl.etiqueta)
-        ? buildBusinessUnitControlName(newControl.unidadRecibeServicio, newControl.unidadPrestaServicio).trim()
-        : newControl.identificador.trim()
-    if (!identificador) return
-
-    const targetVertical = loteVerticales.find((lv) => lv.id === loteVerticalId)
-    setFormError(null)
-    setIsSavingControl(true)
-
-    try {
-      await createControl({
-        lotVerticalId: loteVerticalId,
-        lotId: lote.id,
-        verticalId: targetVertical?.verticalId,
-        identifier: identificador,
-        tag: newControl.etiqueta,
-        correspondsToProcess: correspondeProceso,
-        process: correspondeProceso ? newControl.proceso : undefined,
-        subprocesses: correspondeProceso ? newControl.subprocesos : undefined,
-        linkedProducts:
-          correspondeProceso && newControl.etiqueta !== "Proceso de apoyo"
-            ? newControl.productosVinculados
-            : [],
-        auditorId: newControl.auditorId || undefined,
-      })
-      await refresh()
-      setNewControl(initialNewControl)
-      setIsControlSuggestionsOpen(false)
-      setIsProcessSuggestionsOpen(false)
-      setShowAddControl(null)
-    } catch (submitError) {
-      setFormError(getErrorMessage(submitError, "No se pudo guardar el control."))
-    } finally {
-      setIsSavingControl(false)
-    }
-  }
-
-  const handleDeleteControl = async (_loteVerticalId: string, controlId: string) => {
-    await deleteControl(controlId)
-    await refresh()
-  }
-
-  const openEditControl = (loteVerticalId: string, control: Control) => {
-    const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
-    const controlIsProcess = isProcessTag(control.etiqueta) || Boolean(control.correspondeProceso)
-    const businessUnits = isBusinessUnitTag(control.etiqueta) ? splitBusinessUnitControlName(control.identificador) : { recibe: "", presta: "" }
-
-    setEditingControl({ loteVerticalId, controlId: control.id })
-    setEditControl({
-      identificador: control.identificador,
-      etiqueta: control.etiqueta ?? "Unidad de Negocio",
-      auditorId: control.auditorId || "",
-      correspondeProceso: controlIsProcess,
-      proceso: controlIsProcess ? control.proceso || control.identificador : control.proceso || "",
-      subprocesos,
-      subprocesoTemp: "",
-      productosVinculados: control.productosVinculados ?? [],
-      unidadPrestaServicio: businessUnits.presta,
-      unidadRecibeServicio: businessUnits.recibe,
-    })
-  }
-
-  const handleUpdateControl = async () => {
-    if (!editingControl) return
-    const validationError = getControlValidationError(editControl)
-    if (validationError) {
-      setFormError(validationError)
-      return
-    }
-
-    const correspondeProceso = isProcessTag(editControl.etiqueta)
-    const identificador = correspondeProceso
-      ? editControl.proceso.trim()
-      : isBusinessUnitTag(editControl.etiqueta)
-        ? buildBusinessUnitControlName(editControl.unidadRecibeServicio, editControl.unidadPrestaServicio).trim()
-        : editControl.identificador.trim()
-    if (!identificador) return
-
-    setFormError(null)
-    setIsSavingControl(true)
-
-    try {
-      await updateControl({
-        id: editingControl.controlId,
-        identifier: identificador,
-        tag: editControl.etiqueta,
-        correspondsToProcess: correspondeProceso,
-        process: correspondeProceso ? editControl.proceso : undefined,
-        subprocesses: correspondeProceso ? editControl.subprocesos : undefined,
-        linkedProducts:
-          correspondeProceso && editControl.etiqueta !== "Proceso de apoyo"
-            ? editControl.productosVinculados
-            : [],
-        auditorId: editControl.auditorId || undefined,
-      })
-      await refresh()
-      setEditingControl(null)
-      setEditControl(initialNewControl)
-    } catch (submitError) {
-      setFormError(getErrorMessage(submitError, "No se pudo actualizar el control."))
-    } finally {
-      setIsSavingControl(false)
-    }
-  }
-
-  const handleAddAuditor = async () => {
-    if (!auditorToAdd) return
-
-    setFormError(null)
-    setIsAddingAuditor(true)
-
-    try {
-      await addLotAuditor(currentLote.id, auditorToAdd)
-      await refresh()
-      await onChanged?.()
-      setAuditorToAdd("")
-    } catch (submitError) {
-      setFormError(getErrorMessage(submitError, "No se pudo agregar el auditor al lote."))
-    } finally {
-      setIsAddingAuditor(false)
-    }
-  }
-
-  const answeredControlIds = useMemo(() => new Set(data.respuestas.map((answer) => answer.controlId)), [data.respuestas])
-  const getSubprocesosCount = (control: Control) => {
-    if (control.subprocesos) return control.subprocesos.length
-    if (!control.subproceso) return 0
-    return control.subproceso.split(",").filter((subproceso) => subproceso.trim().length > 0).length
-  }
-  const getSubprocesosLabel = (control: Control) => {
-    const subprocesos = control.subprocesos ?? control.subproceso?.split(",").map((subproceso) => subproceso.trim()).filter(Boolean) ?? []
-    return subprocesos.join(", ")
-  }
-  const newControlIsProcess = isProcessTag(newControl.etiqueta)
-  const editControlIsProcess = isProcessTag(editControl.etiqueta)
-  const newControlIsBusinessUnit = isBusinessUnitTag(newControl.etiqueta)
-  const editControlIsBusinessUnit = isBusinessUnitTag(editControl.etiqueta)
-  const newControlBusinessUnitName = buildBusinessUnitControlName(newControl.unidadRecibeServicio, newControl.unidadPrestaServicio)
-  const editControlBusinessUnitName = buildBusinessUnitControlName(editControl.unidadRecibeServicio, editControl.unidadPrestaServicio)
-  const newControlValidationError = getControlValidationError(newControl)
-  const editControlValidationError = getControlValidationError(editControl)
-
-  return (
+  const controller = useLoteDetailController({ lote, onChanged })
+  if (!("data" in controller)) return controller
+  const { data, refresh, appUser, canManageLots, canManageControls, currentLote, modelo, auditores, auditoresDisponibles, loteVerticales, setLoteVerticales, initialNewControl, showAddControl, setShowAddControl, newControl, setNewControl, editingControl, setEditingControl, editControl, setEditControl, isControlSuggestionsOpen, setIsControlSuggestionsOpen, formError, setFormError, actionSuccess, setActionSuccess, controlToDelete, setControlToDelete, isSavingControl, setIsSavingControl, auditorToAdd, setAuditorToAdd, isAddingAuditor, setIsAddingAuditor, controlsForCurrentUnit, existingControlNames, filteredControlNames, hasExactControlMatch, existingProcessNames, productControls, businessUnitOptions, toggleLinkedProduct, handleAddControl, openEditControl, handleUpdateControl, handleAddAuditor, answeredControlIds, getSubprocesosCount, getSubprocesosLabel, newControlIsProcess, editControlIsProcess, newControlIsBusinessUnit, editControlIsBusinessUnit, newControlBusinessUnitName, editControlBusinessUnitName, newControlValidationError, editControlValidationError } = controller
+return (
     <div className="space-y-6">
       {/* Auditores */}
       <div>
@@ -418,7 +111,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
             auditores.map((auditor) => (
               <div key={auditor.id} className="flex items-center gap-2 bg-background border border-border px-2 py-1.5 rounded-full shadow-none hover:border-primary/30 transition-colors">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <span className="text-primary text-[10px] font-bold uppercase">
+                  <span className="text-primary text-xs font-bold uppercase">
                     {auditor.name.split(" ").map((n) => n[0]).join("")}
                   </span>
                 </div>
@@ -426,10 +119,10 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">Este lote todavia no tiene analistas o especialistas asignados.</p>
+            <p className="text-sm text-muted-foreground">Este lote todavía no tiene analistas o especialistas asignados.</p>
           )}
         </div>
-        {formError && <p className="mt-2 text-sm text-destructive">{formError}</p>}
+        {formError && <p className="mt-2 text-sm text-status-danger-text">{formError}</p>}
       </div>
 
       {/* Verticales con sus Controles */}
@@ -501,7 +194,8 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                         const isFinishedControl = displayEstado === "terminado"
                         const canManageThisControl =
                           lote.estado === "abierto" &&
-                          (canManageLots || (appUser?.role === "auditor" && !isFinishedControl))
+                          !isFinishedControl &&
+                          canEditAssignedControl(appUser?.role, appUser?.id, control.auditorId)
                         
                         return (
                           <div
@@ -515,12 +209,12 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                                   {control.identificador}
                                 </span>
                                 {control.etiqueta && (
-                                  <Badge variant="outline" className="h-5 rounded-full border-border/80 bg-background text-[10px] font-medium text-muted-foreground">
+                                  <Badge variant="outline" className="h-5 rounded-full border-border/80 bg-background text-xs font-medium text-muted-foreground">
                                     {control.etiqueta}
                                   </Badge>
                                 )}
                                 {subprocesosCount > 0 && (
-                                  <Badge variant="outline" className="h-5 gap-1 rounded-full border-primary/20 bg-primary/5 text-[10px] font-semibold text-primary">
+                                  <Badge variant="outline" className="h-5 gap-1 rounded-full border-primary/20 bg-primary/5 text-xs font-semibold text-primary">
                                     <LayoutList className="h-2.5 w-2.5" />
                                     {subprocesosCount} subprocesos
                                   </Badge>
@@ -533,7 +227,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
 
                             <div className="flex min-w-0 items-center gap-2 sm:w-52">
                               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-background">
-                                <span className="text-[10px] font-bold uppercase text-muted-foreground">
+                                <span className="text-xs font-bold uppercase text-muted-foreground">
                                   {auditor ? auditor.name.split(" ").map((n) => n[0]).join("") : "-"}
                                 </span>
                               </div>
@@ -559,14 +253,21 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                                       <Pencil className="h-4 w-4 mr-2" />
                                       Editar
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={() => handleDeleteControl(loteVertical.id, control.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Borrar
-                                    </DropdownMenuItem>
+                                    {canManageLots && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-status-danger-text"
+                                          onClick={() => {
+                                            setActionSuccess(null)
+                                            setControlToDelete(control)
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Borrar
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               ) : (
@@ -579,7 +280,7 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     )}
                   </div>
 
-                  {/* Botón para agregar control */}
+                  {/* Acción disponible únicamente para quienes pueden administrar el lote. */}
                   <Button
                     variant="outline"
                     size="sm"
@@ -588,7 +289,6 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
                     onClick={() => {
                       setNewControl(initialNewControl)
                       setIsControlSuggestionsOpen(false)
-                      setIsProcessSuggestionsOpen(false)
                       setShowAddControl(loteVertical.id)
                     }}
                   >
@@ -602,631 +302,33 @@ export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
         </div>
       </section>
 
+      {actionSuccess && (
+        <p role="status" className="rounded-md border border-status-success-border bg-status-success-surface px-3 py-2 text-sm text-status-success-text">
+          {actionSuccess}
+        </p>
+      )}
+
+      <ConfirmDestructiveDialog
+        open={Boolean(controlToDelete)}
+        onOpenChange={(next) => {
+          if (!next) setControlToDelete(null)
+        }}
+        title="Eliminar control"
+        description={`Se eliminará el control “${controlToDelete?.identificador ?? ""}”. Esta acción no se puede deshacer.`}
+        errorMessage="No se pudo eliminar el control."
+        onConfirm={async () => {
+          if (!controlToDelete) return
+          const identifier = controlToDelete.identificador
+          await deleteControl(controlToDelete.id)
+          await refresh()
+          await onChanged?.()
+          setActionSuccess(`El control “${identifier}” fue eliminado.`)
+        }}
+      />
+
       {/* Dialogo para agregar control */}
-      <Dialog
-        open={showAddControl !== null}
-        onOpenChange={() => {
-          setIsControlSuggestionsOpen(false)
-          setIsProcessSuggestionsOpen(false)
-          setShowAddControl(null)
-        }}
-      >
-        <DialogContent className="!w-[min(calc(100vw-2rem),42rem)] !max-w-[42rem] border-border bg-card">
-          <DialogHeader>
-            <DialogTitle>Agregar Nuevo Control</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="etiqueta-control">Etiqueta *</Label>
-              <Select
-                value={newControl.etiqueta}
-                onValueChange={(value) => {
-                  const etiqueta = value as NonNullable<Control["etiqueta"]>
-                  const nextIsProcess = isProcessTag(etiqueta)
-                  setNewControl({
-                    ...newControl,
-                    etiqueta,
-                    correspondeProceso: nextIsProcess,
-                    identificador: nextIsProcess ? newControl.proceso : etiqueta === "Unidad de Negocio" ? "" : newControl.identificador,
-                    proceso: nextIsProcess ? newControl.proceso : "",
-                    subprocesos: nextIsProcess ? newControl.subprocesos : [],
-                    subprocesoTemp: nextIsProcess ? newControl.subprocesoTemp : "",
-                    productosVinculados: etiqueta === "Proceso de apoyo" || !nextIsProcess ? [] : newControl.productosVinculados,
-                    unidadPrestaServicio: etiqueta === "Unidad de Negocio" ? newControl.unidadPrestaServicio : "",
-                    unidadRecibeServicio: etiqueta === "Unidad de Negocio" ? newControl.unidadRecibeServicio : "",
-                  })
-                }}
-              >
-                <SelectTrigger id="etiqueta-control" className="bg-secondary border-border">
-                  <SelectValue placeholder="Seleccionar etiqueta" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {CONTROL_TAGS.map((tag) => (
-                    <SelectItem key={tag} value={tag}>
-                      {tag}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {newControlIsBusinessUnit && (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="unidad-recibe-servicio">Unidad de negocio que recibe el servicio *</Label>
-                    <Select
-                      value={newControl.unidadRecibeServicio}
-                      onValueChange={(value) =>
-                        setNewControl({
-                          ...newControl,
-                          unidadRecibeServicio: value,
-                          identificador: buildBusinessUnitControlName(value, newControl.unidadPrestaServicio),
-                        })
-                      }
-                    >
-                      <SelectTrigger id="unidad-recibe-servicio" className="bg-secondary border-border">
-                        <SelectValue placeholder="Seleccionar unidad" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {businessUnitOptions.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unidad-presta-servicio">Unidad de negocio que presta servicio *</Label>
-                    <Select
-                      value={newControl.unidadPrestaServicio}
-                      onValueChange={(value) =>
-                        setNewControl({
-                          ...newControl,
-                          unidadPrestaServicio: value,
-                          identificador: buildBusinessUnitControlName(newControl.unidadRecibeServicio, value),
-                        })
-                      }
-                    >
-                      <SelectTrigger id="unidad-presta-servicio" className="bg-secondary border-border">
-                        <SelectValue placeholder="Seleccionar unidad" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {businessUnitOptions.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nombre del Control</Label>
-                  <Input value={newControlBusinessUnitName} readOnly placeholder="Se autocompleta al seleccionar las unidades" className="bg-secondary border-border" />
-                </div>
-              </>
-            )}
-            {!newControlIsProcess && !newControlIsBusinessUnit && (
-            <div className="relative space-y-2">
-              <Label htmlFor="identificador">Nombre del Control *</Label>
-              <Input
-                id="identificador"
-                placeholder="Ej: Control de Inventario, Revisión de Facturas"
-                value={newControl.identificador}
-                onFocus={() => setIsControlSuggestionsOpen(true)}
-                onBlur={() => window.setTimeout(() => setIsControlSuggestionsOpen(false), 120)}
-                onChange={(e) => {
-                  setNewControl({ ...newControl, identificador: e.target.value })
-                  setIsControlSuggestionsOpen(true)
-                }}
-                className="bg-secondary border-border"
-              />
-              {isControlSuggestionsOpen && !newControlIsProcess && (
-                <div
-                  className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-none"
-                  onMouseDown={(event) => event.preventDefault()}
-                >
-                  {filteredControlNames.length > 0 ? (
-                    filteredControlNames.map((name) => (
-                      <button
-                        key={name}
-                        type="button"
-                        className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                        onClick={() => {
-                          setNewControl({ ...newControl, identificador: name })
-                          setIsControlSuggestionsOpen(false)
-                        }}
-                      >
-                        {name}
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      type="button"
-                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
-                      onClick={() => setIsControlSuggestionsOpen(false)}
-                    >
-                      Crear nuevo control{newControl.identificador.trim() ? `: ${newControl.identificador.trim()}` : ""}
-                    </button>
-                  )}
-                  {newControl.identificador.trim() && filteredControlNames.length > 0 && !hasExactControlMatch && (
-                    <button
-                      type="button"
-                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
-                      onClick={() => setIsControlSuggestionsOpen(false)}
-                    >
-                      Crear nuevo control: {newControl.identificador.trim()}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            )}
-            {!newControlIsProcess && (
-            <div className="space-y-2">
-                  <Label htmlFor="auditor">Analista o especialista de Control de Calidad *</Label>
-              <Select
-                value={newControl.auditorId}
-                onValueChange={(value) => setNewControl({ ...newControl, auditorId: value })}
-              >
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Seleccionar analista o especialista" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {auditores.map((auditor) => (
-                    <SelectItem key={auditor.id} value={auditor.id}>
-                      {auditor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            )}
-            {newControlIsProcess && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="proceso">Nombre de proceso *</Label>
-                  <div className="relative">
-                    <Input
-                      id="proceso"
-                      placeholder="Ej: Ventas, Operaciones"
-                      value={newControl.proceso}
-                      onFocus={() => setIsProcessSuggestionsOpen(true)}
-                      onBlur={() => window.setTimeout(() => setIsProcessSuggestionsOpen(false), 120)}
-                      onChange={(e) => {
-                        setNewControl({ ...newControl, proceso: e.target.value, identificador: e.target.value })
-                        setIsProcessSuggestionsOpen(true)
-                      }}
-                      className="bg-secondary border-border"
-                    />
-                    {isProcessSuggestionsOpen && (
-                      <div
-                        className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-none"
-                        onMouseDown={(event) => event.preventDefault()}
-                      >
-                        {filteredProcessNames.length > 0 ? (
-                          filteredProcessNames.map((process) => (
-                            <button
-                              key={process}
-                              type="button"
-                              className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                              onClick={() => {
-                                setNewControl({ ...newControl, proceso: process, identificador: process })
-                                setIsProcessSuggestionsOpen(false)
-                              }}
-                            >
-                              {process}
-                            </button>
-                          ))
-                        ) : (
-                          <button
-                            type="button"
-                            className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
-                            onClick={() => setIsProcessSuggestionsOpen(false)}
-                          >
-                            Crear nuevo proceso{newControl.proceso.trim() ? `: ${newControl.proceso.trim()}` : ""}
-                          </button>
-                        )}
-                        {newControl.proceso.trim() && filteredProcessNames.length > 0 && !hasExactProcessMatch && (
-                          <button
-                            type="button"
-                            className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-primary hover:bg-secondary"
-                            onClick={() => setIsProcessSuggestionsOpen(false)}
-                          >
-                            Crear nuevo proceso: {newControl.proceso.trim()}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subproceso">Subprocesos *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="subproceso"
-                      placeholder="Agregar subproceso"
-                      value={newControl.subprocesoTemp}
-                      onChange={(e) => setNewControl({ ...newControl, subprocesoTemp: e.target.value })}
-                      className="bg-secondary border-border"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const nextSub = newControl.subprocesoTemp.trim()
-                        if (!nextSub) return
-                        setNewControl({
-                          ...newControl,
-                          subprocesos: [...newControl.subprocesos, nextSub],
-                          subprocesoTemp: "",
-                        })
-                      }}
-                    >
-                      Agregar
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {newControl.subprocesos.map((sub, index) => (
-                      <span key={`${sub}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-border px-2 py-1 text-xs">
-                        {sub}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNewControl({
-                              ...newControl,
-                              subprocesos: newControl.subprocesos.filter((_, idx) => idx !== index),
-                            })
-                          }
-                          className="text-destructive"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {newControl.etiqueta !== "Proceso de apoyo" && (
-                  <div className="space-y-2">
-                    <Label>Producto vinculado *</Label>
-                    <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
-                      {productControls.length > 0 ? (
-                        productControls.map((product) => (
-                          <button
-                            key={product}
-                            type="button"
-                            className={cn(
-                              "rounded-md border px-3 py-2 text-left text-sm transition-colors",
-                              newControl.productosVinculados.includes(product)
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-background text-foreground hover:border-primary/40",
-                            )}
-                            onClick={() =>
-                              toggleLinkedProduct(newControl.productosVinculados, product, (nextProducts) =>
-                                setNewControl({ ...newControl, productosVinculados: nextProducts }),
-                              )
-                            }
-                          >
-                            {product}
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground sm:col-span-2">
-                          No hay controles con etiqueta Producto en este lote.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="auditor-proceso">Analista o especialista de Control de Calidad *</Label>
-                  <Select
-                    value={newControl.auditorId}
-                    onValueChange={(value) => setNewControl({ ...newControl, auditorId: value })}
-                  >
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar analista o especialista" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {auditores.map((auditor) => (
-                        <SelectItem key={auditor.id} value={auditor.id}>
-                          {auditor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-          </div>
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddControl(null)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => showAddControl && handleAddControl(showAddControl)}
-              disabled={isSavingControl || Boolean(newControlValidationError)}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isSavingControl ? "Guardando..." : "Agregar Control"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LoteControlDialogs controller={controller} />
 
-      <Dialog
-        open={editingControl !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingControl(null)
-            setEditControl(initialNewControl)
-          }
-        }}
-      >
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-border bg-card sm:w-[90vw] lg:w-[70vw]">
-          <DialogHeader>
-            <DialogTitle>Editar Control</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-etiqueta-control">Etiqueta *</Label>
-              <Select
-                value={editControl.etiqueta}
-                onValueChange={(value) => {
-                  const etiqueta = value as NonNullable<Control["etiqueta"]>
-                  const nextIsProcess = isProcessTag(etiqueta)
-                  setEditControl({
-                    ...editControl,
-                    etiqueta,
-                    correspondeProceso: nextIsProcess,
-                    identificador: nextIsProcess ? editControl.proceso || editControl.identificador : etiqueta === "Unidad de Negocio" ? "" : editControl.identificador,
-                    proceso: nextIsProcess ? editControl.proceso || editControl.identificador : "",
-                    subprocesos: nextIsProcess ? editControl.subprocesos : [],
-                    subprocesoTemp: nextIsProcess ? editControl.subprocesoTemp : "",
-                    productosVinculados: etiqueta === "Proceso de apoyo" || !nextIsProcess ? [] : editControl.productosVinculados,
-                    unidadPrestaServicio: etiqueta === "Unidad de Negocio" ? editControl.unidadPrestaServicio : "",
-                    unidadRecibeServicio: etiqueta === "Unidad de Negocio" ? editControl.unidadRecibeServicio : "",
-                  })
-                }}
-              >
-                <SelectTrigger id="edit-etiqueta-control" className="bg-secondary border-border">
-                  <SelectValue placeholder="Seleccionar etiqueta" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {CONTROL_TAGS.map((tag) => (
-                    <SelectItem key={tag} value={tag}>
-                      {tag}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {editControlIsBusinessUnit && (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-unidad-recibe-servicio">Unidad de negocio que recibe el servicio *</Label>
-                    <Select
-                      value={editControl.unidadRecibeServicio}
-                      onValueChange={(value) =>
-                        setEditControl({
-                          ...editControl,
-                          unidadRecibeServicio: value,
-                          identificador: buildBusinessUnitControlName(value, editControl.unidadPrestaServicio),
-                        })
-                      }
-                    >
-                      <SelectTrigger id="edit-unidad-recibe-servicio" className="bg-secondary border-border">
-                        <SelectValue placeholder="Seleccionar unidad" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {businessUnitOptions.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-unidad-presta-servicio">Unidad de negocio que presta servicio *</Label>
-                    <Select
-                      value={editControl.unidadPrestaServicio}
-                      onValueChange={(value) =>
-                        setEditControl({
-                          ...editControl,
-                          unidadPrestaServicio: value,
-                          identificador: buildBusinessUnitControlName(editControl.unidadRecibeServicio, value),
-                        })
-                      }
-                    >
-                      <SelectTrigger id="edit-unidad-presta-servicio" className="bg-secondary border-border">
-                        <SelectValue placeholder="Seleccionar unidad" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {businessUnitOptions.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nombre del Control</Label>
-                  <Input value={editControlBusinessUnitName} readOnly placeholder="Se autocompleta al seleccionar las unidades" className="bg-secondary border-border" />
-                </div>
-              </>
-            )}
-            {!editControlIsProcess && !editControlIsBusinessUnit && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-identificador">Nombre del Control *</Label>
-                  <Input
-                    id="edit-identificador"
-                    value={editControl.identificador}
-                    onChange={(event) => setEditControl({ ...editControl, identificador: event.target.value })}
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auditor">Analista o especialista de Control de Calidad *</Label>
-                  <Select
-                    value={editControl.auditorId}
-                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
-                  >
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar analista o especialista" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {auditores.map((auditor) => (
-                        <SelectItem key={auditor.id} value={auditor.id}>
-                          {auditor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {editControlIsProcess && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-proceso">Nombre de proceso *</Label>
-                  <Input
-                    id="edit-proceso"
-                    value={editControl.proceso}
-                    onChange={(event) =>
-                      setEditControl({ ...editControl, proceso: event.target.value, identificador: event.target.value })
-                    }
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-subproceso">Subprocesos *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="edit-subproceso"
-                      placeholder="Agregar subproceso"
-                      value={editControl.subprocesoTemp}
-                      onChange={(event) => setEditControl({ ...editControl, subprocesoTemp: event.target.value })}
-                      className="bg-secondary border-border"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const nextSub = editControl.subprocesoTemp.trim()
-                        if (!nextSub) return
-                        setEditControl({
-                          ...editControl,
-                          subprocesos: [...editControl.subprocesos, nextSub],
-                          subprocesoTemp: "",
-                        })
-                      }}
-                    >
-                      Agregar
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {editControl.subprocesos.map((sub, index) => (
-                      <span key={`${sub}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-border px-2 py-1 text-xs">
-                        {sub}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditControl({
-                              ...editControl,
-                              subprocesos: editControl.subprocesos.filter((_, idx) => idx !== index),
-                            })
-                          }
-                          className="text-destructive"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {editControl.etiqueta !== "Proceso de apoyo" && (
-                  <div className="space-y-2">
-                    <Label>Producto vinculado *</Label>
-                    <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3 sm:grid-cols-2">
-                      {productControls.length > 0 ? (
-                        productControls.map((product) => (
-                          <button
-                            key={product}
-                            type="button"
-                            className={cn(
-                              "rounded-md border px-3 py-2 text-left text-sm transition-colors",
-                              editControl.productosVinculados.includes(product)
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-background text-foreground hover:border-primary/40",
-                            )}
-                            onClick={() =>
-                              toggleLinkedProduct(editControl.productosVinculados, product, (nextProducts) =>
-                                setEditControl({ ...editControl, productosVinculados: nextProducts }),
-                              )
-                            }
-                          >
-                            {product}
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground sm:col-span-2">
-                          No hay controles con etiqueta Producto en este lote.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auditor-proceso">Analista o especialista de Control de Calidad *</Label>
-                  <Select
-                    value={editControl.auditorId}
-                    onValueChange={(value) => setEditControl({ ...editControl, auditorId: value })}
-                  >
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue placeholder="Seleccionar analista o especialista" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {auditores.map((auditor) => (
-                        <SelectItem key={auditor.id} value={auditor.id}>
-                          {auditor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-          </div>
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingControl(null)
-                setEditControl(initialNewControl)
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleUpdateControl}
-              disabled={isSavingControl || Boolean(editControlValidationError)}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isSavingControl ? "Guardando..." : "Guardar Cambios"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

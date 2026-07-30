@@ -1,5 +1,6 @@
 "use client"
 
+// Formulario de alta que vincula ciclo, modelo, unidad y equipo auditor.
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -12,19 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Building2 } from "lucide-react"
+import { SafeImage } from "@/components/ui/safe-image"
 import { useAppData } from "@/hooks/use-app-data"
-import { createLot } from "@/lib/supabase-data"
+import { createLot } from "@/lib/repositories/supabase/planning"
 import { getErrorMessage } from "@/lib/error-message"
 
-const cycleLabels: Record<number, string> = {
-  1: "Ciclo 1 (Ene - Feb)",
-  2: "Ciclo 2 (Mar - Abr)",
-  3: "Ciclo 3 (May - Jun)",
-  4: "Ciclo 4 (Jul - Ago)",
-  5: "Ciclo 5 (Sep - Oct)",
-  6: "Ciclo 6 (Nov - Dic)",
-}
+const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
+// Sugiere el bimestre calendario actual como valor inicial.
 function getCurrentBimester(date = new Date()) {
   return Math.floor(date.getMonth() / 2) + 1
 }
@@ -35,7 +31,7 @@ interface LoteFormProps {
 }
 
 export function LoteForm({ onClose, onSaved }: LoteFormProps) {
-  const { data, refresh } = useAppData()
+  const { data, refresh } = useAppData({ domains: ["users", "settings", "models", "planning"] })
   const [unidadId, setUnidadId] = useState("")
   const [año, setAño] = useState("2026")
   const [ciclo, setCiclo] = useState("")
@@ -71,6 +67,8 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
       bimestre: getCurrentBimester(today),
       fechaInicio: "",
       fechaFin: "",
+      mesInicio: today.getMonth() + 1,
+      mesFin: today.getMonth() + 1,
     }
   }, [data.ciclos])
   const availableCycles = useMemo(
@@ -150,7 +148,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
                   <span className="flex items-center gap-2">
                     <span className="flex h-6 w-10 items-center justify-center overflow-hidden rounded border border-primary/20 bg-primary/10">
                       {unidad.logo ? (
-                        <img src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
+                        <SafeImage src={unidad.logo} alt={unidad.nombre} className="h-full w-full object-contain" />
                       ) : (
                         <Building2 className="h-3.5 w-3.5 text-primary" />
                       )}
@@ -189,7 +187,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
             <SelectContent>
               {cyclesForSelectedYear.map((cycle) => (
                 <SelectItem key={cycle.id} value={String(cycle.bimestre)}>
-                  {cycleLabels[cycle.bimestre] ?? `Ciclo ${cycle.bimestre}`}
+                  {monthNames[cycle.mesInicio - 1]} - {monthNames[cycle.mesFin - 1]} ({cycle.año})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -243,7 +241,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-sm font-semibold text-primary">
                   {auditor.avatar ? (
-                    <img src={auditor.avatar} alt={auditor.name} className="h-full w-full object-cover" />
+                    <SafeImage src={auditor.avatar} alt={auditor.name} className="h-full w-full object-cover" />
                   ) : (
                     <span>
                       {auditor.name
@@ -276,7 +274,7 @@ export function LoteForm({ onClose, onSaved }: LoteFormProps) {
       </div>
 
       <div className="flex flex-col gap-3 pt-4 border-t border-border sm:flex-row sm:justify-end">
-        {error && <p className="text-sm text-destructive sm:mr-auto">{error}</p>}
+        {error && <p className="text-sm text-status-danger-text sm:mr-auto">{error}</p>}
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>
