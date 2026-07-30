@@ -47,12 +47,7 @@ function mapProfile(row: {
 }
 
 // Valida la sesión actual y obtiene o crea el perfil de la aplicación.
-async function ensureProfile(authUser: SupabaseUser, signal: AbortSignal): Promise<User | null> {
-  const { data } = await supabase.auth.getSession()
-  const currentSession = data.session
-  if (!currentSession?.access_token) throw new Error("No se encontró una sesión válida.")
-  if (currentSession.user.id !== authUser.id) throw new Error("La sesión cambió mientras se cargaba el perfil.")
-
+async function ensureProfile(currentSession: Session, signal: AbortSignal): Promise<User> {
   const response = await fetch("/api/auth/profile", {
     method: "POST",
     signal,
@@ -63,7 +58,6 @@ async function ensureProfile(authUser: SupabaseUser, signal: AbortSignal): Promi
   const body = (await response.json().catch(() => null)) as { profile?: Parameters<typeof mapProfile>[0]; error?: string } | null
 
   if (!response.ok || !body?.profile) {
-    await supabase.auth.signOut()
     throw new Error(body?.error ?? "No se pudo cargar el perfil del usuario.")
   }
 
@@ -104,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const profile = await ensureProfile(currentSession.user, controller.signal)
+    const profile = await ensureProfile(currentSession, controller.signal)
     if (generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
   }
 
@@ -123,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setSession(data.session)
         if (data.session?.user) {
-          const profile = await ensureProfile(data.session.user, controller.signal)
+          const profile = await ensureProfile(data.session, controller.signal)
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         }
       } catch {
@@ -152,19 +146,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      ensureProfile(nextSession.user, controller.signal)
+      // Los callbacks de onAuthStateChange deben terminar de inmediato. Las
+      // operaciones asíncronas de perfil se difieren para no competir con el
+      // bloqueo interno que Supabase usa al persistir/refrescar la sesión.
+      setTimeout(() => ensureProfile(nextSession, controller.signal)
         .then((profile) => {
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         })
         .catch(() => {
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) {
-            setSession(null)
             setAppUser(null)
           }
         })
         .finally(() => {
           if (isMounted && generation === profileGenerationRef.current) setIsLoading(false)
-        })
+        }), 0)
     })
 
     return () => {

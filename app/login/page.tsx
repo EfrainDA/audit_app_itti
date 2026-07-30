@@ -17,7 +17,7 @@ const ALLOW_PUBLIC_SIGNUP = process.env.NEXT_PUBLIC_ALLOW_PUBLIC_SIGNUP === "tru
 // Gestiona acceso, registro opcional y redirección mediante Supabase Auth.
 function LoginContent() {
   const router = useRouter()
-  const { session, refreshProfile } = useAuth()
+  const { session } = useAuth()
   const [mode, setMode] = useState<AuthMode>("login")
   const [name, setName] = useState("")
   const [company, setCompany] = useState("")
@@ -50,7 +50,6 @@ function LoginContent() {
         })
 
         if (signInError) throw signInError
-        await refreshProfile()
         router.replace(LOGIN_DESTINATION)
         return
       }
@@ -78,7 +77,6 @@ function LoginContent() {
       if (signUpError) throw signUpError
 
       if (data.session) {
-        await refreshProfile()
         router.replace(LOGIN_DESTINATION)
       } else {
         setMessage("Revisa tu correo para confirmar la cuenta y luego inicia sesi\u00f3n.")
