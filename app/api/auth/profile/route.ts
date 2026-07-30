@@ -49,6 +49,7 @@ export async function POST(request: Request) {
   }
 
   const adminClient = createServerAdminClient()
+  const userClient = createServerAuthClient(token)
   const authUser = authData.user
   const rateLimit = consumeRateLimit(`profile:${authUser.id}`, {
     limit: 20,
@@ -71,13 +72,23 @@ export async function POST(request: Request) {
   if (!email) return errorResponse("La cuenta autenticada no tiene correo asociado.", 403)
 
   const selectColumns = "id,name,email,role,status,avatar,company,cargo,area"
-  const { data: profileByAuthId, error: authIdError } = await adminClient
+  // Un usuario activo puede leer su propio perfil mediante RLS. Esto evita que
+  // el acceso normal dependa de una clave administrativa de la plataforma.
+  const { data: profileByAuthId, error: authIdError } = await userClient
     .from("users")
     .select(selectColumns)
     .eq("auth_user_id", authUser.id)
     .maybeSingle<UserProfile>()
 
-  if (authIdError) return errorResponse("No se pudo consultar el perfil.", 500)
+  if (authIdError) {
+    logServerEvent("error", "profile_lookup_failed", {
+      requestId,
+      authUserId: authUser.id,
+      code: authIdError.code,
+      message: authIdError.message,
+    })
+    return errorResponse("No se pudo consultar el perfil.", 500)
+  }
   if (profileByAuthId) {
     if (profileByAuthId.status !== "activo") return errorResponse("El usuario no está activo.", 403)
     if (!isSupportedRole(profileByAuthId.role)) return errorResponse("El perfil no tiene un rol habilitado.", 403)
