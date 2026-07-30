@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createServerAdminClient, getServerSupabaseConfig, readJsonBody, requireAppRole } from "@/lib/server-auth"
 import { consumeRateLimit } from "@/lib/server-rate-limit"
 import { validatePassword } from "@/lib/domain/password-policy"
-import { getRequestId, logServerEvent } from "@/lib/server-observability"
+import { getRequestId, logServerEvent, sendOperationalAlert } from "@/lib/server-observability"
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, {
@@ -131,6 +131,11 @@ export async function POST(
       actorProfileId: auth.profile.id,
       targetProfileId: id,
     })
+    await sendOperationalAlert("admin_password_changed", "info", {
+      requestId,
+      actorProfileId: auth.profile.id,
+      targetProfileId: id,
+    })
     return NextResponse.json(
       { ok: true },
       { headers: { "Cache-Control": "no-store" } },
@@ -141,6 +146,11 @@ export async function POST(
       actorProfileId: auth.profile.id,
       targetProfileId: id,
       error,
+    })
+    await sendOperationalAlert("admin_password_change_failed", "critical", {
+      requestId,
+      actorProfileId: auth.profile.id,
+      targetProfileId: id,
     })
     return errorResponse(getAuthAdminErrorMessage(error), 500)
   }

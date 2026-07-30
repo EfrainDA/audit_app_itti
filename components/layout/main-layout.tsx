@@ -6,6 +6,7 @@ import { MobileNav, Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
 import { AppShellSkeleton } from "@/components/ui/async-state"
+import { Button } from "@/components/ui/button"
 import { canAccessPath, getAllowedRoutes, getRouteDefinition } from "@/lib/domain/capabilities"
 
 interface MainLayoutProps {
@@ -14,7 +15,7 @@ interface MainLayoutProps {
 
 // Marco privado que protege rutas y compone navegación, encabezado y contenido.
 export function MainLayout({ children }: MainLayoutProps) {
-  const { session, appUser, isLoading } = useAuth()
+  const { session, appUser, profileError, isLoading, refreshProfile, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -42,6 +43,27 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   if (isLoading || !session) {
     return <AppShellSkeleton label="Preparando sesión" />
+  }
+
+  if (!appUser) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+        <section className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
+          <h1 className="text-lg font-semibold">No se pudo cargar tu perfil</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {profileError ?? "La sesión está activa, pero el perfil todavía no está disponible."}
+          </p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+            <Button variant="outline" onClick={() => void signOut()}>
+              Cerrar sesión
+            </Button>
+            <Button onClick={() => void refreshProfile().catch(() => undefined)}>
+              Reintentar
+            </Button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   if (isRoleBlockedPath) {

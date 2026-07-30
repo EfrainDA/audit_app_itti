@@ -5,6 +5,7 @@ import { createServerAdminClient, getServerSupabaseConfig } from "@/lib/server-a
 import {
   getRequestId,
   logServerEvent,
+  sendOperationalAlert,
   withRequestId,
 } from "@/lib/server-observability"
 
@@ -43,6 +44,10 @@ export async function GET(request: Request) {
       requestId,
       durationMs,
       error,
+    })
+    await sendOperationalAlert("readiness_check_failed", "critical", {
+      requestId,
+      durationMs,
     })
     return withRequestId(
       NextResponse.json(

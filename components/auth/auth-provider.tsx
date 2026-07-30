@@ -9,6 +9,7 @@ type AuthContextValue = {
   session: Session | null
   authUser: SupabaseUser | null
   appUser: User | null
+  profileError: string | null
   isLoading: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -18,7 +19,10 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 // Configuración del cierre de sesión cuando la pestaña permanece inactiva.
-const TAB_AWAY_TIMEOUT_MS = 60 * 60 * 1000
+const configuredTabAwayTimeout = Number(process.env.NEXT_PUBLIC_TAB_AWAY_TIMEOUT_MS)
+const TAB_AWAY_TIMEOUT_MS = Number.isFinite(configuredTabAwayTimeout) && configuredTabAwayTimeout > 0
+  ? configuredTabAwayTimeout
+  : 60 * 60 * 1000
 const TAB_AWAY_STARTED_AT_KEY = "audit_app_tab_away_started_at"
 
 // Convierte el perfil recibido desde la base de datos al modelo usado por la UI.
@@ -64,10 +68,16 @@ async function ensureProfile(currentSession: Session, signal: AbortSignal): Prom
   return mapProfile(body.profile)
 }
 
+function getProfileErrorMessage(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") return null
+  return error instanceof Error ? error.message : "No se pudo cargar el perfil del usuario."
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Estado central de autenticación.
   const [session, setSession] = useState<Session | null>(null)
   const [appUser, setAppUser] = useState<User | null>(null)
+  const [profileError, setProfileError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const profileGenerationRef = useRef(0)
   const profileAbortRef = useRef<AbortController | null>(null)
@@ -80,27 +90,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     setSession(null)
     setAppUser(null)
+    setProfileError(null)
   }, [])
 
   // Vuelve a consultar la sesión y actualiza el perfil visible en la aplicación.
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     const generation = ++profileGenerationRef.current
     profileAbortRef.current?.abort()
     const controller = new AbortController()
     profileAbortRef.current = controller
-    const { data } = await supabase.auth.getSession()
-    const currentSession = data.session
-    if (generation !== profileGenerationRef.current || controller.signal.aborted) return
-    setSession(currentSession)
+    setProfileError(null)
+    setIsLoading(true)
 
-    if (!currentSession?.user) {
-      setAppUser(null)
-      return
+    try {
+      const { data } = await supabase.auth.getSession()
+      const currentSession = data.session
+      if (generation !== profileGenerationRef.current || controller.signal.aborted) return
+      setSession(currentSession)
+
+      if (!currentSession?.user) {
+        setAppUser(null)
+        return
+      }
+
+      const profile = await ensureProfile(currentSession, controller.signal)
+      if (generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
+    } catch (error) {
+      const message = getProfileErrorMessage(error)
+      if (message && generation === profileGenerationRef.current && !controller.signal.aborted) {
+        setAppUser(null)
+        setProfileError(message)
+        throw error
+      }
+    } finally {
+      if (generation === profileGenerationRef.current) setIsLoading(false)
     }
-
-    const profile = await ensureProfile(currentSession, controller.signal)
-    if (generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
-  }
+  }, [])
 
   // Carga la sesión guardada al iniciar la aplicación y escucha cambios de Supabase.
   useEffect(() => {
@@ -116,14 +141,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted || generation !== profileGenerationRef.current || controller.signal.aborted) return
 
         setSession(data.session)
+        setProfileError(null)
         if (data.session?.user) {
           const profile = await ensureProfile(data.session, controller.signal)
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         }
-      } catch {
-        if (isMounted) {
-          setSession(null)
+      } catch (error) {
+        const message = getProfileErrorMessage(error)
+        if (isMounted && message && generation === profileGenerationRef.current && !controller.signal.aborted) {
           setAppUser(null)
+          setProfileError(message)
         }
       } finally {
         if (isMounted && generation === profileGenerationRef.current) setIsLoading(false)
@@ -139,9 +166,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileAbortRef.current = controller
       setSession(nextSession)
       setAppUser(null)
+      setProfileError(null)
+      setIsLoading(true)
 
       if (!nextSession?.user) {
         setAppUser(null)
+        setProfileError(null)
         setIsLoading(false)
         return
       }
@@ -153,9 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then((profile) => {
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) setAppUser(profile)
         })
-        .catch(() => {
+        .catch((error) => {
+          const message = getProfileErrorMessage(error)
           if (isMounted && generation === profileGenerationRef.current && !controller.signal.aborted) {
             setAppUser(null)
+            if (message) setProfileError(message)
           }
         })
         .finally(() => {
@@ -259,11 +291,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       authUser: session?.user ?? null,
       appUser,
+      profileError,
       isLoading,
       refreshProfile,
       signOut,
     }),
-    [appUser, isLoading, session, signOut],
+    [appUser, isLoading, profileError, refreshProfile, session, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

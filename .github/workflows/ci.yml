@@ -57,6 +57,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_TAB_AWAY_TIMEOUT_MS: "250"
       - run: npm run test:e2e
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co

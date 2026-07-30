@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerAdminClient, createServerAuthClient, getBearerToken, getServerSupabaseConfig } from "@/lib/server-auth"
 import { consumeRateLimit } from "@/lib/server-rate-limit"
-import { getRequestId, logServerEvent } from "@/lib/server-observability"
+import { getRequestId, logServerEvent, sendOperationalAlert } from "@/lib/server-observability"
 
 type UserProfile = {
   id: string
@@ -34,11 +34,7 @@ function isSupportedRole(role: UserProfile["role"]) {
 // OAuth desconocida queda registrada como inactiva para revisión administrativa.
 export async function POST(request: Request) {
   const requestId = getRequestId(request)
-  const config = getServerSupabaseConfig()
-  if (!config.supabaseServiceRoleKey) {
-    return errorResponse("Falta configurar SUPABASE_AUTH_ADMIN_KEY en el servidor.", 500)
-  }
-
+  const startedAt = performance.now()
   const token = getBearerToken(request)
   if (!token) return errorResponse("No se encontró una sesión válida.", 401)
 
@@ -48,7 +44,6 @@ export async function POST(request: Request) {
     return errorResponse("La sesión ya no es válida.", 401)
   }
 
-  const adminClient = createServerAdminClient()
   const userClient = createServerAuthClient(token)
   const authUser = authData.user
   const rateLimit = consumeRateLimit(`profile:${authUser.id}`, {
@@ -81,19 +76,45 @@ export async function POST(request: Request) {
     .maybeSingle<UserProfile>()
 
   if (authIdError) {
+    const durationMs = Math.round(performance.now() - startedAt)
     logServerEvent("error", "profile_lookup_failed", {
       requestId,
       authUserId: authUser.id,
       code: authIdError.code,
       message: authIdError.message,
+      durationMs,
+    })
+    await sendOperationalAlert("profile_lookup_failed", "critical", {
+      requestId,
+      code: authIdError.code,
+      durationMs,
     })
     return errorResponse("No se pudo consultar el perfil.", 500)
   }
   if (profileByAuthId) {
     if (profileByAuthId.status !== "activo") return errorResponse("El usuario no está activo.", 403)
     if (!isSupportedRole(profileByAuthId.role)) return errorResponse("El perfil no tiene un rol habilitado.", 403)
-    return NextResponse.json({ profile: profileByAuthId })
+    const durationMs = Math.round(performance.now() - startedAt)
+    const latencyThresholdMs = Number(process.env.SUPABASE_LATENCY_ALERT_MS ?? "1500")
+    if (durationMs >= latencyThresholdMs) {
+      logServerEvent("warn", "supabase_profile_latency_high", { requestId, durationMs })
+      await sendOperationalAlert("supabase_profile_latency_high", "warning", {
+        requestId,
+        durationMs,
+        thresholdMs: latencyThresholdMs,
+      })
+    }
+    return NextResponse.json(
+      { profile: profileByAuthId },
+      { headers: { "Server-Timing": `profile;dur=${durationMs}` } },
+    )
   }
+
+  const config = getServerSupabaseConfig()
+  if (!config.supabaseServiceRoleKey) {
+    return errorResponse("Falta configurar una clave administrativa de Supabase en el servidor.", 500)
+  }
+  const adminClient = createServerAdminClient()
 
   const { data: profileByEmail, error: emailError } = await adminClient
     .from("users")

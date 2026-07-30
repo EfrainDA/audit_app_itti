@@ -48,11 +48,17 @@ npm run db:stop
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Cliente y servidor | URL del proyecto Supabase. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente y servidor | Clave pública limitada por RLS. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor | Operaciones administrativas y readiness. |
+| `SUPABASE_SECRET_KEY` | Solo servidor | Clave moderna recomendada para operaciones administrativas y readiness. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor | Alternativa JWT heredada para operaciones administrativas. |
 | `NEXT_PUBLIC_ALLOW_PUBLIC_SIGNUP` | Cliente | Habilita el registro público únicamente cuando vale `true`. |
 
 Nunca se debe exponer una clave `service_role` mediante una variable
 `NEXT_PUBLIC_*`.
+
+El servidor acepta, en orden de prioridad, `SUPABASE_AUTH_ADMIN_KEY`,
+`SUPABASE_SERVICE_ROLE_JWT`, `SUPABASE_SERVICE_ROLE_KEY` o
+`SUPABASE_SECRET_KEY`. Todas las claves y URLs deben pertenecer al mismo
+proyecto Supabase.
 
 ## Comandos principales
 

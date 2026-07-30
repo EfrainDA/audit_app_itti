@@ -1,16 +1,16 @@
 // Aprovisionamiento inicial idempotente. Requiere service_role y no forma parte
 // del arranque normal de la aplicación.
 import { createClient } from "@supabase/supabase-js"
+import { ADMIN_KEY_NAMES, readSupabaseEnvironment } from "./supabase-env.mjs"
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const { url, adminKey: serviceKey } = readSupabaseEnvironment()
 const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase()
 const password = process.env.BOOTSTRAP_ADMIN_PASSWORD
 const name = process.env.BOOTSTRAP_ADMIN_NAME?.trim() || "Administrador"
 
 if (!url || !serviceKey || !email || !password) {
   console.error(
-    "Configura NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, "
+    `Configura NEXT_PUBLIC_SUPABASE_URL, una de ${ADMIN_KEY_NAMES.join(", ")}, `
       + "BOOTSTRAP_ADMIN_EMAIL y BOOTSTRAP_ADMIN_PASSWORD.",
   )
   process.exit(1)

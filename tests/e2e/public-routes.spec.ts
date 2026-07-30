@@ -19,3 +19,11 @@ test("el inicio de sesión es accesible y las rutas privadas no muestran datos s
   await page.goto("/planificacion")
   await expect(page).toHaveURL(/\/login\?next=%2Fplanificacion$/)
 })
+
+test("el endpoint de perfil rechaza solicitudes sin autenticación", async ({ request }) => {
+  const response = await request.post("/api/auth/profile")
+  expect(response.status()).toBe(401)
+  await expect(response.json()).resolves.toMatchObject({
+    error: expect.stringMatching(/sesión válida/i),
+  })
+})
