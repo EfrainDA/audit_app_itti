@@ -3,6 +3,8 @@
 // Campos compartidos por las altas y ediciones de controles. Restringe las
 // opciones al catálogo y a la unidad de negocio del lote seleccionado.
 import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import { Check, Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,25 +59,51 @@ export function CatalogControlFields({
   businessUnitOptions: string[]
   businessUnitId: string
 }) {
+  const [catalogSearch, setCatalogSearch] = useState("")
+  const [isCatalogSearchOpen, setIsCatalogSearchOpen] = useState(false)
   const isBusinessUnit = isBusinessUnitTag(draft.etiqueta)
   const isProcess = isProcessTag(draft.etiqueta)
   const category = draft.etiqueta in categoryByTag
     ? categoryByTag[draft.etiqueta as keyof typeof categoryByTag]
     : null
-  const availableItems = category
-    ? catalogItems
-      .filter((item) =>
-        item.categoria === category
-        && (item.categoria === "area_transversal" || item.unidadNegocioId === businessUnitId)
-        && (item.estado === "activo" || item.id === draft.catalogItemId),
-      )
-      .sort((first, second) => first.nombre.localeCompare(second.nombre))
-    : []
+  const availableItems = useMemo(
+    () => category
+      ? catalogItems
+        .filter((item) =>
+          item.categoria === category
+          && (item.categoria === "area_transversal" || item.unidadNegocioId === businessUnitId)
+          && (item.estado === "activo" || item.id === draft.catalogItemId),
+        )
+        .sort((first, second) => first.nombre.localeCompare(second.nombre))
+      : [],
+    [businessUnitId, catalogItems, category, draft.catalogItemId],
+  )
   const selectedItem = catalogItems.find((item) => item.id === draft.catalogItemId)
+  const normalizedCatalogSearch = catalogSearch
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase()
+  const filteredAvailableItems = useMemo(
+    () => normalizedCatalogSearch
+      ? availableItems.filter((item) =>
+          `${item.nombre} ${item.descripcion ?? ""}`
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLocaleLowerCase()
+            .includes(normalizedCatalogSearch),
+        )
+      : availableItems,
+    [availableItems, normalizedCatalogSearch],
+  )
   const linkedProducts = (selectedItem?.productosVinculadosIds ?? [])
     .map((productId) => catalogItems.find((item) => item.id === productId))
     .filter((item): item is CatalogItem => Boolean(item))
   const typeOptions = isBusinessUnit ? [...CONTROL_TAGS, "Unidad de Negocio" as const] : CONTROL_TAGS
+
+  useEffect(() => {
+    setCatalogSearch(selectedItem?.nombre ?? "")
+  }, [draft.etiqueta, selectedItem?.id, selectedItem?.nombre])
 
   const changeType = (tag: NonNullable<Control["etiqueta"]>) => {
     const nextIsProcess = isProcessTag(tag)
@@ -97,6 +125,8 @@ export function CatalogControlFields({
   const selectCatalogItem = (itemId: string) => {
     const item = catalogItems.find((catalogItem) => catalogItem.id === itemId)
     if (!item) return
+    setCatalogSearch(item.nombre)
+    setIsCatalogSearchOpen(false)
     onChange({
       ...draft,
       catalogItemId: item.id,
@@ -110,6 +140,21 @@ export function CatalogControlFields({
           .filter((name): name is string => Boolean(name))
         : [],
       correspondeProceso: item.categoria === "proceso",
+    })
+  }
+
+  const changeCatalogSearch = (value: string) => {
+    setCatalogSearch(value)
+    setIsCatalogSearchOpen(true)
+    if (!draft.catalogItemId) return
+    onChange({
+      ...draft,
+      catalogItemId: "",
+      identificador: "",
+      proceso: "",
+      subprocesos: [],
+      subprocesoTemp: "",
+      productosVinculados: [],
     })
   }
 
@@ -184,18 +229,58 @@ export function CatalogControlFields({
                 <Link href="/ajustes/catalogos">Administrar catálogo</Link>
               </Button>
             </div>
-            <Select value={draft.catalogItemId} onValueChange={selectCatalogItem}>
-              <SelectTrigger id={`${idPrefix}-catalog-item`}>
-                <SelectValue placeholder={`Seleccionar ${catalogLabelByTag[draft.etiqueta as keyof typeof catalogLabelByTag]?.toLocaleLowerCase() ?? "registro"}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableItems.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.nombre}{item.estado === "inactivo" ? " (inactivo)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-3.5 z-10 h-4 w-4 text-muted-foreground" />
+              <Input
+                id={`${idPrefix}-catalog-item`}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={isCatalogSearchOpen}
+                aria-controls={`${idPrefix}-catalog-results`}
+                value={catalogSearch}
+                onChange={(event) => changeCatalogSearch(event.target.value)}
+                onFocus={() => setIsCatalogSearchOpen(true)}
+                onBlur={() => window.setTimeout(() => setIsCatalogSearchOpen(false), 120)}
+                placeholder={`Buscar ${catalogLabelByTag[draft.etiqueta as keyof typeof catalogLabelByTag]?.toLocaleLowerCase() ?? "registro"}...`}
+                autoComplete="off"
+                className="pl-9"
+              />
+              {isCatalogSearchOpen && availableItems.length > 0 && (
+                <div
+                  id={`${idPrefix}-catalog-results`}
+                  role="listbox"
+                  className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+                >
+                  {filteredAvailableItems.length > 0 ? (
+                    filteredAvailableItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="option"
+                        aria-selected={item.id === draft.catalogItemId}
+                        className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectCatalogItem(item.id)}
+                      >
+                        <Check className={`mt-0.5 h-4 w-4 shrink-0 ${item.id === draft.catalogItemId ? "opacity-100" : "opacity-0"}`} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">
+                            {item.nombre}{item.estado === "inactivo" ? " (inactivo)" : ""}
+                          </span>
+                          {item.descripcion && (
+                            <span className="block truncate text-xs text-muted-foreground">{item.descripcion}</span>
+                          )}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-3 text-sm text-muted-foreground">
+                      No se encontraron coincidencias.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             {availableItems.length === 0 && (
               <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
                 No hay registros activos de este tipo. Agrégalos primero desde Ajustes → Catálogos.
