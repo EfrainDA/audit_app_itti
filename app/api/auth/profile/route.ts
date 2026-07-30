@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server"
 import { createServerAdminClient, createServerAuthClient, getBearerToken, getServerSupabaseConfig } from "@/lib/server-auth"
-import { consumeRateLimit } from "@/lib/server-rate-limit"
 import { getRequestId, logServerEvent, sendOperationalAlert } from "@/lib/server-observability"
+import { consumeRateLimit } from "@/lib/server-rate-limit"
+import { NextResponse } from "next/server"
 
 type UserProfile = {
   id: string
   name: string
   email: string
-  role: "admin" | "ceo" | "supervisor" | "auditor" | "auditado"
+  role: "admin" | "ceo" | "supervisor" | "auditor"
   status: "activo" | "inactivo"
   avatar: string | null
   company: string | null

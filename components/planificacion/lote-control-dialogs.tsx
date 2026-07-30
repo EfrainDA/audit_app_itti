@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 
-import type { useLoteDetailController } from "./use-lote-detail-controller"
 import { CatalogControlFields } from "./catalog-control-fields"
+import type { useLoteDetailController } from "./use-lote-detail-controller"
 
 type ReadyController = Extract<ReturnType<typeof useLoteDetailController>, { data: unknown }>
 

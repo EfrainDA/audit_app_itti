@@ -60,7 +60,6 @@ ALTER TYPE "public"."answer_value" OWNER TO "postgres";
 CREATE TYPE "public"."control_status" AS ENUM (
     'pendiente',
     'en_curso',
-    'en_replica',
     'terminado',
     'terminada'
 );
@@ -99,7 +98,6 @@ ALTER TYPE "public"."model_status" OWNER TO "postgres";
 
 
 CREATE TYPE "public"."notification_type" AS ENUM (
-    'replica',
     'cierre',
     'ajuste',
     'asignacion'
@@ -132,8 +130,7 @@ CREATE TYPE "public"."user_role" AS ENUM (
     'admin',
     'ceo',
     'supervisor',
-    'auditor',
-    'auditado'
+    'auditor'
 );
 
 
@@ -280,29 +277,6 @@ ALTER FUNCTION "public"."create_cycle"("cycle_year" integer, "cycle_start_month"
 
 
 -- Funciones auxiliares de identidad y alcance reutilizadas por las políticas RLS.
-CREATE OR REPLACE FUNCTION "public"."current_app_audited_user_matches"("target_people" "text"[]) RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select exists (
-    select 1
-    from public.users u
-    join unnest(coalesce(target_people, '{}'::text[])) as audited_person(value) on true
-    where u.id = public.current_app_user_id()
-      and u.role = 'auditado'
-      and (
-        lower(trim(audited_person.value)) = lower(trim(u.name))
-        or lower(trim(audited_person.value)) = lower(trim(u.email))
-        or lower(trim(audited_person.value)) like '%' || lower(trim(u.name)) || '%'
-        or lower(trim(audited_person.value)) like '%' || lower(trim(u.email)) || '%'
-      )
-  );
-$$;
-
-
-ALTER FUNCTION "public"."current_app_audited_user_matches"("target_people" "text"[]) OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."current_app_can_read_lot"("target_lot_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -319,74 +293,6 @@ $$;
 
 
 ALTER FUNCTION "public"."current_app_can_read_lot"("target_lot_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."current_app_can_read_replica_answer"("target_answer_id" "uuid") RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select exists (
-    select 1
-    from public.answers a
-    join public.controls c on c.id = a.control_id
-    where a.id = target_answer_id
-      and c.status in ('en_replica', 'terminado', 'terminada')
-      and public.current_app_audited_user_matches(a.audited_people)
-  );
-$$;
-
-
-ALTER FUNCTION "public"."current_app_can_read_replica_answer"("target_answer_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."current_app_can_read_replica_control"("target_control_id" "uuid") RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select exists (
-    select 1
-    from public.answers a
-    join public.controls c on c.id = a.control_id
-    where a.control_id = target_control_id
-      and c.status in ('en_replica', 'terminado', 'terminada')
-      and public.current_app_audited_user_matches(a.audited_people)
-  );
-$$;
-
-
-ALTER FUNCTION "public"."current_app_can_read_replica_control"("target_control_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."current_app_can_read_replica_lot"("target_lot_id" "uuid") RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select exists (
-    select 1
-    from public.lot_verticals lv
-    where lv.lot_id = target_lot_id
-      and public.current_app_can_read_replica_lot_vertical(lv.id)
-  );
-$$;
-
-
-ALTER FUNCTION "public"."current_app_can_read_replica_lot"("target_lot_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."current_app_can_read_replica_lot_vertical"("target_lot_vertical_id" "uuid") RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select exists (
-    select 1
-    from public.controls c
-    where c.lot_vertical_id = target_lot_vertical_id
-      and public.current_app_can_read_replica_control(c.id)
-  );
-$$;
-
-
-ALTER FUNCTION "public"."current_app_can_read_replica_lot_vertical"("target_lot_vertical_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."current_app_is_active"() RETURNS boolean
@@ -900,22 +806,6 @@ COMMENT ON COLUMN "public"."answers"."audited_areas" IS 'Areas associated with t
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."audited_response_notes" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "answer_id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "comment" "text",
-    "file_url" "text",
-    "file_name" "text",
-    "file_type" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "audited_response_notes_has_content" CHECK ((("comment" IS NOT NULL) OR ("file_url" IS NOT NULL)))
-);
-
-
-ALTER TABLE "public"."audited_response_notes" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."audits" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "lot_id" "uuid" NOT NULL,
@@ -1190,11 +1080,6 @@ ALTER TABLE ONLY "public"."answers"
 
 
 
-ALTER TABLE ONLY "public"."audited_response_notes"
-    ADD CONSTRAINT "audited_response_notes_pkey" PRIMARY KEY ("id");
-
-
-
 ALTER TABLE ONLY "public"."audits"
     ADD CONSTRAINT "audits_control_id_key" UNIQUE ("control_id");
 
@@ -1329,14 +1214,6 @@ CREATE INDEX "controls_status_score_idx" ON "public"."controls" USING "btree" ("
 
 
 CREATE INDEX "idx_answers_control_id" ON "public"."answers" USING "btree" ("control_id");
-
-
-
-CREATE INDEX "idx_audited_response_notes_answer_id" ON "public"."audited_response_notes" USING "btree" ("answer_id");
-
-
-
-CREATE INDEX "idx_audited_response_notes_user_id" ON "public"."audited_response_notes" USING "btree" ("user_id");
 
 
 
@@ -1483,16 +1360,6 @@ ALTER TABLE ONLY "public"."answers"
 
 ALTER TABLE ONLY "public"."answers"
     ADD CONSTRAINT "answers_parameter_id_fkey" FOREIGN KEY ("parameter_id") REFERENCES "public"."parameters"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."audited_response_notes"
-    ADD CONSTRAINT "audited_response_notes_answer_id_fkey" FOREIGN KEY ("answer_id") REFERENCES "public"."answers"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."audited_response_notes"
-    ADD CONSTRAINT "audited_response_notes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -1650,7 +1517,7 @@ CREATE POLICY "active app users can read parameters" ON "public"."parameters" FO
 
 
 
-CREATE POLICY "active app users can read permitted users" ON "public"."users" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR ("auth_user_id" = "auth"."uid"()) OR (("public"."current_app_role"() = 'auditor'::"text") AND ((("role" = 'auditado'::"public"."user_role") AND ("status" = 'activo'::"public"."record_status")) OR (("role" = 'auditor'::"public"."user_role") AND "public"."current_app_shares_lot_with_auditor"("id")))))));
+CREATE POLICY "active app users can read permitted users" ON "public"."users" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR ("auth_user_id" = "auth"."uid"()) OR (("public"."current_app_role"() = 'auditor'::"text") AND ("role" = 'auditor'::"public"."user_role") AND "public"."current_app_shares_lot_with_auditor"("id")))));
 
 
 
@@ -1718,33 +1585,6 @@ CREATE POLICY "assigned lot team can read audits" ON "public"."audits" FOR SELEC
 
 CREATE POLICY "assigned lot team can read lot auditors" ON "public"."lot_auditors" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_lot"("lot_id")));
 
-
-
-CREATE POLICY "auditados can insert own audited notes" ON "public"."audited_response_notes" FOR INSERT TO "authenticated" WITH CHECK (("public"."current_app_is_active"() AND (("user_id" = "public"."current_app_user_id"()) AND "public"."current_app_can_read_replica_answer"("answer_id"))));
-
-
-
-CREATE POLICY "auditados can read assigned replica answer evidences" ON "public"."answer_evidences" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_replica_answer"("answer_id")));
-
-
-
-CREATE POLICY "auditados can read assigned replica answers" ON "public"."answers" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_replica_answer"("id")));
-
-
-
-CREATE POLICY "auditados can read assigned replica controls" ON "public"."controls" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_replica_control"("id")));
-
-
-
-CREATE POLICY "auditados can read assigned replica lot verticals" ON "public"."lot_verticals" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_replica_lot_vertical"("id")));
-
-
-
-CREATE POLICY "auditados can read assigned replica lots" ON "public"."lots" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND "public"."current_app_can_read_replica_lot"("id")));
-
-
-
-ALTER TABLE "public"."audited_response_notes" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "auditors can read assigned lots" ON "public"."lots" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR (EXISTS ( SELECT 1
@@ -1853,13 +1693,6 @@ CREATE POLICY "managers and owners can read notifications" ON "public"."notifica
 
 
 CREATE POLICY "managers and owners can update notifications" ON "public"."notifications" FOR UPDATE TO "authenticated" USING (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR ("user_id" = "public"."current_app_user_id"())))) WITH CHECK (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR ("user_id" = "public"."current_app_user_id"()))));
-
-
-
-CREATE POLICY "managers assigned auditors and owners can read audited notes" ON "public"."audited_response_notes" FOR SELECT TO "authenticated" USING (("public"."current_app_is_active"() AND ("public"."current_app_is_manager"() OR ("user_id" = "public"."current_app_user_id"()) OR (EXISTS ( SELECT 1
-   FROM ("public"."answers" "a"
-     JOIN "public"."controls" "c" ON (("c"."id" = "a"."control_id")))
-  WHERE (("a"."id" = "audited_response_notes"."answer_id") AND ("c"."auditor_id" = "public"."current_app_user_id"())))))));
 
 
 
@@ -2121,34 +1954,9 @@ GRANT ALL ON FUNCTION "public"."create_cycle"("cycle_year" integer, "cycle_start
 
 
 
-GRANT ALL ON FUNCTION "public"."current_app_audited_user_matches"("target_people" "text"[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."current_app_audited_user_matches"("target_people" "text"[]) TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."current_app_can_read_lot"("target_lot_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."current_app_can_read_lot"("target_lot_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."current_app_can_read_lot"("target_lot_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_answer"("target_answer_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_answer"("target_answer_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_control"("target_control_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_control"("target_control_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_lot"("target_lot_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_lot"("target_lot_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_lot_vertical"("target_lot_vertical_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."current_app_can_read_replica_lot_vertical"("target_lot_vertical_id" "uuid") TO "service_role";
 
 
 
@@ -2268,11 +2076,6 @@ GRANT ALL ON TABLE "public"."answer_evidences" TO "service_role";
 GRANT ALL ON TABLE "public"."answers" TO "anon";
 GRANT ALL ON TABLE "public"."answers" TO "authenticated";
 GRANT ALL ON TABLE "public"."answers" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."audited_response_notes" TO "authenticated";
-GRANT ALL ON TABLE "public"."audited_response_notes" TO "service_role";
 
 
 
@@ -2469,67 +2272,26 @@ DROP POLICY IF EXISTS "assigned lot team can read answer evidence files" ON "sto
 DROP POLICY IF EXISTS "auditors can upload answer evidence files" ON "storage"."objects";
 DROP POLICY IF EXISTS "managers can delete answer evidence files" ON "storage"."objects";
 
-CREATE POLICY "app users can read permitted answer evidence files"
+CREATE POLICY "authorized users can read answer evidence files"
 ON "storage"."objects"
 FOR SELECT
 TO "authenticated"
 USING (
   "public"."current_app_is_active"()
   AND "bucket_id" = 'answer-evidences'
-  AND (
-    "public"."current_app_is_manager"()
-    OR EXISTS (
-      SELECT 1
-      FROM "public"."answer_evidences" AS "ae"
-      JOIN "public"."answers" AS "a" ON "a"."id" = "ae"."answer_id"
-      JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
-      WHERE "ae"."file_url" = "storage"."objects"."name"
-        AND (
-          "c"."auditor_id" = "public"."current_app_user_id"()
-          OR "public"."current_app_can_read_replica_answer"("a"."id")
-        )
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM "public"."audited_response_notes" AS "arn"
-      JOIN "public"."answers" AS "a" ON "a"."id" = "arn"."answer_id"
-      JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
-      WHERE "arn"."file_url" = "storage"."objects"."name"
-        AND (
-          "arn"."user_id" = "public"."current_app_user_id"()
-          OR "c"."auditor_id" = "public"."current_app_user_id"()
-          OR "public"."current_app_can_read_replica_answer"("a"."id")
-        )
-    )
-  )
-);
-
-CREATE POLICY "assigned lot team can read answer evidence files"
-ON "storage"."objects"
-FOR SELECT
-TO "authenticated"
-USING (
-  "bucket_id" = 'answer-evidences'
-  AND "public"."current_app_is_active"()
-  AND (
-    EXISTS (
-      SELECT 1
-      FROM "public"."answer_evidences" AS "ae"
-      JOIN "public"."answers" AS "a" ON "a"."id" = "ae"."answer_id"
-      JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
-      JOIN "public"."lot_verticals" AS "lv" ON "lv"."id" = "c"."lot_vertical_id"
-      WHERE "ae"."file_url" = "storage"."objects"."name"
-        AND "public"."current_app_can_read_lot"("lv"."lot_id")
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM "public"."audited_response_notes" AS "arn"
-      JOIN "public"."answers" AS "a" ON "a"."id" = "arn"."answer_id"
-      JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
-      JOIN "public"."lot_verticals" AS "lv" ON "lv"."id" = "c"."lot_vertical_id"
-      WHERE "arn"."file_url" = "storage"."objects"."name"
-        AND "public"."current_app_can_read_lot"("lv"."lot_id")
-    )
+  AND EXISTS (
+    SELECT 1
+    FROM "public"."answer_evidences" AS "ae"
+    JOIN "public"."answers" AS "a" ON "a"."id" = "ae"."answer_id"
+    JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
+    JOIN "public"."lot_verticals" AS "lv" ON "lv"."id" = "c"."lot_vertical_id"
+    WHERE "ae"."file_url" = "storage"."objects"."name"
+      AND (
+        "public"."current_app_is_manager"()
+        OR "a"."auditor_id" = "public"."current_app_user_id"()
+        OR "c"."auditor_id" = "public"."current_app_user_id"()
+        OR "public"."current_app_can_read_lot"("lv"."lot_id")
+      )
   )
 );
 
@@ -2540,25 +2302,14 @@ TO "authenticated"
 WITH CHECK (
   "public"."current_app_is_active"()
   AND "bucket_id" = 'answer-evidences'
-  AND (
-    (
-      ("storage"."foldername"("name"))[1] <> 'auditado'
-      AND EXISTS (
-        SELECT 1
-        FROM "public"."answers" AS "a"
-        JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
-        WHERE "a"."id"::text = ("storage"."foldername"("storage"."objects"."name"))[2]
-          AND "a"."control_id"::text = ("storage"."foldername"("storage"."objects"."name"))[1]
-          AND "a"."auditor_id" = "public"."current_app_user_id"()
-          AND "c"."auditor_id" = "public"."current_app_user_id"()
-      )
-    )
-    OR (
-      ("storage"."foldername"("name"))[1] = 'auditado'
-      AND ("storage"."foldername"("name"))[2] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
-      AND ("storage"."foldername"("name"))[3] = "public"."current_app_user_id"()::text
-      AND "public"."current_app_can_read_replica_answer"(("storage"."foldername"("name"))[2]::uuid)
-    )
+  AND EXISTS (
+    SELECT 1
+    FROM "public"."answers" AS "a"
+    JOIN "public"."controls" AS "c" ON "c"."id" = "a"."control_id"
+    WHERE "a"."id"::text = ("storage"."foldername"("storage"."objects"."name"))[2]
+      AND "a"."control_id"::text = ("storage"."foldername"("storage"."objects"."name"))[1]
+      AND "a"."auditor_id" = "public"."current_app_user_id"()
+      AND "c"."auditor_id" = "public"."current_app_user_id"()
   )
 );
 
@@ -2572,16 +2323,7 @@ USING (
   AND "public"."current_app_is_manager"()
 );
 
-REVOKE ALL ON TABLE "public"."audited_response_notes" FROM "anon";
-
 NOTIFY "pgrst", 'reload schema';
-
-
-
-
-
-
-
 
 
 

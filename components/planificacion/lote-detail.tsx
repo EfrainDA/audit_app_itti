@@ -1,20 +1,16 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Detalle del lote: equipo auditor, verticales y controles planificados.
-import { useMemo, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -23,43 +19,19 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { 
-  Plus, 
-  User, 
-  Pencil,
-  Trash2, 
-  FileCheck, 
-  LayoutList 
-} from "lucide-react"
-import {
   type Lote,
-  type Control,
-  type LoteVertical,
-  getControlDisplayEstado,
+  getControlDisplayEstado
 } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/repositories/supabase/planning"
-import { getErrorMessage } from "@/lib/error-message"
-import { canEditAssignedControl, canManageControls as roleCanManageControls, isManager } from "@/lib/domain/permissions"
-import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
+import { canEditAssignedControl } from "@/lib/domain/permissions"
+import { deleteControl } from "@/lib/repositories/supabase/planning"
 import {
-  buildBusinessUnitControlName,
-  CONTROL_TAGS,
-  isBusinessUnitTag,
-  isProcessTag,
-  splitBusinessUnitControlName,
-  createEmptyControlDraft,
-  getControlDraftError,
-  toggleListValue,
-} from "@/features/planning/domain/control-naming"
+  FileCheck,
+  LayoutList,
+  Pencil,
+  Plus,
+  Trash2,
+  User
+} from "lucide-react"
 
 interface LoteDetailProps {
   lote: Lote
@@ -67,12 +39,12 @@ interface LoteDetailProps {
 }
 
 // Mantiene formularios, permisos y mutaciones del lote seleccionado.
-import { useLoteDetailController } from "./use-lote-detail-controller"
 import { LoteControlDialogs } from "./lote-control-dialogs"
+import { useLoteDetailController } from "./use-lote-detail-controller"
 export function LoteDetail({ lote, onChanged }: LoteDetailProps) {
   const controller = useLoteDetailController({ lote, onChanged })
   if (!("data" in controller)) return controller
-  const { data, refresh, appUser, canManageLots, canManageControls, currentLote, modelo, auditores, auditoresDisponibles, loteVerticales, setLoteVerticales, initialNewControl, showAddControl, setShowAddControl, newControl, setNewControl, editingControl, setEditingControl, editControl, setEditControl, isControlSuggestionsOpen, setIsControlSuggestionsOpen, formError, setFormError, actionSuccess, setActionSuccess, controlToDelete, setControlToDelete, isSavingControl, setIsSavingControl, auditorToAdd, setAuditorToAdd, isAddingAuditor, setIsAddingAuditor, controlsForCurrentUnit, existingControlNames, filteredControlNames, hasExactControlMatch, existingProcessNames, productControls, businessUnitOptions, toggleLinkedProduct, handleAddControl, openEditControl, handleUpdateControl, handleAddAuditor, answeredControlIds, getSubprocesosCount, getSubprocesosLabel, newControlIsProcess, editControlIsProcess, newControlIsBusinessUnit, editControlIsBusinessUnit, newControlBusinessUnitName, editControlBusinessUnitName, newControlValidationError, editControlValidationError } = controller
+  const { data, refresh, appUser, canManageLots, canManageControls, modelo, auditores, auditoresDisponibles, loteVerticales, initialNewControl, setShowAddControl, setNewControl, setIsControlSuggestionsOpen, formError, actionSuccess, setActionSuccess, controlToDelete, setControlToDelete, auditorToAdd, setAuditorToAdd, isAddingAuditor, openEditControl, handleAddAuditor, answeredControlIds, getSubprocesosCount, getSubprocesosLabel } = controller
 return (
     <div className="space-y-6">
       {/* Auditores */}

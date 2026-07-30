@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server"
-import { createServerAdminClient, getServerSupabaseConfig, readJsonBody, requireAppRole } from "@/lib/server-auth"
-import { consumeRateLimit } from "@/lib/server-rate-limit"
 import { validatePassword } from "@/lib/domain/password-policy"
+import { createServerAdminClient, getServerSupabaseConfig, readJsonBody, requireAppRole } from "@/lib/server-auth"
 import { getRequestId, logServerEvent, sendOperationalAlert } from "@/lib/server-observability"
+import { consumeRateLimit } from "@/lib/server-rate-limit"
+import { NextResponse } from "next/server"
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, {

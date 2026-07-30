@@ -1,20 +1,8 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { SafeImage } from "@/components/ui/safe-image"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -24,53 +12,20 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  getSemaphore,
+  type CountMetrics
+} from "@/features/dashboard/domain/metrics"
+import {
+  formatEstado,
+  getEstadoBadgeColor
+} from "@/lib/data"
 import { cn } from "@/lib/utils"
 import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Clock,
-  Crown,
-  Eye,
-  Layers,
-  Play,
-  ShieldAlert,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCheck,
-  Users,
-  type LucideIcon,
+  Play
 } from "lucide-react"
-import {
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  type Ciclo,
-  type Lote,
-  type ModeloControl,
-  type Respuesta,
-  type UnidadNegocio,
-} from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import {
-  getActiveCycle,
-  getCounts,
-  getDaysUntil,
-  getExecutiveScoreTone,
-  getSemaphore,
-  type CountMetrics,
-} from "@/features/dashboard/domain/metrics"
-import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
-import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
+import Link from "next/link"
 
-import { DashboardView, ControlContext, StatCard, RoleDashboard, SupervisorVerticalScore, SupervisorLoteSummary, SupervisorAnalystSummary, CeoCycleSummary, LotSummaryIndexes, appendToIndex, buildLotSummary, ParameterDistribution, CeoSemaphoreColumn, CeoComparedCycle, CeoCycleVerticalDetail, getControlCategory, getSummaryControlCategory, getControlProductLabels, getControlProcessLabel, getUniqueNonEmpty, normalizeComparableName, getVerticalGroupKey, areVerticalGroupKeysSimilar, findSimilarVerticalGroupKey, averageUnitScore, formatScore, formatCompactList, getControlDetailLabel, buildCeoCycleVerticalDetails, formatDelta } from "./dashboard-model"
+import { ControlContext, formatCompactList, StatCard, SupervisorLoteSummary } from "./dashboard-model"
 
 const toneValueStyles = { neutral: "text-foreground", primary: "text-primary", success: "text-status-success-text", warning: "text-status-warning-text", danger: "text-status-danger-text" }
 
@@ -232,5 +187,5 @@ function AnalystAssignedTable({ controls }: { controls: ControlContext[] }) {
   )
 }
 
-export { KpiCard, SemiGauge, AnalystProgressPanel, AnalystAssignedTable }
+export { AnalystAssignedTable, AnalystProgressPanel, KpiCard, SemiGauge }
 

@@ -1,10 +1,10 @@
 "use client"
 
 // Formulario de alta que vincula ciclo, modelo, unidad y equipo auditor.
-import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { SafeImage } from "@/components/ui/safe-image"
 import {
   Select,
   SelectContent,
@@ -12,11 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Building2 } from "lucide-react"
-import { SafeImage } from "@/components/ui/safe-image"
 import { useAppData } from "@/hooks/use-app-data"
-import { createLot } from "@/lib/repositories/supabase/planning"
 import { getErrorMessage } from "@/lib/error-message"
+import { createLot } from "@/lib/repositories/supabase/planning"
+import { Building2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 

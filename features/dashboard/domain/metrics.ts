@@ -56,7 +56,7 @@ export function getActiveCycle(cycles: Ciclo[]): Ciclo {
 export function getCounts(controls: CountableControl[], answeredControlIds: Set<string> = new Set()): CountMetrics {
   const completed = controls.filter((control) => control.estado === "terminado" || control.estado === "terminada").length
   const isStarted = (control: CountableControl) =>
-    control.estado === "en_curso" || control.estado === "en_replica" || answeredControlIds.has(control.id)
+    control.estado === "en_curso" || answeredControlIds.has(control.id)
   const inCourse = controls.filter((control) =>
     control.estado !== "terminado" && control.estado !== "terminada" && isStarted(control)
   ).length

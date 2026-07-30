@@ -1,6 +1,6 @@
 // Persistencia de modelos de control y su estructura jerárquica.
-import type { ModeloControl } from "@/lib/data"
 import type { ControlModelInput } from "@/features/models/domain/model-input"
+import type { ModeloControl } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { requireAdminProfile, requireManager } from "./access"
 

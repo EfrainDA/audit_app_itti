@@ -1,10 +1,24 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
 import {
@@ -14,41 +28,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useAppData } from "@/hooks/use-app-data"
+import { formatEstado, getEstadoBadgeColor, type ModeloControl } from "@/lib/data"
+import { getErrorMessage } from "@/lib/error-message"
+import { cloneControlModel, deleteControlModel, updateControlModelStatus } from "@/lib/repositories/supabase/models"
 import {
-  Plus,
-  ArrowUpRight,
-  Search,
-  MoreHorizontal,
-  Eye,
-  Pencil,
-  Copy,
   Archive,
-  FileCheck,
+  ArrowUpRight,
   Calendar,
+  Copy,
+  Eye,
+  FileCheck,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
   User,
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { getEstadoBadgeColor, formatEstado, type ModeloControl } from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import { cloneControlModel, deleteControlModel, updateControlModelStatus } from "@/lib/repositories/supabase/models"
-import { getErrorMessage } from "@/lib/error-message"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { ModeloDetail } from "./modelo-detail"
 import { ModeloForm } from "./modelo-form"
-import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 
 // Catálogo de modelos con filtros y acciones de alta, clonación y estado.
 export function ModelosContent() {

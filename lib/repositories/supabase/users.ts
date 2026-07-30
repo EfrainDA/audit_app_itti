@@ -1,8 +1,8 @@
 // Operaciones de perfiles. Las contraseñas administradas pasan por una ruta de
 // servidor; el cliente nunca recibe la clave privilegiada de Supabase Auth.
-import type { User } from "@/lib/data"
-import { supabase } from "@/lib/supabase"
-import { requireActiveProfile, requireAdminProfile } from "./access"
+import type { User } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
+import { requireActiveProfile, requireAdminProfile } from "./access";
 
 export async function updateUserProfile(
   id: string,

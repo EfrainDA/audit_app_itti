@@ -1,18 +1,34 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Listado que combina lotes, verticales, controles y respuestas para filtrar resultados.
-import { useMemo, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { EmptyState } from "@/components/ui/async-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { RealisticIcon } from "@/components/ui/realistic-icon"
-import { EmptyState } from "@/components/ui/async-state"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  formatEstado,
+  getEstadoBadgeColor,
+  getScoreColor
+} from "@/lib/data"
 import {
   AlertCircle,
   Building2,
@@ -24,62 +40,10 @@ import {
   Filter,
   Search,
 } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  type Control,
-  type Lote,
-  type LoteVertical,
-  getScoreColor,
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  getControlDisplayEstado,
-} from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { fetchAnswersForControl } from "@/lib/repositories/supabase/evaluations"
-import { getErrorMessage } from "@/lib/error-message"
-import { downloadPptx, downloadXlsx } from "@/lib/export"
-import {
-  controlMatchesFilters,
-  getCompleteLotVerticals,
-  matchesControlStatus,
-} from "@/features/evaluations/domain/evaluation-list"
+import Image from "next/image"
+import Link from "next/link"
 
 const YEAR_KEY = "a\u00f1o"
-
-interface LoteConDatos extends Lote {
-  unidadNombre: string
-  unidadLogo?: string
-  modeloNombre: string
-  auditoresNombres: string
-  loteVerticales: LoteVertical[]
-  calificacionFinal: number | null
-  verticalResultados: VerticalResultado[]
-}
-
-interface VerticalResultado {
-  id: string
-  nombre: string
-  peso: number
-  controlesTotal: number
-  controlesConScore: number
-  scorePromedio: number | null
-  aporte: number | null
-}
 
 interface EvaluacionesContentProps {
   view?: "evaluaciones" | "calificaciones"
@@ -90,7 +54,7 @@ import { useEvaluacionesContentController } from "./use-evaluaciones-content-con
 export function EvaluacionesContent({ view = "evaluaciones" }: EvaluacionesContentProps) {
   const controller = useEvaluacionesContentController({ view })
   if (!("data" in controller)) return controller
-  const { data, isLoading, dataError, lotes, unidades, users, modelos, loteVerticalesData, answeredControlIds, searchTerm, setSearchTerm, filterEstado, setFilterEstado, loteEstadoFilter, setLoteEstadoFilter, isExportOpen, setIsExportOpen, exportLoteId, setExportLoteId, exportFormat, setExportFormat, isExporting, setIsExporting, exportError, setExportError, calificacionesCycleFilter, setCalificacionesCycleFilter, lotesConDatos, calificacionesCycleOptions, defaultCalificacionesCycleKey, selectedCalificacionesCycleKey, lotesCalificacionesFiltrados, controles, controlesLotesAbiertos, normalizedSearchTerm, hasActiveControlFilters, lotesFiltrados, stats, exportSelectedLote } = controller
+  const { searchTerm, setSearchTerm, filterEstado, setFilterEstado, loteEstadoFilter, setLoteEstadoFilter, isExportOpen, setIsExportOpen, exportLoteId, setExportLoteId, exportFormat, setExportFormat, isExporting, exportError, setExportError, calificacionesCycleFilter, setCalificacionesCycleFilter, lotesConDatos, calificacionesCycleOptions, lotesCalificacionesFiltrados, hasActiveControlFilters, lotesFiltrados, stats, exportSelectedLote } = controller
 return (
     <div className="space-y-4">
       {view === "evaluaciones" && (
@@ -185,35 +149,43 @@ return (
               Exportar
             </Button>
           </DialogTrigger>
-          <DialogContent className="!w-[calc(100vw-2rem)] !max-w-[26rem] gap-4 p-5 sm:!w-[26rem] sm:!max-w-[26rem] lg:!max-w-[26rem] lg:p-5">
-            <DialogHeader>
-              <DialogTitle>Exportar informe</DialogTitle>
+          <DialogContent className="!w-[calc(100vw-2rem)] !max-w-[26rem] gap-5 p-5 sm:!w-[26rem] sm:!max-w-[26rem] lg:!max-w-[26rem] lg:p-5 [&_[data-slot=dialog-close]]:size-9">
+            <DialogHeader className="gap-1 pr-12">
+              <DialogTitle className="text-[17px]">Exportar informe</DialogTitle>
               <DialogDescription>Selecciona el lote que quieres exportar.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 pt-1">
-              <Select value={exportLoteId} onValueChange={setExportLoteId}>
-                <SelectTrigger className="w-full border-border/70 bg-card/70">
-                  <SelectValue placeholder="Seleccionar lote" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lotesConDatos.map((lote) => (
-                    <SelectItem key={lote.id} value={lote.id}>
-                      <p className="mt-1 text-sm font-semibold">Ciclo {lote.ciclo} - {lote[YEAR_KEY]}</p>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as typeof exportFormat)}>
-                <SelectTrigger className="w-full border-border/70 bg-card/70">
-                  <SelectValue placeholder="Formato" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="excel">Excel</SelectItem>
-                  <SelectItem value="presentation">Presentacion</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="export-lote" className="text-xs font-medium text-muted-foreground">Lote</Label>
+                <Select value={exportLoteId} onValueChange={setExportLoteId}>
+                  <SelectTrigger id="export-lote" className="h-10 w-full border-border bg-background">
+                    <SelectValue placeholder="Seleccionar lote" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lotesConDatos.map((lote) => (
+                      <SelectItem key={lote.id} value={lote.id}>
+                        <span className="block max-w-[20rem] truncate">
+                          {lote.nombreLote} — Ciclo {lote.ciclo}/{lote[YEAR_KEY]}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="export-format" className="text-xs font-medium text-muted-foreground">Formato</Label>
+                <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as typeof exportFormat)}>
+                  <SelectTrigger id="export-format" className="h-10 w-full border-border bg-background">
+                    <SelectValue placeholder="Seleccionar formato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excel">Excel</SelectItem>
+                    <SelectItem value="presentation">Presentación</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {exportError && <p className="text-sm text-status-danger-text">{exportError}</p>}
-              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-4 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={() => setIsExportOpen(false)} disabled={isExporting}>
                   Cancelar
                 </Button>

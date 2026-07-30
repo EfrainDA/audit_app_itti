@@ -16,7 +16,6 @@ const CAPABILITIES_BY_ROLE: Record<AppRole, ReadonlySet<AppCapability>> = {
   supervisor: new Set(["dashboard:view", "planning:view", "evaluations:view", "scores:view", "models:view", "settings:view", "preferences:view"]),
   auditor: new Set(["dashboard:view", "planning:view", "evaluations:view", "scores:view", "preferences:view"]),
   ceo: new Set(["dashboard:view", "evaluations:view"]),
-  auditado: new Set(["dashboard:view", "evaluations:view", "preferences:view"]),
 }
 
 const APP_ROUTES = [

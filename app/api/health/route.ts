@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
 import { getRequestId, withRequestId } from "@/lib/server-observability"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 

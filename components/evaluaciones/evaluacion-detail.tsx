@@ -1,77 +1,41 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Formulario de evaluación: administra respuestas, evidencias, borradores y cierre.
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { SafeImage } from "@/components/ui/safe-image"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
 import { SaveStatus } from "@/components/ui/async-state"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  ArrowLeft,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  MinusCircle,
-  AlertCircle,
-  Eye,
-  Save,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  Paperclip,
-  Play,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react"
-import {
-  type Control,
-  getScoreColor,
-  getScoreBgColor,
-  getEstadoBadgeColor,
-  formatEstado,
-  getControlDisplayEstado,
-} from "@/lib/data"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import {
-  fetchAnswersForControl,
-  finalizeEvaluation,
-  saveEvaluationDraft,
-  type EvaluationAnswerInput,
-} from "@/lib/repositories/supabase/evaluations"
-import { saveAnswerEvidenceFiles } from "@/lib/repositories/supabase/evidences"
-import { getErrorMessage } from "@/lib/error-message"
-import {
-  createEmptyRespuesta,
   EVIDENCE_FILE_ACCEPT,
   formatFechaRespuesta,
   getRespuestaValorLabel,
-  isAcceptedEvidenceFile,
-  calculateEvaluationScore,
-  getEvaluationProgress,
-  MAX_EVIDENCE_FILES,
-  toAnswerPayload,
-  type EditableRespuesta as Respuesta,
-  type RespuestaValor,
+  MAX_EVIDENCE_FILES
 } from "@/features/evaluations/domain/evaluation-answer"
+import {
+  formatEstado,
+  getEstadoBadgeColor,
+  getScoreBgColor,
+  getScoreColor
+} from "@/lib/data"
+import { cn } from "@/lib/utils"
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  MinusCircle,
+  Paperclip,
+  Save,
+  X,
+  XCircle
+} from "lucide-react"
+import Link from "next/link"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -83,7 +47,7 @@ import { useEvaluacionDetailController } from "./use-evaluacion-detail-controlle
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const controller = useEvaluacionDetailController({ controlId })
   if (!("data" in controller)) return controller
-  const { data, isLoading, dataError, refresh, appUser, loteVertical, control, lote, cicloLote, unidad, modelo, vertical, auditor, selectedLote, selectedUnidad, selectedModelo, selectedLoteVerticales, auditedUsers, respuestas, setRespuestas, evidenceFiles, setEvidenceFiles, activeParametroIndex, setActiveParametroIndex, autoSaveStatus, setAutoSaveStatus, formError, setFormError, isSubmitting, setIsSubmitting, areAnswersLoading, setAreAnswersLoading, router, nowTime, cycleStartsAt, cycleEndsAt, cycleIsEnabled, cycleIsInForce, evaluationBlockedReason, canEditEvaluation, answeredControlIds, hasLocalAnswers, displayEstado, currentControl, currentLote, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, handleSelectAuditedUser, handleAddRespuestaListItem, handleRemoveRespuestaListItem, getAnswersPayload, getAnsweredParamsWithoutComment, validateRequiredComments, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, evaluationProgress, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentTieneRespuesta, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreCalculado, scoreActual, handleFinalizeEvaluation } = controller
+  const { appUser, control, unidad, vertical, auditor, respuestas, setActiveParametroIndex, autoSaveStatus, formError, isSubmitting, evaluationBlockedReason, canEditEvaluation, displayEstado, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreActual } = controller
 return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -223,73 +187,29 @@ return (
               <div className="space-y-3">
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label className="text-xs font-semibold text-muted-foreground">Datos del auditado</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => {
-                          handleAddRespuestaListItem(currentParametro.id, "personasAuditadas")
-                          handleAddRespuestaListItem(currentParametro.id, "cargos")
-                          handleAddRespuestaListItem(currentParametro.id, "areas")
-                        }}
+                    <Label className="text-xs font-semibold text-muted-foreground">Datos de la persona evaluada</Label>
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)] md:items-center">
+                      <Input
+                        placeholder="Persona evaluada"
+                        className="h-8 border-border bg-background text-xs"
+                        value={currentRespuesta.personasAuditadas[0] ?? ""}
+                        onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "personasAuditadas", 0, e.target.value)}
                         disabled={!canEditEvaluation}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Línea
-                      </Button>
-                    </div>
-                    <div className="space-y-1.5">
-                      {currentRespuesta.personasAuditadas.map((persona, personIndex) => (
-                        <div key={`persona-row-${currentParametro.id}-${personIndex}`} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_30px] md:items-center">
-                          <Select
-                            value={auditedUsers.find((user) => user.name === persona)?.id}
-                            onValueChange={(value) => handleSelectAuditedUser(currentParametro.id, personIndex, value)}
-                            disabled={!canEditEvaluation || auditedUsers.length === 0}
-                          >
-                            <SelectTrigger className="h-8 w-full border-border bg-background text-xs">
-                              <SelectValue placeholder={persona || (auditedUsers.length ? "Persona auditada" : "Sin auditados activos")} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {auditedUsers.map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            placeholder="Cargo"
-                            className="h-8 border-border bg-background text-xs"
-                            value={currentRespuesta.cargos[personIndex] ?? ""}
-                            onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "cargos", personIndex, e.target.value)}
-                            disabled={!canEditEvaluation}
-                          />
-                          <Input
-                            placeholder="Área"
-                            className="h-8 border-border bg-background text-xs"
-                            value={currentRespuesta.areas[personIndex] ?? ""}
-                            onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "areas", personIndex, e.target.value)}
-                            disabled={!canEditEvaluation}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 justify-self-end text-muted-foreground hover:text-status-danger-text"
-                            onClick={() => {
-                              handleRemoveRespuestaListItem(currentParametro.id, "personasAuditadas", personIndex)
-                              handleRemoveRespuestaListItem(currentParametro.id, "cargos", personIndex)
-                              handleRemoveRespuestaListItem(currentParametro.id, "areas", personIndex)
-                            }}
-                            disabled={!canEditEvaluation || currentRespuesta.personasAuditadas.length === 1}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
+                      />
+                      <Input
+                        placeholder="Cargo"
+                        className="h-8 border-border bg-background text-xs"
+                        value={currentRespuesta.cargos[0] ?? ""}
+                        onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "cargos", 0, e.target.value)}
+                        disabled={!canEditEvaluation}
+                      />
+                      <Input
+                        placeholder="Área"
+                        className="h-8 border-border bg-background text-xs"
+                        value={currentRespuesta.areas[0] ?? ""}
+                        onChange={(e) => handleSetRespuestaListItem(currentParametro.id, "areas", 0, e.target.value)}
+                        disabled={!canEditEvaluation}
+                      />
                     </div>
                   </div>
 

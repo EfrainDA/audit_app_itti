@@ -1,14 +1,14 @@
 "use client"
 
-import { FormEvent, Suspense, useEffect, useState } from "react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { Building2, ClipboardCheck, Eye, EyeOff, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
-import { useAuth } from "@/components/auth/auth-provider"
+import { Building2, ClipboardCheck, Eye, EyeOff, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+import { FormEvent, Suspense, useEffect, useState } from "react"
 
 type AuthMode = "login" | "register"
 const LOGIN_DESTINATION = "/"
@@ -364,7 +364,7 @@ function LoginContent() {
                   </div>
                 </div>
                 <div className="mt-7 space-y-4">
-                  {["Matriz auditada", "Evidencia validada", "Riesgo controlado"].map((item) => (
+                  {["Matriz revisada", "Evidencia validada", "Riesgo controlado"].map((item) => (
                     <div key={item} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-status-success-surface text-xs font-bold text-status-success-text">OK</span>
                       <span className="h-2 flex-1 rounded-full bg-slate-200" />

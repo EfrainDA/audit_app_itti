@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { MobileNav, Sidebar } from "./sidebar"
-import { Header } from "./header"
 import { useAuth } from "@/components/auth/auth-provider"
 import { AppShellSkeleton } from "@/components/ui/async-state"
 import { Button } from "@/components/ui/button"
 import { canAccessPath, getAllowedRoutes, getRouteDefinition } from "@/lib/domain/capabilities"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { Header } from "./header"
+import { MobileNav, Sidebar } from "./sidebar"
 
 interface MainLayoutProps {
   children: React.ReactNode

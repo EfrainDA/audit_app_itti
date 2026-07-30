@@ -2,18 +2,18 @@
 
 // Página contenedora del lote: resuelve la ruta, prepara el encabezado y delega
 // la administración de verticales y controles al módulo de planificación.
-import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Building2 } from "lucide-react"
+import { LoteDetail } from "@/components/planificacion/lote-detail"
+import { ContentSkeleton, EmptyState, ErrorState } from "@/components/ui/async-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { SafeImage } from "@/components/ui/safe-image"
-import { ContentSkeleton, EmptyState, ErrorState } from "@/components/ui/async-state"
-import { LoteDetail } from "@/components/planificacion/lote-detail"
 import { useAppData } from "@/hooks/use-app-data"
 import { formatEstado, getEstadoBadgeColor } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { ArrowLeft, Building2 } from "lucide-react"
+import { useParams, useRouter } from "next/navigation"
 
 export default function PlanificacionLotePage() {
   const router = useRouter()

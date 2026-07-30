@@ -1,12 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { Bell, BellOff, LogOut, Search, Settings2, X } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { SafeImage } from "@/components/ui/safe-image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,12 +10,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { SafeImage } from "@/components/ui/safe-image"
 import { useNotifications } from "@/hooks/use-notifications"
 import { useSearchIndex } from "@/hooks/use-search-index"
-import { useAuth } from "@/components/auth/auth-provider"
-import { formatEstado } from "@/lib/data"
 import type { Notificacion } from "@/lib/data"
+import { formatEstado } from "@/lib/data"
 import { getAllowedRoutes, hasCapability } from "@/lib/domain/capabilities"
+import { Bell, BellOff, LogOut, Search, Settings2, X } from "lucide-react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 
 // Normaliza textos para que la búsqueda ignore mayúsculas y tildes.
 function normalizeSearch(value: unknown) {
@@ -41,7 +41,6 @@ function getNotificationHref(notification: Notificacion) {
   const evaluationHref = notification.mensaje.match(/\/evaluaciones\/[0-9a-f-]{32,36}/i)?.[0]
 
   if (evaluationHref) return evaluationHref
-  if (notification.tipo === "replica") return "/evaluaciones"
   if (title.includes("auditor termino")) return "/"
   if (title.includes("lote") || message.includes("lote")) return "/planificacion"
   if (title.includes("control") || title.includes("reasignacion") || message.includes("control")) return "/evaluaciones"

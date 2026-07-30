@@ -1,13 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -16,10 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { FileText, Layers3, Plus, Trash2 } from "lucide-react"
-import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/repositories/supabase/models"
-import { getErrorMessage } from "@/lib/error-message"
+import { Textarea } from "@/components/ui/textarea"
 import type { ModeloControl } from "@/lib/data"
+import { getErrorMessage } from "@/lib/error-message"
+import { createControlModel, updateControlModel, type ControlModelInput } from "@/lib/repositories/supabase/models"
+import { FileText, Layers3, Plus, Trash2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 
 interface ModeloFormProps {
   onClose?: () => void

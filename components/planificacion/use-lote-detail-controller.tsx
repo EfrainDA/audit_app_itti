@@ -1,65 +1,26 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Detalle del lote: equipo auditor, verticales y controles planificados.
-import { useMemo, useState, useEffect } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { 
-  Plus, 
-  User, 
-  Pencil,
-  Trash2, 
-  FileCheck, 
-  LayoutList 
-} from "lucide-react"
-import {
-  type Lote,
-  type Control,
-  type LoteVertical,
-  getControlDisplayEstado,
-} from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { useAppData } from "@/hooks/use-app-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { addLotAuditor, createControl, deleteControl, updateControl } from "@/lib/repositories/supabase/planning"
-import { getErrorMessage } from "@/lib/error-message"
-import { canManageControls as roleCanManageControls, isManager } from "@/lib/domain/permissions"
-import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 import {
   buildBusinessUnitControlName,
-  CONTROL_TAGS,
+  createEmptyControlDraft,
+  getControlDraftError,
   isBusinessUnitTag,
   isProcessTag,
   splitBusinessUnitControlName,
-  createEmptyControlDraft,
-  getControlDraftError,
-  toggleListValue,
+  toggleListValue
 } from "@/features/planning/domain/control-naming"
+import { useAppData } from "@/hooks/use-app-data"
+import {
+  type Control,
+  type Lote,
+  type LoteVertical
+} from "@/lib/data"
+import { isManager, canManageControls as roleCanManageControls } from "@/lib/domain/permissions"
+import { getErrorMessage } from "@/lib/error-message"
+import { addLotAuditor, createControl, updateControl } from "@/lib/repositories/supabase/planning"
+import { useEffect, useMemo, useState } from "react"
 
 interface LoteDetailProps {
   lote: Lote

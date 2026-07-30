@@ -2,7 +2,6 @@
 
 // Confirmación reutilizable que mantiene abierto el diálogo cuando la acción
 // falla y presenta un error recuperable al usuario.
-import { useState, type MouseEvent } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { getErrorMessage } from "@/lib/error-message"
+import { useState, type MouseEvent } from "react"
 
 type ConfirmDestructiveDialogProps = {
   open: boolean

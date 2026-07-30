@@ -1,6 +1,5 @@
 // Readiness profundo: verifica configuración privilegiada y conectividad real
 // con PostgreSQL antes de declarar que la instancia puede recibir tráfico.
-import { NextResponse } from "next/server"
 import { createServerAdminClient, getServerSupabaseConfig } from "@/lib/server-auth"
 import {
   getRequestId,
@@ -8,6 +7,7 @@ import {
   sendOperationalAlert,
   withRequestId,
 } from "@/lib/server-observability"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 

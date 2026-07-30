@@ -1,61 +1,43 @@
 "use client"
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Bloques visuales exclusivos del panel ejecutivo. Reciben datos ya agregados
 // para mantener la consulta, los permisos y el cálculo fuera de la presentación.
-import { useEffect, useMemo, useState } from "react"import Link from "next/link"import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"import { Badge } from "@/components/ui/badge"import { Button } from "@/components/ui/button"import { SafeImage } from "@/components/ui/safe-image"
-import {  Select,  SelectContent,  SelectItem,  SelectTrigger,  SelectValue,} from "@/components/ui/select"import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"import {  Table,  TableBody,  TableCell,  TableHead,  TableHeader,  TableRow,} from "@/components/ui/table"import {
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import { SafeImage } from "@/components/ui/safe-image"
 import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Clock,
-  Crown,
-  Eye,
-  Layers,
-  Play,
-  ShieldAlert,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCheck,
-  Users,
-  type LucideIcon,
-} from "lucide-react"
-import {
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  type Ciclo,
-  type Lote,
-  type ModeloControl,
-  type Respuesta,
-  type Umbral,
-  type UnidadNegocio,
-} from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   getConfiguredScoreThresholds,
-  getActiveCycle,
-  getCounts,
-  getDaysUntil,
   getExecutiveScoreTone,
-  getSemaphore,
   getThresholdRangeLabel,
-  getThresholdTone,
-  type CountMetrics,
+  getThresholdTone
 } from "@/features/dashboard/domain/metrics"
-import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
-import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
+import {
+  type Umbral
+} from "@/lib/data"
+import { cn } from "@/lib/utils"
+import {
+  ArrowDown,
+  ArrowUp,
+  Eye
+} from "lucide-react"
+import Link from "next/link"
+import { useEffect, useState } from "react"
 
-import { DashboardView, ControlContext, StatCard, RoleDashboard, SupervisorVerticalScore, SupervisorLoteSummary, SupervisorAnalystSummary, CeoCycleSummary, LotSummaryIndexes, appendToIndex, buildLotSummary, CeoSemaphoreColumn, CeoComparedCycle, CeoCycleVerticalDetail, getControlCategory, getSummaryControlCategory, getControlProductLabels, getControlProcessLabel, getUniqueNonEmpty, normalizeComparableName, getVerticalGroupKey, areVerticalGroupKeysSimilar, findSimilarVerticalGroupKey, averageUnitScore, formatScore, formatCompactList, getControlDetailLabel, buildCeoCycleVerticalDetails, formatDelta } from "./dashboard-model"
+import { areVerticalGroupKeysSimilar, averageUnitScore, buildCeoCycleVerticalDetails, CeoComparedCycle, CeoCycleSummary, CeoSemaphoreColumn, findSimilarVerticalGroupKey, formatDelta, formatScore, getVerticalGroupKey, SupervisorLoteSummary } from "./dashboard-model"
 
 // Resume el resultado global y su variación frente al ciclo anterior.
 export function CeoScoreCard({ score, delta, thresholds }: { score: number | null; delta: number | null; thresholds: Umbral[] }) {

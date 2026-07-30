@@ -6,7 +6,7 @@ export interface User {
   company?: string
   cargo?: string
   area?: string
-  role: "admin" | "ceo" | "supervisor" | "auditor" | "auditado"
+  role: "admin" | "ceo" | "supervisor" | "auditor"
   status: "activo" | "inactivo"
   avatar?: string
 }
@@ -110,7 +110,7 @@ export interface Control {
   loteVerticalId: string
   identificador: string
   descripcion?: string
-  estado: "pendiente" | "en_curso" | "en_replica" | "terminado"
+  estado: "pendiente" | "en_curso" | "terminado"
   scoreControl?: number
   etiqueta?: "Unidad de Negocio" | "Producto" | "Proceso" | "Proceso de apoyo" | "Otro" | "Área transversal"
   catalogItemId?: string
@@ -129,7 +129,7 @@ export interface Auditoria {
   loteId: string
   controlId: string
   fecha: string
-  estado: "pendiente" | "en_curso" | "en_replica" | "terminada"
+  estado: "pendiente" | "en_curso" | "terminada"
   scoreTotal?: number
   auditorId: string
 }
@@ -144,19 +144,8 @@ export interface Respuesta {
   personasAuditadas?: string[]
   cargosAuditados?: string[]
   areasAuditadas?: string[]
-  descargosAuditado?: DescargoAuditado[]
   fechaRespuesta: string
   auditorId: string
-}
-
-export interface DescargoAuditado {
-  id: string
-  respuestaId: string
-  usuarioId: string
-  comentario?: string
-  evidencia?: string
-  evidenciaUrl?: string
-  fecha: string
 }
 
 export interface Notificacion {
@@ -164,7 +153,7 @@ export interface Notificacion {
   usuarioId: string
   titulo: string
   mensaje: string
-  tipo: "replica" | "cierre" | "ajuste" | "asignacion"
+  tipo: "cierre" | "ajuste" | "asignacion"
   leida: boolean
   fecha: string
 }
@@ -198,8 +187,6 @@ export function getEstadoBadgeColor(estado: string): string {
     case "pendiente":
     case "borrador":
       return "border-border bg-muted text-muted-foreground"
-    case "en_replica":
-      return "border-status-warning-border bg-status-warning-surface text-status-warning-text"
     case "deprecado":
     case "inactivo":
       return "border-status-danger-border bg-status-danger-surface text-status-danger-text"

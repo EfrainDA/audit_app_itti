@@ -3,78 +3,23 @@
 // Componentes de supervisión. Cada bloque recibe resúmenes calculados y se
 // concentra en comunicar avance, asignaciones, alertas y riesgo operativo.
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { SafeImage } from "@/components/ui/safe-image"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  getSemaphore,
+  type CountMetrics
+} from "@/features/dashboard/domain/metrics"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Clock,
-  Crown,
-  Eye,
   Layers,
-  Play,
   ShieldAlert,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCheck,
   Users,
-  type LucideIcon,
+  type LucideIcon
 } from "lucide-react"
-import {
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  type Ciclo,
-  type Lote,
-  type ModeloControl,
-  type Respuesta,
-  type UnidadNegocio,
-} from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import {
-  getActiveCycle,
-  getCounts,
-  getDaysUntil,
-  getExecutiveScoreTone,
-  getSemaphore,
-  type CountMetrics,
-} from "@/features/dashboard/domain/metrics"
-import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
-import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
 
-import { DashboardView, ControlContext, StatCard, RoleDashboard, SupervisorVerticalScore, SupervisorLoteSummary, SupervisorAnalystSummary, CeoCycleSummary, LotSummaryIndexes, appendToIndex, buildLotSummary, ParameterDistribution, CeoSemaphoreColumn, CeoComparedCycle, CeoCycleVerticalDetail, getControlCategory, getSummaryControlCategory, getControlProductLabels, getControlProcessLabel, getUniqueNonEmpty, normalizeComparableName, getVerticalGroupKey, areVerticalGroupKeysSimilar, findSimilarVerticalGroupKey, averageUnitScore, formatScore, formatCompactList, getControlDetailLabel, buildCeoCycleVerticalDetails, formatDelta } from "./dashboard-model"
 import { SemiGauge } from "./analyst-dashboard"
+import { formatCompactList, SupervisorAnalystSummary, SupervisorLoteSummary } from "./dashboard-model"
 
 // Muestra el avance consolidado del ciclo y la proporción completada.
 export function SupervisorCycleProgress({
@@ -307,7 +252,6 @@ export function SupervisorLoteProgress({ lotes }: { lotes: SupervisorLoteSummary
                   {lote.verticalScores.map((vertical) => {
                     const statusAdvance = vertical.controls.filter((control) =>
                       control.estado === "en_curso" ||
-                      control.estado === "en_replica" ||
                       control.estado === "terminado" ||
                       control.estado === "terminada" ||
                       control.scoreControl !== undefined

@@ -2,18 +2,18 @@
 
 // Preferencias personales: perfil, avatar, contraseña y tema visual.
 // Las mutaciones de cuenta se ejecutan mediante repositorios dedicados.
-import { useEffect, useState, type ChangeEvent } from "react"
-import { useTheme } from "next-themes"
-import { Camera, KeyRound, Moon, Palette, Save, Sun } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SafeImage } from "@/components/ui/safe-image"
-import { useAuth } from "@/components/auth/auth-provider"
 import { getErrorMessage } from "@/lib/error-message"
-import { updateOwnProfile } from "@/lib/repositories/supabase/users"
 import { changeOwnPassword } from "@/lib/repositories/supabase/account"
+import { updateOwnProfile } from "@/lib/repositories/supabase/users"
+import { Camera, KeyRound, Moon, Palette, Save, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useEffect, useState, type ChangeEvent } from "react"
 
 export function ProfilePreferences() {
   const { appUser, refreshProfile } = useAuth()

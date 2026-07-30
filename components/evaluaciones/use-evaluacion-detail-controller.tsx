@@ -1,57 +1,34 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Formulario de evaluación: administra respuestas, evidencias, borradores y cierre.
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
+import { useAuth } from "@/components/auth/auth-provider"
 import { ContentSkeleton, ErrorState } from "@/components/ui/async-state"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { SafeImage } from "@/components/ui/safe-image"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  calculateEvaluationScore,
+  createEmptyRespuesta,
+  getEvaluationProgress,
+  isAcceptedEvidenceFile,
+  MAX_EVIDENCE_FILES,
+  toAnswerPayload,
+  type EditableRespuesta as Respuesta,
+  type RespuestaValor
+} from "@/features/evaluations/domain/evaluation-answer"
+import { useAppData } from "@/hooks/use-app-data"
 import {
-  ArrowLeft,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  MinusCircle,
-  AlertCircle,
-  Eye,
-  Save,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  Paperclip,
-  Play,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react"
-import {
-  type Control,
-  getScoreColor,
-  getScoreBgColor,
-  getEstadoBadgeColor,
   formatEstado,
   getControlDisplayEstado,
+  getEstadoBadgeColor,
+  getScoreBgColor,
+  getScoreColor,
+  type Control,
 } from "@/lib/data"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
 import { canEditAssignedControl } from "@/lib/domain/permissions"
+import { getErrorMessage } from "@/lib/error-message"
 import {
   fetchAnswersForControl,
   finalizeEvaluation,
@@ -59,20 +36,16 @@ import {
   type EvaluationAnswerInput,
 } from "@/lib/repositories/supabase/evaluations"
 import { saveAnswerEvidenceFiles } from "@/lib/repositories/supabase/evidences"
-import { getErrorMessage } from "@/lib/error-message"
+import { cn } from "@/lib/utils"
 import {
-  createEmptyRespuesta,
-  EVIDENCE_FILE_ACCEPT,
-  formatFechaRespuesta,
-  getRespuestaValorLabel,
-  isAcceptedEvidenceFile,
-  calculateEvaluationScore,
-  getEvaluationProgress,
-  MAX_EVIDENCE_FILES,
-  toAnswerPayload,
-  type EditableRespuesta as Respuesta,
-  type RespuestaValor,
-} from "@/features/evaluations/domain/evaluation-answer"
+  ArrowLeft,
+  Building2,
+  Eye,
+  Play
+} from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 interface EvaluacionDetailProps {
   controlId: string
@@ -98,7 +71,6 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
   const selectedLoteVerticales = selectedLote
     ? data.loteVerticales.filter((item) => item.loteId === selectedLote.id)
     : []
-  const auditedUsers = data.users.filter((user) => user.role === "auditado" && user.status === "activo")
 
   // Estado editable indexado por parámetro para actualizar cada respuesta sin búsquedas lineales.
   const [respuestas, setRespuestas] = useState<Record<string, Respuesta>>({})
@@ -155,7 +127,6 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
                 fechaRespuesta: answer.fechaRespuesta,
                 comentario: answer.comentario,
                 evidencias: answer.evidencias,
-                descargosAuditado: answer.descargosAuditado,
               },
             ]),
           )
@@ -464,74 +435,6 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
     })
   }
 
-  const handleSelectAuditedUser = (parametroId: string, index: number, userId: string) => {
-    const auditedUser = auditedUsers.find((user) => user.id === userId)
-    if (!auditedUser) return
-
-    setRespuestas((prev) => {
-      const current = {
-        ...createEmptyRespuesta(parametroId),
-        ...prev[parametroId],
-      }
-      const personasAuditadas = [...current.personasAuditadas]
-      const cargos = [...current.cargos]
-      const areas = [...current.areas]
-
-      personasAuditadas[index] = auditedUser.name
-      cargos[index] = auditedUser.cargo ?? ""
-      areas[index] = auditedUser.area ?? ""
-
-      return {
-        ...prev,
-        [parametroId]: {
-          ...current,
-          personasAuditadas,
-          cargos,
-          areas,
-        },
-      }
-    })
-  }
-
-  const handleAddRespuestaListItem = (parametroId: string, field: "personasAuditadas" | "cargos" | "areas") => {
-    setRespuestas((prev) => {
-      const current = {
-        ...createEmptyRespuesta(parametroId),
-        ...prev[parametroId],
-      }
-
-      return {
-        ...prev,
-        [parametroId]: {
-          ...current,
-          [field]: [...current[field], ""],
-        },
-      }
-    })
-  }
-
-  const handleRemoveRespuestaListItem = (
-    parametroId: string,
-    field: "personasAuditadas" | "cargos" | "areas",
-    index: number
-  ) => {
-    setRespuestas((prev) => {
-      const current = {
-        ...createEmptyRespuesta(parametroId),
-        ...prev[parametroId],
-      }
-      const nextValues = current[field].filter((_, itemIndex) => itemIndex !== index)
-
-      return {
-        ...prev,
-        [parametroId]: {
-          ...current,
-          [field]: nextValues.length > 0 ? nextValues : [""],
-        },
-      }
-    })
-  }
-
   // Convierte el estado visual al contrato transaccional del repositorio.
   const getAnswersPayload = (): EvaluationAnswerInput[] =>
     Object.values(respuestas)
@@ -691,5 +594,5 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
     }
   }
 
-    return { controlId, data, isLoading, dataError, refresh, appUser, loteVertical, control, lote, cicloLote, unidad, modelo, vertical, auditor, selectedLote, selectedUnidad, selectedModelo, selectedLoteVerticales, auditedUsers, respuestas, setRespuestas, evidenceFiles, setEvidenceFiles, activeParametroIndex, setActiveParametroIndex, autoSaveStatus, setAutoSaveStatus, formError, setFormError, isSubmitting, setIsSubmitting, areAnswersLoading, setAreAnswersLoading, router, nowTime, cycleStartsAt, cycleEndsAt, cycleIsEnabled, cycleIsInForce, evaluationBlockedReason, canEditEvaluation, answeredControlIds, hasLocalAnswers, displayEstado, currentControl, currentLote, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, handleSelectAuditedUser, handleAddRespuestaListItem, handleRemoveRespuestaListItem, getAnswersPayload, getAnsweredParamsWithoutComment, validateRequiredComments, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, evaluationProgress, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentTieneRespuesta, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreCalculado, scoreActual, handleFinalizeEvaluation }
+    return { controlId, data, isLoading, dataError, refresh, appUser, loteVertical, control, lote, cicloLote, unidad, modelo, vertical, auditor, selectedLote, selectedUnidad, selectedModelo, selectedLoteVerticales, respuestas, setRespuestas, evidenceFiles, setEvidenceFiles, activeParametroIndex, setActiveParametroIndex, autoSaveStatus, setAutoSaveStatus, formError, setFormError, isSubmitting, setIsSubmitting, areAnswersLoading, setAreAnswersLoading, router, nowTime, cycleStartsAt, cycleEndsAt, cycleIsEnabled, cycleIsInForce, evaluationBlockedReason, canEditEvaluation, answeredControlIds, hasLocalAnswers, displayEstado, currentControl, currentLote, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, getAnswersPayload, getAnsweredParamsWithoutComment, validateRequiredComments, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, evaluationProgress, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentTieneRespuesta, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreCalculado, scoreActual, handleFinalizeEvaluation }
 }

@@ -1,20 +1,6 @@
 "use client"
 
-import Image from "next/image"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import {
-  ChartColumn,
-  CalendarDays,
-  ClipboardCheck,
-  Settings2,
-  ChevronLeft,
-  ChevronRight,
-  House,
-  MoreHorizontal,
-  SlidersHorizontal,
-} from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -22,9 +8,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useEffect, useState } from "react"
-import { useAuth } from "@/components/auth/auth-provider"
 import { getAllowedRoutes } from "@/lib/domain/capabilities"
+import { cn } from "@/lib/utils"
+import {
+  CalendarDays,
+  ChartColumn,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  House,
+  MoreHorizontal,
+  Settings2,
+  SlidersHorizontal,
+} from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: House },

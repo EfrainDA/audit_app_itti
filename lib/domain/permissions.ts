@@ -30,5 +30,5 @@ export function canEditAssignedControl(
 }
 
 export function canAccessModels(role?: AppRole) {
-  return role !== "auditor" && role !== "auditado" && role !== "ceo"
+  return role !== "auditor" && role !== "ceo"
 }

@@ -1,13 +1,13 @@
 "use client"
 
 // Vista de solo lectura de un modelo, sus verticales y parámetros.
-import { Badge } from "@/components/ui/badge"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Badge } from "@/components/ui/badge"
 import type { ModeloControl } from "@/lib/data"
 import { CheckCircle, XCircle } from "lucide-react"
 

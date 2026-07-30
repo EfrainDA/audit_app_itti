@@ -1,78 +1,17 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { SafeImage } from "@/components/ui/safe-image"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+  getCounts,
+  type CountMetrics
+} from "@/features/dashboard/domain/metrics"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Clock,
-  Crown,
-  Eye,
-  Layers,
-  Play,
-  ShieldAlert,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCheck,
-  Users,
-  type LucideIcon,
-} from "lucide-react"
-import {
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  type Ciclo,
   type Lote,
   type ModeloControl,
   type Respuesta,
-  type UnidadNegocio,
+  type UnidadNegocio
 } from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import {
-  getActiveCycle,
-  getCounts,
-  getDaysUntil,
-  getExecutiveScoreTone,
-  getSemaphore,
-  type CountMetrics,
-} from "@/features/dashboard/domain/metrics"
-import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
-import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
 
 export type DashboardView = "analista" | "supervisor" | "ceo"
-
-const YEAR_KEY = "a\u00f1o"
 
 export type ControlContext = {
   id: string
@@ -95,10 +34,6 @@ export type ControlContext = {
   fechaCreacion: string
 }
 
-type AuditedControlContext = ControlContext & {
-  respuestas: Respuesta[]
-}
-
 
 export type StatCard = {
   title: string
@@ -110,7 +45,7 @@ export type RoleDashboard = {
   cards: StatCard[]
 }
 
-export type SupervisorVerticalScore = {
+type SupervisorVerticalScore = {
   id: string
   name: string
   weight: number
@@ -219,7 +154,7 @@ export function buildLotSummary(lote: Lote, indexes: LotSummaryIndexes): Supervi
     const inCourse = verticalControls.filter((control) =>
       control.estado !== "terminado" &&
       control.estado !== "terminada" &&
-      (control.estado === "en_curso" || control.estado === "en_replica" || indexes.answeredControlIds.has(control.id))
+      (control.estado === "en_curso" || indexes.answeredControlIds.has(control.id))
     ).length
     const advance = completed + inCourse
     const scored = verticalControls.filter((control) => control.scoreControl !== undefined)
@@ -379,14 +314,6 @@ export type CeoCycleVerticalDetail = {
   }[]
 }
 
-const toneValueStyles: Record<StatCard["tone"], string> = {
-  primary: "text-primary",
-  success: "text-status-success-text",
-  warning: "text-status-warning-text",
-  danger: "text-status-danger-text",
-  neutral: "text-foreground",
-}
-
 // Selección del ciclo y cálculo de contadores compartidos entre paneles.
 // Normalización de categorías y nombres para agrupaciones ejecutivas.
 export function getControlCategory(control: ControlContext) {
@@ -404,7 +331,7 @@ export function getControlCategory(control: ControlContext) {
   return "unidad"
 }
 
-export function getSummaryControlCategory(control: SupervisorVerticalScore["controls"][number], verticalName: string) {
+function getSummaryControlCategory(control: SupervisorVerticalScore["controls"][number], verticalName: string) {
   const proceso = `${control.proceso ?? ""} ${control.subproceso ?? ""}`.trim()
   const etiqueta = control.etiqueta?.toLowerCase() ?? ""
   const vertical = verticalName.toLowerCase()
@@ -419,7 +346,7 @@ export function getSummaryControlCategory(control: SupervisorVerticalScore["cont
   return "unidad"
 }
 
-export function getControlProductLabels(control: SupervisorVerticalScore["controls"][number]) {
+function getControlProductLabels(control: SupervisorVerticalScore["controls"][number]) {
   const products = [control.producto, ...(control.productosVinculados ?? [])]
     .map((product) => product?.trim())
     .filter((product): product is string => Boolean(product))
@@ -427,7 +354,7 @@ export function getControlProductLabels(control: SupervisorVerticalScore["contro
   return products.length ? products : [control.identificador ?? "Producto sin nombre"]
 }
 
-export function getControlProcessLabel(control: SupervisorVerticalScore["controls"][number]) {
+function getControlProcessLabel(control: SupervisorVerticalScore["controls"][number]) {
   return control.proceso?.trim() || control.subproceso?.trim() || control.identificador || "Proceso sin nombre"
 }
 
@@ -435,7 +362,7 @@ export function getUniqueNonEmpty(values: (string | undefined)[]) {
   return new Set(values.map((value) => value?.trim()).filter(Boolean)).size
 }
 
-export function normalizeComparableName(value: string) {
+function normalizeComparableName(value: string) {
   const stopWords = new Set(["de", "del", "la", "el", "los", "las", "y", "por", "para"])
   const aliases: Record<string, string> = {
     un: "unidad",
@@ -499,7 +426,7 @@ export function formatCompactList(values: string[], emptyLabel = "Sin datos") {
   return `${uniqueValues.slice(0, 3).join(", ")} +${uniqueValues.length - 3}`
 }
 
-export function getControlDetailLabel(control: SupervisorVerticalScore["controls"][number], verticalName: string) {
+function getControlDetailLabel(control: SupervisorVerticalScore["controls"][number], verticalName: string) {
   const category = getSummaryControlCategory(control, verticalName)
 
   if (category === "producto") return getControlProductLabels(control).join(", ")

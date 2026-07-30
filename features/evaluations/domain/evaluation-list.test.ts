@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { controlMatchesFilters, matchesControlStatus } from "./evaluation-list"
 import type { Control } from "../../../lib/data"
+import { controlMatchesFilters, matchesControlStatus } from "./evaluation-list"
 
 const control: Control = {
   id: "control-1",

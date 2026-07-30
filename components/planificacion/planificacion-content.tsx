@@ -1,35 +1,11 @@
 "use client"
 
 // Pantalla maestra que filtra lotes y abre sus flujos de creación y detalle.
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { RealisticIcon } from "@/components/ui/realistic-icon"
-import { SafeImage } from "@/components/ui/safe-image"
-import {
-  Plus,
-  Search,
-  Calendar,
-  Building2,
-  Lock,
-  Unlock,
-  Download,
-  MoreHorizontal,
-  Eye,
-  RotateCcw,
-  Trash2,
-} from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 import {
   Dialog,
   DialogContent,
@@ -38,22 +14,46 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { RealisticIcon } from "@/components/ui/realistic-icon"
+import { SafeImage } from "@/components/ui/safe-image"
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  getEstadoBadgeColor,
-  formatEstado,
-} from "@/lib/data"
-import { LoteForm } from "./lote-form"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
+import {
+  formatEstado,
+  getEstadoBadgeColor,
+} from "@/lib/data"
 import { downloadXlsx } from "@/lib/export"
 import { updateLotStatus } from "@/lib/repositories/supabase/planning"
-import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
+import {
+  Building2,
+  Calendar,
+  Download,
+  Eye,
+  Lock,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Unlock,
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { LoteForm } from "./lote-form"
 
 // Centraliza filtros y acciones permitidas para el rol autenticado.
 export function PlanificacionContent() {
@@ -141,7 +141,6 @@ export function PlanificacionContent() {
   })
 
   const exportSingleLote = (lote: (typeof lotesConDatos)[number]) => {
-    const unidad = unidades.find((item) => item.id === lote.unidadNegocioId)
     const loteVerticales = loteVerticalesData.filter((loteVertical) => loteVertical.loteId === lote.id)
     const controls = loteVerticales.flatMap((loteVertical) => loteVertical.controles)
     const getProducts = (control: (typeof controls)[number]) => {
@@ -173,7 +172,17 @@ export function PlanificacionContent() {
       }))
     })
     const rows = [
-      [{ value: unidad?.nombre || lote.unidadNombre, styleId: "TitleCenter", mergeAcross: 2 }],
+      [{ value: "PLANIFICACIÓN DEL LOTE", styleId: "TitleCenter", mergeAcross: 2 }],
+      ["", "", ""],
+      [{ value: "DATOS GENERALES", styleId: "DarkHeader", mergeAcross: 2 }],
+      [{ value: "Nombre del lote", styleId: "DetailLabel" }, { value: `${lote.unidadNombre} · ${lote.modeloNombre}`, styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Unidad de negocio", styleId: "DetailLabel" }, { value: lote.unidadNombre, styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Modelo de control", styleId: "DetailLabel" }, { value: lote.modeloNombre, styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Ciclo", styleId: "DetailLabel" }, { value: `Ciclo ${lote.ciclo} - ${lote.año}`, styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Estado", styleId: "DetailLabel" }, { value: formatEstado(lote.estado), styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Auditores", styleId: "DetailLabel" }, { value: lote.auditoresNombres || "Sin auditores asignados", styleId: "DetailValue", mergeAcross: 1 }],
+      [{ value: "Fecha de exportación", styleId: "DetailLabel" }, { value: new Date().toLocaleDateString("es-PY"), styleId: "DetailValue", mergeAcross: 1 }],
+      ["", "", ""],
       [{ value: "PRODUCTOS DEL ALCANCE", styleId: "GreenHeader", mergeAcross: 2 }],
       ...(alcanceProductos.length
         ? alcanceProductos.map((product, index) => [{ value: `${index + 1}. ${product}`, styleId: "Bordered", mergeAcross: 2 }])
@@ -197,14 +206,14 @@ export function PlanificacionContent() {
             { value: "", styleId: "Bordered" },
           ]]),
     ]
-    const safeName = (unidad?.nombre || lote.unidadNombre || "lote")
+    const safeName = `${lote.unidadNombre}-${lote.modeloNombre}`
       .replace(/[^\w-]+/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "") || "lote"
 
-    downloadXlsx(`planificacion-${safeName}-ciclo-${lote.ciclo}.xlsx`, [
+    downloadXlsx(`planificacion-${safeName}-ciclo-${lote.ciclo}-${lote.año}.xlsx`, [
       {
-        name: unidad?.nombre || lote.unidadNombre,
+        name: "Planificación",
         rows,
         columns: [280, 360, 420],
       },

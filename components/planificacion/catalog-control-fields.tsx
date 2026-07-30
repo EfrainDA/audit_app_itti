@@ -2,9 +2,9 @@
 
 // Campos compartidos por las altas y ediciones de controles. Restringe las
 // opciones al catálogo y a la unidad de negocio del lote seleccionado.
+import { Check, Search } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { Check, Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Control, CatalogItem, User } from "@/lib/data"
 import {
   buildBusinessUnitControlName,
   CONTROL_TAGS,
@@ -25,6 +24,7 @@ import {
   isBusinessUnitTag,
   isProcessTag,
 } from "@/features/planning/domain/control-naming"
+import type { CatalogItem, Control, User } from "@/lib/data"
 
 const categoryByTag = {
   Producto: "producto",

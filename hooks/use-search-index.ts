@@ -1,7 +1,7 @@
 "use client"
 
-import useSWR from "swr"
 import { fetchSearchIndex, type SearchIndex } from "@/lib/repositories/supabase/search"
+import useSWR from "swr"
 
 const emptySearchIndex: SearchIndex = {
   users: [],

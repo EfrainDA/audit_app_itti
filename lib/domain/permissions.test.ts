@@ -14,7 +14,6 @@ describe("permisos por rol", () => {
     ["supervisor", true],
     ["auditor", false],
     ["ceo", false],
-    ["auditado", false],
   ] as const)("identifica managers para %s", (role, expected) => {
     expect(isManager(role)).toBe(expected)
   })

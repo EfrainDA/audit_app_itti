@@ -2,7 +2,6 @@
 
 // Selector compartido para conservar formato, posición y comportamiento de
 // ciclo en todos los dashboards.
-import type { Ciclo } from "@/lib/data"
 import {
   Select,
   SelectContent,
@@ -10,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { Ciclo } from "@/lib/data"
 
 const YEAR_KEY = "a\u00f1o"
 

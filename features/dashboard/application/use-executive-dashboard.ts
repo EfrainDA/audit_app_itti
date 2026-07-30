@@ -1,10 +1,10 @@
 "use client"
 
-import useSWR from "swr"
 import {
   fetchExecutiveDashboard,
   type ExecutiveDashboard,
 } from "@/lib/repositories/supabase/dashboard"
+import useSWR from "swr"
 
 export function useExecutiveDashboard(input: {
   cycleId?: string

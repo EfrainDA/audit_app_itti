@@ -1,14 +1,10 @@
 "use client"
 
-import { supabase } from "@/lib/supabase"
-import { requireActiveProfile } from "@/lib/repositories/supabase/access"
-import type { DbCatalogItem, DbControl, DbLotVertical } from "./app-data-db-types"
 import type {
   Auditoria,
   CatalogItem,
   Ciclo,
   Control,
-  DescargoAuditado,
   Lote,
   LoteVertical,
   ModeloControl,
@@ -20,6 +16,9 @@ import type {
   User,
   Vertical,
 } from "@/lib/data"
+import { requireActiveProfile } from "@/lib/repositories/supabase/access"
+import { supabase } from "@/lib/supabase"
+import type { DbCatalogItem, DbControl, DbLotVertical } from "./app-data-db-types"
 
 // Capa de acceso a datos: centraliza consultas a Supabase, adaptación de filas
 // al modelo de la UI y validaciones de permisos previas a cada escritura.
@@ -167,17 +166,6 @@ type DbAnswer = {
   answered_at: string
   auditor_id: string
   answer_evidences?: { file_name: string | null; file_url: string }[]
-  audited_response_notes?: DbAuditedResponseNote[]
-}
-
-type DbAuditedResponseNote = {
-  id: string
-  answer_id: string
-  user_id: string
-  comment: string | null
-  file_url: string | null
-  file_name: string | null
-  created_at: string
 }
 
 type DbNotification = {
@@ -246,15 +234,6 @@ function normalizeThresholdColor(color: string, name: string): Umbral["color"] {
   if (normalizedColor === "verde" || normalizedColor === "#16a34a" || normalizedName.includes("optimo")) return "verde"
   if (normalizedColor === "amarillo" || normalizedColor === "#d97706" || normalizedName.includes("aceptable")) return "amarillo"
   return "rojo"
-}
-
-function auditedPeopleMatchUser(answer: Pick<Respuesta, "personasAuditadas">, user: Pick<User, "name" | "email">) {
-  const userKeys = [user.name, user.email].map(normalizeLookupValue).filter(Boolean)
-  const auditedKeys = (answer.personasAuditadas ?? []).map(normalizeLookupValue).filter(Boolean)
-
-  return auditedKeys.some((auditedKey) =>
-    userKeys.some((userKey) => auditedKey === userKey || auditedKey.includes(userKey) || userKey.includes(auditedKey)),
-  )
 }
 
 function normalizeAuditStatus(status: DbAudit["status"]): Auditoria["estado"] {
@@ -395,7 +374,7 @@ export async function fetchAppData(
       ? fetchAllPages((from, to) => {
           let query = supabase
             .from("answers")
-            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url)")
             .eq("auditor_id", currentProfile.id)
           if (scope.controlId) query = query.eq("control_id", scope.controlId)
           return query.range(from, to).abortSignal(signal)
@@ -403,7 +382,7 @@ export async function fetchAppData(
       : fetchAllPages((from, to) => {
           let query = supabase
             .from("answers")
-            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,auditor_id,answer_evidences(file_name,file_url)")
           if (scope.controlId) query = query.eq("control_id", scope.controlId)
           return query.range(from, to).abortSignal(signal)
         }),
@@ -425,7 +404,7 @@ export async function fetchAppData(
       ? await fetchAllPages((from, to) => {
           let query = supabase
             .from("answers")
-            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url)")
             .eq("auditor_id", currentProfile.id)
           if (scope.controlId) query = query.eq("control_id", scope.controlId)
           return query.range(from, to).abortSignal(signal)
@@ -433,7 +412,7 @@ export async function fetchAppData(
       : await fetchAllPages((from, to) => {
           let query = supabase
             .from("answers")
-            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url),audited_response_notes(id,answer_id,user_id,comment,file_url,file_name,created_at)")
+            .select("id,control_id,parameter_id,value,comment,audited_people,audited_roles,answered_at,auditor_id,answer_evidences(file_name,file_url)")
           if (scope.controlId) query = query.eq("control_id", scope.controlId)
           return query.range(from, to).abortSignal(signal)
         })
@@ -574,15 +553,6 @@ export async function fetchAppData(
       personasAuditadas: (answer.audited_people ?? []).filter(Boolean),
       cargosAuditados: (answer.audited_roles ?? []).filter(Boolean),
       areasAuditadas: (answer.audited_areas ?? []).filter(Boolean),
-      descargosAuditado: ((answer.audited_response_notes ?? []) as DbAuditedResponseNote[]).map((note): DescargoAuditado => ({
-        id: note.id,
-        respuestaId: note.answer_id,
-        usuarioId: note.user_id,
-        comentario: note.comment ?? undefined,
-        evidencia: note.file_name ?? undefined,
-        evidenciaUrl: note.file_url ?? undefined,
-        fecha: note.created_at,
-      })),
       fechaRespuesta: answer.answered_at,
       auditorId: answer.auditor_id,
     })),
@@ -597,41 +567,6 @@ export async function fetchAppData(
       leida: notification.read,
       fecha: notification.created_at,
     })),
-  }
-
-  // Un auditado solo recibe controles en los que figura como persona evaluada.
-  if (currentProfile?.role === "auditado") {
-    const auditedControlIds = new Set(
-      appData.respuestas
-        .filter((answer) => auditedPeopleMatchUser(answer, { name: appData.users.find((user) => user.id === currentProfile.id)?.name ?? "", email: appData.users.find((user) => user.id === currentProfile.id)?.email ?? "" }))
-        .map((answer) => answer.controlId),
-    )
-    const assignedLotIds = new Set(
-      appData.loteVerticales
-        .filter((lotVertical) => lotVertical.controles.some((control) => auditedControlIds.has(control.id)))
-        .map((lotVertical) => lotVertical.loteId),
-    )
-    const assignedModelIds = new Set(
-      appData.lotes
-        .filter((lot) => assignedLotIds.has(lot.id))
-        .map((lot) => lot.modeloControlId),
-    )
-
-    return {
-      ...appData,
-      modelos: appData.modelos.filter((model) => assignedModelIds.has(model.id)),
-      lotes: appData.lotes.filter((lot) => assignedLotIds.has(lot.id)),
-      loteVerticales: appData.loteVerticales
-        .filter((lotVertical) => assignedLotIds.has(lotVertical.loteId))
-        .map((lotVertical) => ({
-          ...lotVertical,
-          controles: lotVertical.controles.filter((control) => auditedControlIds.has(control.id)),
-        })),
-      auditorias: appData.auditorias.filter((audit) => auditedControlIds.has(audit.controlId)),
-      respuestas: appData.respuestas.filter((answer) => auditedControlIds.has(answer.controlId)),
-      answeredControlIds: Array.from(auditedControlIds),
-      notificaciones: appData.notificaciones,
-    }
   }
 
   // Los roles de gestión conservan el conjunto autorizado íntegro por RLS.

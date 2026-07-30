@@ -2,13 +2,12 @@
 
 // Administración del catálogo que alimenta la planificación. La pantalla
 // conserva separadas las categorías, aplica alcance por unidad y pagina localmente.
-import { useMemo, useState } from "react"
 import {
-  CircleCheck,
-  CircleOff,
   Boxes,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
+  CircleOff,
   Network,
   Package,
   Pencil,
@@ -17,6 +16,7 @@ import {
   Workflow,
   X,
 } from "lucide-react"
+import { useMemo, useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -40,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   CATALOG_CATEGORIES,
   getCatalogItemError,

@@ -2,13 +2,13 @@
 
 // Caché independiente de notificaciones para actualizar contadores y estados de
 // lectura sin recargar todos los dominios de la aplicación.
-import useSWR from "swr"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
   fetchNotifications,
   setAllNotificationsRead,
   setNotificationRead,
 } from "@/lib/repositories/supabase/notifications"
+import useSWR from "swr"
 
 export function useNotifications() {
   const { appUser } = useAuth()

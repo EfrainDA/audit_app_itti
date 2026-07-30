@@ -1,7 +1,5 @@
 // Reglas puras y contratos del formulario de evaluación. Este módulo no
 // depende de React ni de Supabase y puede validarse con pruebas unitarias.
-import type { DescargoAuditado } from "@/lib/data"
-
 export type RespuestaValor = "cumple" | "intermedio" | "no_cumple" | "na" | null
 
 export interface EditableRespuesta {
@@ -14,7 +12,6 @@ export interface EditableRespuesta {
   fechaRespuesta?: string
   comentario: string
   evidencias: string[]
-  descargosAuditado: DescargoAuditado[]
 }
 
 export type EvaluationAnswerInput = {
@@ -60,7 +57,6 @@ export function createEmptyRespuesta(parametroId: string): EditableRespuesta {
     areas: [""],
     comentario: "",
     evidencias: [],
-    descargosAuditado: [],
   }
 }
 
@@ -69,9 +65,9 @@ export function toAnswerPayload(respuesta: EditableRespuesta): EvaluationAnswerI
     parametroId: respuesta.parametroId,
     valor: respuesta.valor,
     comentario: respuesta.comentario,
-    personasAuditadas: respuesta.personasAuditadas,
-    cargos: respuesta.cargos,
-    areas: respuesta.areas,
+    personasAuditadas: [respuesta.personasAuditadas[0]?.trim() ?? ""],
+    cargos: [respuesta.cargos[0]?.trim() ?? ""],
+    areas: [respuesta.areas[0]?.trim() ?? ""],
     fechaRespuesta: respuesta.fechaRespuesta,
   }
 }

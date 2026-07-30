@@ -1,5 +1,5 @@
 // Índice liviano para la búsqueda global; limita resultados desde la consulta.
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase";
 
 const SEARCH_LIMIT = 250
 

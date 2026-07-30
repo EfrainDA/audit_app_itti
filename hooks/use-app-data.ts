@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
-import useSWR from "swr"
+import { useAuth } from "@/components/auth/auth-provider"
+import { getAppDataScopeKey } from "@/lib/domain/app-data-scope"
 import {
   fetchAppData,
   type AppData,
   type AppDataDomain,
   type AppDataScope,
 } from "@/lib/repositories/supabase/app-data"
-import { useAuth } from "@/components/auth/auth-provider"
-import { getAppDataScopeKey } from "@/lib/domain/app-data-scope"
+import { useEffect, useMemo, useRef } from "react"
+import useSWR from "swr"
 
 const emptyData: AppData = {
   users: [],

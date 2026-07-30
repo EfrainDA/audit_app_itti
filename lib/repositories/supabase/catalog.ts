@@ -1,7 +1,7 @@
 // Persistencia del catálogo mediante una RPC que mantiene atómicas las
 // relaciones entre procesos y productos.
-import type { CatalogItem, CatalogItemCategory } from "@/lib/data"
 import { normalizeSubprocesses } from "@/features/settings/domain/catalog"
+import type { CatalogItem, CatalogItemCategory } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { requireManager } from "./access"
 

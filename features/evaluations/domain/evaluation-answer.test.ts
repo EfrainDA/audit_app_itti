@@ -1,27 +1,29 @@
 import { describe, expect, it } from "vitest"
 import {
   MAX_EVIDENCE_FILE_SIZE,
+  calculateEvaluationScore,
   createEmptyRespuesta,
+  getEvaluationProgress,
   getRespuestaValorLabel,
   isAcceptedEvidenceFile,
   toAnswerPayload,
-  calculateEvaluationScore,
-  getEvaluationProgress,
 } from "./evaluation-answer"
 
 describe("respuestas de evaluación", () => {
   it("crea borradores independientes y genera el payload esperado", () => {
     const answer = createEmptyRespuesta("parameter-1")
-    answer.personasAuditadas.push("Persona")
+    answer.personasAuditadas = [" Persona ", "Segunda persona"]
+    answer.cargos = [" Gerente ", "Otro cargo"]
+    answer.areas = [" Finanzas ", "Otra área"]
 
     expect(createEmptyRespuesta("parameter-2").personasAuditadas).toEqual([""])
     expect(toAnswerPayload(answer)).toEqual({
       parametroId: "parameter-1",
       valor: null,
       comentario: "",
-      personasAuditadas: ["", "Persona"],
-      cargos: [""],
-      areas: [""],
+      personasAuditadas: ["Persona"],
+      cargos: ["Gerente"],
+      areas: ["Finanzas"],
       fechaRespuesta: undefined,
     })
   })

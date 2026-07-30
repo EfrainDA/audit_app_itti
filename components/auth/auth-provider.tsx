@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
-import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
 import type { User } from "@/lib/data"
+import { supabase } from "@/lib/supabase"
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 
 type AuthContextValue = {
   session: Session | null

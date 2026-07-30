@@ -1,8 +1,9 @@
 "use client"
-// Panel por rol derivado de los mismos datos para analistas, auditados, supervisores y dirección.
-import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+// Panel por rol derivado de los mismos datos para analistas, supervisores y dirección.
+import { useAuth } from "@/components/auth/auth-provider"
+import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
 import { ContentSkeleton, ErrorState } from "@/components/ui/async-state"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -11,39 +12,37 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
 import {
-  Crown,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCheck,
-} from "lucide-react"
+  getActiveCycle,
+  getCounts,
+  getDaysUntil,
+} from "@/features/dashboard/domain/metrics"
+import { useAppData } from "@/hooks/use-app-data"
 import {
   isCountableLote,
   type Ciclo,
   type Lote,
   type Respuesta,
 } from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { useAuth } from "@/components/auth/auth-provider"
 import {
-  getActiveCycle,
-  getCounts,
-  getDaysUntil,
-} from "@/features/dashboard/domain/metrics"
-import { useExecutiveDashboard } from "@/features/dashboard/application/use-executive-dashboard"
-import { DashboardCycleFilter } from "@/components/dashboard/dashboard-cycle-filter"
+  Crown,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserCheck,
+} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 // Tipos intermedios para calcular métricas sin acoplarlas al JSX.
-import { DashboardView, ControlContext, RoleDashboard, SupervisorAnalystSummary, CeoCycleSummary, LotSummaryIndexes, appendToIndex, buildLotSummary, buildParameterDistribution, ParameterDistribution, getControlCategory, getUniqueNonEmpty, findSimilarVerticalGroupKey, averageUnitScore } from "./dashboard-model"
+import { CeoCycleSummary, ControlContext, DashboardView, LotSummaryIndexes, ParameterDistribution, RoleDashboard, SupervisorAnalystSummary, appendToIndex, averageUnitScore, buildLotSummary, buildParameterDistribution, findSimilarVerticalGroupKey, getControlCategory, getUniqueNonEmpty } from "./dashboard-model"
 
-import { KpiCard, AnalystProgressPanel, AnalystAssignedTable } from "./analyst-dashboard"
+import { AnalystAssignedTable, AnalystProgressPanel, KpiCard } from "./analyst-dashboard"
 
-import { SupervisorCycleProgress, SupervisorCycleMeta, SupervisorFocusPanel, SupervisorLoteProgress, SupervisorAnalystAssignments, SupervisorInsightStrip, SupervisorRiskMonitor } from "./supervisor-dashboard"
+import { SupervisorAnalystAssignments, SupervisorCycleMeta, SupervisorCycleProgress, SupervisorFocusPanel, SupervisorInsightStrip, SupervisorLoteProgress, SupervisorRiskMonitor } from "./supervisor-dashboard"
 
-import { CeoScoreCard, CeoMetricCard, CeoGroupHealth, CeoHistoricalChart, CeoRanking, CeoSemaphoreMatrix } from "./ceo-dashboard"
+import { CeoGroupHealth, CeoHistoricalChart, CeoMetricCard, CeoRanking, CeoScoreCard, CeoSemaphoreMatrix } from "./ceo-dashboard"
 import { CeoParameterDistribution } from "./ceo-parameter-distribution"
 
 const YEAR_KEY = "a\u00f1o"
-type AuditedControlContext = ControlContext & { respuestas: Respuesta[] }
 
 // Aplica filtros, deriva métricas y elige la vista correspondiente al rol.
 export function DashboardContent() {
@@ -173,21 +172,6 @@ export function DashboardContent() {
     allControls.forEach((control) => {
       if (control.auditorId) appendToIndex(controlsByAuditorId, control.auditorId, control)
     })
-    const auditedControlIds = new Set(
-      respuestas
-        .filter((answer) => (answer.personasAuditadas?.length ?? 0) > 0)
-        .map((answer) => answer.controlId),
-    )
-    const auditedControls: AuditedControlContext[] = allControls
-      .filter((control) => auditedControlIds.has(control.id))
-      .filter((control) => control.estado === "en_replica" || control.estado === "terminado" || control.estado === "terminada")
-      .map((control) => ({
-        ...control,
-        respuestas: (answersByControlId.get(control.id) ?? []).filter((answer) =>
-          answer.controlId === control.id &&
-          (answer.personasAuditadas?.length ?? 0) > 0
-        ),
-      }))
     const analystAuditorId = isAuditor ? appUser?.id : users.find((user) => user.role === "auditor")?.id
     const analystControls = allControls.filter((control) => control.auditorId === analystAuditorId)
     const analystAssignedLotes = activeLotes.filter((lote) => analystAuditorId ? lote.auditores.includes(analystAuditorId) : false)
@@ -314,7 +298,6 @@ export function DashboardContent() {
       activeLotes,
       allControls,
       unassignedControls: allControls.filter((control) => !control.auditorId).length,
-      auditedControls,
       analystControls,
       analystOpenControls,
       globalCounts,
@@ -671,7 +654,7 @@ export function DashboardContent() {
         <CeoScoreCard score={ceoCurrentScore} delta={ceoDelta} thresholds={appData.umbrales} />
         <CeoMetricCard title="Unidades de negocio evaluadas" value={unitCount} detail={ceoFilteredLotes.map((lote) => lote.unidadNombre).join(", ") || "Sin unidades evaluadas"} />
         <CeoMetricCard title="Productos evaluados" value={productCount} detail="Controles clasificados como producto" />
-        <CeoMetricCard title="Procesos evaluados" value={processCount} detail="Procesos y subprocesos auditados" />
+        <CeoMetricCard title="Procesos evaluados" value={processCount} detail="Procesos y subprocesos revisados" />
       </section>
 
       <section className="grid gap-3 xl:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)]">

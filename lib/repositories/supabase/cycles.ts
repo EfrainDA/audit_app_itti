@@ -1,7 +1,7 @@
 // Ciclos de evaluación. La creación usa una RPC para validar el período dentro
 // de la misma transacción que inserta el registro.
-import type { Ciclo } from "@/lib/data"
 import { getCycleDates, type CycleInput } from "@/features/settings/domain/cycles"
+import type { Ciclo } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { requireManager } from "./access"
 

@@ -1,12 +1,12 @@
 "use client"
 
 // Editor de rangos semánticos consumidos por todos los dashboards.
-import type { Dispatch, SetStateAction } from "react"
-import type { Umbral } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import type { Umbral } from "@/lib/data"
+import type { Dispatch, SetStateAction } from "react"
 import { SettingsSectionHeader } from "./settings-section-header"
 
 export type ThresholdDrafts = Record<string, { min: number; max: number }>

@@ -1,67 +1,30 @@
 "use client"
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Listado que combina lotes, verticales, controles y respuestas para filtrar resultados.
-import { useMemo, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ContentSkeleton, ErrorState } from "@/components/ui/async-state"
-import { Input } from "@/components/ui/input"
-import { RealisticIcon } from "@/components/ui/realistic-icon"
-import {
-  AlertCircle,
-  Building2,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardCheck,
-  Clock,
-  Download,
-  Filter,
-  Search,
-} from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  type Control,
-  type Lote,
-  type LoteVertical,
-  getScoreColor,
-  getEstadoBadgeColor,
-  formatEstado,
-  isCountableLote,
-  getControlDisplayEstado,
-} from "@/lib/data"
-import { useAppData } from "@/hooks/use-app-data"
-import { fetchAnswersForControl } from "@/lib/repositories/supabase/evaluations"
-import { getErrorMessage } from "@/lib/error-message"
-import { downloadPptx, downloadXlsx } from "@/lib/export"
 import {
   controlMatchesFilters,
   getCompleteLotVerticals,
   matchesControlStatus,
 } from "@/features/evaluations/domain/evaluation-list"
+import { useAppData } from "@/hooks/use-app-data"
+import {
+  type Control,
+  type Lote,
+  type LoteVertical,
+  formatEstado,
+  getControlDisplayEstado,
+  isCountableLote
+} from "@/lib/data"
+import { getErrorMessage } from "@/lib/error-message"
+import { downloadPptx, downloadXlsx } from "@/lib/export"
+import { fetchAnswersForControl } from "@/lib/repositories/supabase/evaluations"
+import { useMemo, useState } from "react"
 
 const YEAR_KEY = "a\u00f1o"
 
 interface LoteConDatos extends Lote {
+  nombreLote: string
   unidadNombre: string
   unidadLogo?: string
   modeloNombre: string
@@ -136,6 +99,7 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
 
       return {
         ...lote,
+        nombreLote: `${unidad?.nombre || "Unidad sin nombre"} · ${modelo?.nombre || "Modelo sin nombre"}`,
         unidadNombre: unidad?.nombre || "N/A",
         unidadLogo: unidad?.logo,
         modeloNombre: modelo?.nombre || "N/A",
@@ -255,7 +219,7 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
           )
         : new Map<string, Awaited<ReturnType<typeof fetchAnswersForControl>>>()
       const today = new Date().toLocaleDateString("es-PY")
-      const safeName = lote.unidadNombre
+      const safeName = lote.nombreLote
         .replace(/[^\w-]+/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "")
@@ -268,7 +232,7 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
           { value: "Parámetro", styleId: "GreenHeaderCenter" },
           { value: "Puntos base", styleId: "GreenHeaderCenter" },
           { value: "Respuesta", styleId: "GreenHeaderCenter" },
-          { value: "Personas auditadas", styleId: "GreenHeaderCenter" },
+          { value: "Personas evaluadas", styleId: "GreenHeaderCenter" },
           { value: "Cargo", styleId: "GreenHeaderCenter" },
           { value: "Área", styleId: "GreenHeaderCenter" },
           { value: "Comentario / hallazgo", styleId: "GreenHeaderCenter" },
@@ -438,9 +402,10 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
         }))
       ]
       const detailRows = [
-        [{ value: `${lote.unidadNombre} - Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`, styleId: "TitleCenter", mergeAcross: 5 }],
+        [{ value: "INFORME DE EVALUACIÓN", styleId: "TitleCenter", mergeAcross: 5 }],
         ["", "", "", "", "", ""],
         [{ value: "DETALLES DEL LOTE", styleId: "DarkHeader", mergeAcross: 5 }],
+        [{ value: "Nombre del lote", styleId: "DetailLabel" }, { value: lote.nombreLote, styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Unidad evaluada", styleId: "DetailLabel" }, { value: lote.unidadNombre, styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Modelo de control", styleId: "DetailLabel" }, { value: lote.modeloNombre, styleId: "DetailValue", mergeAcross: 4 }],
         [{ value: "Ciclo", styleId: "DetailLabel" }, { value: `Ciclo ${lote.ciclo} - ${lote[YEAR_KEY]}`, styleId: "DetailValue", mergeAcross: 4 }],
@@ -482,7 +447,7 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
               { value: "CÓDIGO DEL PROCEDIMIENTO", styleId: "DarkHeaderCenter" },
               { value: "ÁREA", styleId: "DarkHeaderCenter" },
               { value: "ADHERENCIA AL PROCESO", styleId: "DarkHeaderCenter" },
-              { value: "PERSONAS AUDITADAS - CargoS", styleId: "DarkHeaderCenter" },
+              { value: "PERSONAS EVALUADAS - CARGOS", styleId: "DarkHeaderCenter" },
               { value: "ANALISTA DE CALIDAD", styleId: "DarkHeaderCenter" },
               { value: "FECHA DE CONTROL", styleId: "DarkHeaderCenter" },
               { value: "COMENTARIOS", styleId: "DarkHeaderCenter" },
@@ -518,7 +483,7 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
         downloadPptx(`${safeName}-presentation-ciclo-${lote.ciclo}-${lote[YEAR_KEY]}.pptx`, [
           {
             eyebrow: "Informe de evaluación",
-            title: `${lote.unidadNombre}\nCiclo ${lote.ciclo} - ${lote[YEAR_KEY]}`,
+            title: `${lote.nombreLote}\nCiclo ${lote.ciclo} - ${lote[YEAR_KEY]}`,
             subtitle: `${lote.modeloNombre} | ${lote.auditoresNombres || "Sin auditores asignados"}`,
             metrics: [
               { label: "Calificacion final", value: lote.calificacionFinal !== null ? `${lote.calificacionFinal}%` : "-" },
@@ -567,9 +532,9 @@ export function useEvaluacionesContentController({ view = "evaluaciones" }: Eval
           },
         ])
       } else {
-        downloadXlsx(`${safeName}-informe-ciclo-${lote.ciclo}-${lote[YEAR_KEY]}.xlsx`, [
+        downloadXlsx(`evaluacion-${safeName}-ciclo-${lote.ciclo}-${lote[YEAR_KEY]}.xlsx`, [
           ...excelSheets,
-          { name: "Respuestas", rows: respuestasRows, columns: [220, 150, 320, 100, 140, 220, 180, 420] },
+          { name: "Respuestas", rows: respuestasRows, columns: [180, 220, 320, 100, 140, 220, 160, 160, 420] },
         ])
       }
       setIsExportOpen(false)

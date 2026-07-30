@@ -1,10 +1,10 @@
 "use client"
 
+import type { Umbral } from "@/lib/data"
+import { getErrorMessage } from "@/lib/error-message"
+import { updateThresholds } from "@/lib/repositories/supabase/settings"
 import { useState } from "react"
 import { useSWRConfig } from "swr"
-import type { Umbral } from "@/lib/data"
-import { updateThresholds } from "@/lib/repositories/supabase/settings"
-import { getErrorMessage } from "@/lib/error-message"
 import { ThresholdSettingsPanel, type ThresholdDrafts } from "./threshold-settings-panel"
 
 export function ThresholdsSettings({ thresholds, canManage, onChanged }: { thresholds: Umbral[]; canManage: boolean; onChanged: () => Promise<void> }) {

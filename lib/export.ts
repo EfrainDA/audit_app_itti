@@ -202,6 +202,20 @@ function getXlsxSheetXml(sheet: ExcelSheet) {
     : ""
   const rows = sheet.rows.map((row, rowIndex) => {
     let columnIndex = 1
+    const rowStyleIds = row.map((cell) => getStyleId(cell, rowIndex))
+    const headerStyleIds = new Set<number>([
+      excelStyleIds.DarkHeader,
+      excelStyleIds.DarkHeaderCenter,
+      excelStyleIds.GreenHeader,
+      excelStyleIds.GreenHeaderCenter,
+      excelStyleIds.BlueHeader,
+      excelStyleIds.BlueHeaderCenter,
+    ])
+    const rowHeight = rowStyleIds.includes(excelStyleIds.TitleCenter)
+      ? 28
+      : rowStyleIds.some((styleId) => headerStyleIds.has(styleId))
+        ? 26
+        : 22
     const cells = row.map((cell) => {
       const value = getCellValue(cell)
       const styleId = getStyleId(cell, rowIndex)
@@ -218,7 +232,7 @@ function getXlsxSheetXml(sheet: ExcelSheet) {
 
       return `<c r="${cellRef}" s="${styleId}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`
     }).join("")
-    return `<row r="${rowIndex + 1}">${cells}</row>`
+    return `<row r="${rowIndex + 1}" ht="${rowHeight}" customHeight="1">${cells}</row>`
   }).join("")
   const merges = mergeRefs.length
     ? `<mergeCells count="${mergeRefs.length}">${mergeRefs.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>`
@@ -226,9 +240,13 @@ function getXlsxSheetXml(sheet: ExcelSheet) {
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="22"/>
   ${cols}
   <sheetData>${rows}</sheetData>
   ${merges}
+  <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.2" footer="0.2"/>
+  <pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>
 </worksheet>`
 }
 

@@ -2,8 +2,8 @@
 
 // Distribución ejecutiva de parámetros por resultado. El diálogo permite
 // inspeccionar los elementos de cada categoría sin sobrecargar el gráfico.
-import { useState } from "react"
 import { CheckCircle2, ChevronRight, CircleAlert, CircleDot } from "lucide-react"
+import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
