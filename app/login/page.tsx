@@ -26,6 +26,7 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
+  const [isGoogleEnabled, setIsGoogleEnabled] = useState<boolean | null>(null)
   const [isResettingPassword, setIsResettingPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +37,20 @@ function LoginContent() {
     }
   }, [router, session])
 
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !anonKey) return setIsGoogleEnabled(false)
+
+    fetch(`${supabaseUrl}/auth/v1/settings`, { headers: { apikey: anonKey } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo consultar la configuración de acceso.")
+        const settings = await response.json() as { external?: { google?: boolean } }
+        setIsGoogleEnabled(settings.external?.google === true)
+      })
+      .catch(() => setIsGoogleEnabled(false))
+  }, [])
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
@@ -44,13 +59,13 @@ function LoginContent() {
 
     try {
       if (mode === "login") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (signInError) throw signInError
-        router.replace(LOGIN_DESTINATION)
+        router.replace(signInData.user.app_metadata?.must_change_password === true ? "/change-password" : LOGIN_DESTINATION)
         return
       }
 
@@ -91,6 +106,10 @@ function LoginContent() {
   const handleGoogleAccess = async () => {
     setError(null)
     setMessage(null)
+    if (isGoogleEnabled !== true) {
+      setError("El acceso con Gmail todavía no está habilitado. Contacta al administrador.")
+      return
+    }
     setIsGoogleSubmitting(true)
 
     try {
@@ -127,7 +146,9 @@ function LoginContent() {
     setIsResettingPassword(true)
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
+        redirectTo: typeof window !== "undefined"
+          ? `${(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, "")}/reset-password`
+          : undefined,
       })
 
       if (resetError) throw resetError
@@ -290,7 +311,7 @@ function LoginContent() {
                   type="button"
                   variant="outline"
                   className="h-11 w-full rounded-md bg-white text-slate-700 hover:bg-slate-50"
-                  disabled={isGoogleSubmitting || isSubmitting}
+                  disabled={isGoogleSubmitting || isSubmitting || isGoogleEnabled === null}
                   onClick={handleGoogleAccess}
                 >
                   {isGoogleSubmitting ? (
@@ -315,7 +336,7 @@ function LoginContent() {
                       />
                     </svg>
                   )}
-                  Gmail
+                  {isGoogleEnabled === null ? "Verificando Gmail..." : "Gmail"}
                 </Button>
               </div>
 

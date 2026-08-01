@@ -18,6 +18,20 @@ type CreateControlInput = {
   auditorId?: string
 }
 
+async function requireOpenLot(lotId: string) {
+  const { data, error } = await supabase.from("lots").select("status").eq("id", lotId).single()
+  if (error) throw error
+  if (data.status !== "abierto") throw new Error("El lote ya no está abierto y no admite modificaciones.")
+}
+
+async function requireOpenLotForControl(controlId: string) {
+  const { data: control, error: controlError } = await supabase.from("controls").select("lot_vertical_id").eq("id", controlId).single()
+  if (controlError) throw controlError
+  const { data: vertical, error: verticalError } = await supabase.from("lot_verticals").select("lot_id").eq("id", control.lot_vertical_id).single()
+  if (verticalError) throw verticalError
+  await requireOpenLot(vertical.lot_id)
+}
+
 export async function createLot(input: {
   businessUnitId: string
   modelId: string
@@ -49,6 +63,7 @@ export async function updateLotStatus(id: string, status: Lote["estado"]) {
 
 export async function addLotAuditor(lotId: string, auditorId: string) {
   await requireManager()
+  await requireOpenLot(lotId)
   const { error } = await supabase
     .from("lot_auditors")
     .upsert({ lot_id: lotId, auditor_id: auditorId }, { onConflict: "lot_id,auditor_id" })
@@ -88,6 +103,7 @@ function controlPayload(input: Omit<CreateControlInput, "lotVerticalId" | "lotId
 }
 
 export async function createControl(input: CreateControlInput) {
+  if (input.lotId) await requireOpenLot(input.lotId)
   const lotVerticalId = await resolveLotVertical(input)
   const { error } = await supabase.from("controls").insert({
     lot_vertical_id: lotVerticalId,
@@ -99,11 +115,13 @@ export async function createControl(input: CreateControlInput) {
 
 export async function updateControl(input: Omit<CreateControlInput, "lotVerticalId" | "lotId" | "verticalId"> & { id: string }) {
   const { id, ...values } = input
+  await requireOpenLotForControl(id)
   const { error } = await supabase.from("controls").update(controlPayload(values)).eq("id", id)
   if (error) throw error
 }
 
 export async function deleteControl(id: string) {
+  await requireOpenLotForControl(id)
   const { error } = await supabase.from("controls").delete().eq("id", id)
   if (error) throw error
 }

@@ -9,6 +9,7 @@ export interface User {
   role: "admin" | "ceo" | "supervisor" | "auditor"
   status: "activo" | "inactivo"
   avatar?: string
+  mustChangePassword?: boolean
 }
 
 export interface UnidadNegocio {

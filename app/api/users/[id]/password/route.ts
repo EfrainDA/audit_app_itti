@@ -123,7 +123,15 @@ export async function POST(
       }
     }
 
-    const { error } = await adminClient.auth.admin.updateUserById(authUserId, { password })
+    const { data: currentAuthUser, error: getUserError } = await adminClient.auth.admin.getUserById(authUserId)
+    if (getUserError) throw getUserError
+    const { error } = await adminClient.auth.admin.updateUserById(authUserId, {
+      password,
+      app_metadata: {
+        ...currentAuthUser.user.app_metadata,
+        must_change_password: true,
+      },
+    })
     if (error) throw error
 
     logServerEvent("info", "admin_password_changed", {

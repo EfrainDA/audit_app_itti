@@ -54,7 +54,7 @@ return (
             <User className="h-4 w-4" />
             Equipo de Control de Calidad ({auditores.length})
           </h3>
-          {canManageLots && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          {canManageLots && lote.estado === "abierto" && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Select value={auditorToAdd} onValueChange={setAuditorToAdd}>
               <SelectTrigger className="h-9 bg-secondary border-border sm:w-64">
                 <SelectValue placeholder="Agregar analista o especialista" />
@@ -164,10 +164,12 @@ return (
                         const subprocesosLabel = control.correspondeProceso ? getSubprocesosLabel(control) : ""
                         const displayEstado = getControlDisplayEstado(control, answeredControlIds)
                         const isFinishedControl = displayEstado === "terminado"
-                        const canManageThisControl =
-                          lote.estado === "abierto" &&
+                        const canManageThisControl = lote.estado === "abierto" && (
+                          canManageLots || (
                           !isFinishedControl &&
                           canEditAssignedControl(appUser?.role, appUser?.id, control.auditorId)
+                          )
+                        )
                         
                         return (
                           <div

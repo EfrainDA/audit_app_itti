@@ -13,11 +13,12 @@ import useSWR from "swr"
 export function useNotifications() {
   const { appUser } = useAuth()
   const userId = appUser?.id
+  const notificationRole = appUser?.role === "auditor" || appUser?.role === "supervisor" ? appUser.role : null
   const query = useSWR(
-    userId ? ["notifications", userId] : null,
-    async ([, requestedUserId]: [string, string]) => {
+    userId && notificationRole ? ["notifications", userId, notificationRole] : null,
+    async ([, requestedUserId, requestedRole]: [string, string, "auditor" | "supervisor"]) => {
       const controller = new AbortController()
-      return fetchNotifications(requestedUserId, controller.signal)
+      return fetchNotifications(requestedUserId, requestedRole, controller.signal)
     },
     {
       keepPreviousData: false,

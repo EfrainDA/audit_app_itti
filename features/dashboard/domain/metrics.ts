@@ -53,6 +53,19 @@ export function getActiveCycle(cycles: Ciclo[]): Ciclo {
   }) ?? cycles[cycles.length - 1] ?? getVirtualCurrentCycle()
 }
 
+// Restringe el filtro a los tres ciclos completos inmediatamente anteriores.
+export function getPreviousDashboardCycles(cycles: Ciclo[], activeCycle: Ciclo, limit = 3): Ciclo[] {
+  const activePosition = activeCycle[YEAR_KEY] * 10 + activeCycle.bimestre
+
+  return [...cycles]
+    .filter((cycle) => cycle.id !== activeCycle.id && cycle[YEAR_KEY] * 10 + cycle.bimestre < activePosition)
+    .sort((first, second) => {
+      const yearDiff = second[YEAR_KEY] - first[YEAR_KEY]
+      return yearDiff || second.bimestre - first.bimestre
+    })
+    .slice(0, limit)
+}
+
 export function getCounts(controls: CountableControl[], answeredControlIds: Set<string> = new Set()): CountMetrics {
   const completed = controls.filter((control) => control.estado === "terminado" || control.estado === "terminada").length
   const isStarted = (control: CountableControl) =>

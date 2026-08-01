@@ -4,6 +4,7 @@ import {
   getCounts,
   getDaysUntil,
   getExecutiveScoreTone,
+  getPreviousDashboardCycles,
   getSemaphore,
 } from "./metrics"
 
@@ -75,6 +76,25 @@ describe("metricas del dashboard", () => {
     expect(getExecutiveScoreTone(59).label).toBe("Crítico")
     expect(getExecutiveScoreTone(60).label).toBe("Aceptable")
     expect(getExecutiveScoreTone(85).label).toBe("Óptimo")
+  })
+
+  it("limita el filtro a los tres ciclos anteriores al vigente", () => {
+    const makeCycle = (id: string, year: number, bimester: number) => ({
+      id, año: year, bimestre: bimester, mesInicio: 1, mesFin: 2,
+      fechaInicio: `${year}-01-01`, fechaFin: `${year}-02-28`,
+    })
+    const cycles = [
+      makeCycle("old", 2025, 6),
+      makeCycle("previous-3", 2026, 1),
+      makeCycle("previous-2", 2026, 2),
+      makeCycle("previous-1", 2026, 3),
+      makeCycle("active", 2026, 4),
+      makeCycle("future", 2026, 5),
+    ]
+
+    expect(getPreviousDashboardCycles(cycles, cycles[4]).map((cycle) => cycle.id)).toEqual([
+      "previous-1", "previous-2", "previous-3",
+    ])
   })
 
   it("clasifica el score con los umbrales configurados en Ajustes", () => {

@@ -65,6 +65,7 @@ export function ModelosContent() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [modelToDelete, setModelToDelete] = useState<ModeloControl | null>(null)
+  const [modelToDeprecate, setModelToDeprecate] = useState<ModeloControl | null>(null)
 
   const filteredModelos = modelos.filter((modelo) => {
     const matchesEstado =
@@ -222,7 +223,7 @@ export function ModelosContent() {
                     {modelo.estado === 'publicado' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); handleModelAction(() => updateControlModelStatus(modelo.id, "deprecado")); }} className="text-status-danger-text">
+                        <DropdownMenuItem disabled={!canManageModels} onClick={(e) => { e.stopPropagation(); setModelToDeprecate(modelo); }} className="text-status-danger-text">
                           <Archive className="h-4 w-4 mr-2" />
                           Dar de baja
                         </DropdownMenuItem>
@@ -293,6 +294,16 @@ export function ModelosContent() {
           await refresh()
           setActionSuccess(`El modelo “${name}” fue eliminado.`)
         }}
+      />
+      <ConfirmDestructiveDialog
+        open={Boolean(modelToDeprecate)}
+        onOpenChange={(next) => { if (!next) setModelToDeprecate(null) }}
+        title="Deprecar modelo de control"
+        description={`¿Estás seguro de que deseas deprecar el modelo “${modelToDeprecate?.nombre ?? ""}”? Dejará de estar disponible para nuevas planificaciones.`}
+        confirmLabel="Sí, deprecar"
+        pendingLabel="Deprecando..."
+        errorMessage="No se pudo deprecar el modelo."
+        onConfirm={async () => { if (!modelToDeprecate) return; await handleModelAction(() => updateControlModelStatus(modelToDeprecate.id, "deprecado")) }}
       />
 
       {/* Modelo Detail Dialog */}

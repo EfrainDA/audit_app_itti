@@ -68,7 +68,7 @@ export async function createUserProfile(input: {
   area?: string
 }) {
   await requireAdminProfile()
-  const { error } = await supabase.from("users").insert({
+  const { data, error } = await supabase.from("users").insert({
     name: input.name.trim(),
     email: input.email.trim(),
     company: input.company?.trim() || null,
@@ -76,6 +76,7 @@ export async function createUserProfile(input: {
     area: input.area?.trim() || null,
     role: input.role,
     status: "activo",
-  })
+  }).select("id").single<{ id: string }>()
   if (error) throw error
+  return data
 }

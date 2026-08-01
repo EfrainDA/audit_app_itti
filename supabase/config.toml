@@ -31,8 +31,8 @@ file_size_limit = "10MiB"
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+site_url = "https://audit-app-itti.vercel.app"
+additional_redirect_urls = ["https://audit-app-itti.vercel.app/reset-password", "http://localhost:3000/reset-password"]
 jwt_expiry = 3600
 enable_signup = false
 enable_anonymous_sign_ins = false

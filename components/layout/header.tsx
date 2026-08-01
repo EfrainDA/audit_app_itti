@@ -39,8 +39,10 @@ function getNotificationHref(notification: Notificacion) {
   const title = normalizeSearch(notification.titulo)
   const message = normalizeSearch(notification.mensaje)
   const evaluationHref = notification.mensaje.match(/\/evaluaciones\/[0-9a-f-]{32,36}/i)?.[0]
+  const planningHref = notification.mensaje.match(/\/planificacion\/[0-9a-f-]{32,36}/i)?.[0]
 
   if (evaluationHref) return evaluationHref
+  if (planningHref) return planningHref
   if (title.includes("auditor termino")) return "/"
   if (title.includes("lote") || message.includes("lote")) return "/planificacion"
   if (title.includes("control") || title.includes("reasignacion") || message.includes("control")) return "/evaluaciones"
@@ -361,7 +363,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           )}
         </div>
 
-        <DropdownMenu>
+        {(appUser?.role === "auditor" || appUser?.role === "supervisor") && <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
@@ -411,7 +413,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               </div>
             )}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

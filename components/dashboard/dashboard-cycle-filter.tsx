@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Ciclo } from "@/lib/data"
+import { getPreviousDashboardCycles } from "@/features/dashboard/domain/metrics"
 
 const YEAR_KEY = "a\u00f1o"
 
@@ -24,10 +25,7 @@ export function DashboardCycleFilter({
   value: string
   onValueChange: (value: string) => void
 }) {
-  const cycleOptions = [...cycles].sort((first, second) => {
-    const yearDiff = second[YEAR_KEY] - first[YEAR_KEY]
-    return yearDiff || second.bimestre - first.bimestre
-  })
+  const cycleOptions = getPreviousDashboardCycles(cycles, activeCycle)
 
   return (
     <div className="flex w-full justify-end sm:w-auto">

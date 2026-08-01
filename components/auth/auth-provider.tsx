@@ -36,7 +36,7 @@ function mapProfile(row: {
   company: string | null
   cargo: string | null
   area: string | null
-}): User {
+}, mustChangePassword = false): User {
   return {
     id: row.id,
     name: row.name,
@@ -47,6 +47,7 @@ function mapProfile(row: {
     company: row.company ?? undefined,
     cargo: row.cargo ?? undefined,
     area: row.area ?? undefined,
+    mustChangePassword,
   }
 }
 
@@ -65,7 +66,7 @@ async function ensureProfile(currentSession: Session, signal: AbortSignal): Prom
     throw new Error(body?.error ?? "No se pudo cargar el perfil del usuario.")
   }
 
-  return mapProfile(body.profile)
+  return mapProfile(body.profile, currentSession.user.app_metadata?.must_change_password === true)
 }
 
 function getProfileErrorMessage(error: unknown) {

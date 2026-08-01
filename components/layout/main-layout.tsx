@@ -22,10 +22,12 @@ export function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     if (!isLoading && !session) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`)
+    } else if (!isLoading && appUser?.mustChangePassword && pathname !== "/change-password") {
+      router.replace("/change-password")
     }
-  }, [isLoading, pathname, router, session])
+  }, [appUser?.mustChangePassword, isLoading, pathname, router, session])
 
-  const isRoleBlockedPath = Boolean(appUser && !canAccessPath(appUser.role, pathname))
+  const isRoleBlockedPath = Boolean(appUser && !appUser.mustChangePassword && !canAccessPath(appUser.role, pathname))
   const routeDefinition = getRouteDefinition(pathname)
   useEffect(() => {
     if (!isLoading && session && isRoleBlockedPath) {

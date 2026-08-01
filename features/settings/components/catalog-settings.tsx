@@ -21,6 +21,7 @@ import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -113,6 +114,7 @@ export function CatalogSettings({
   const [success, setSuccess] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [changingStatusId, setChangingStatusId] = useState<string | null>(null)
+  const [itemToDeactivate, setItemToDeactivate] = useState<CatalogItem | null>(null)
 
   const definition = CATALOG_CATEGORIES.find((item) => item.id === category) ?? CATALOG_CATEGORIES[0]
 
@@ -415,7 +417,7 @@ export function CatalogSettings({
                             disabled={changingStatusId !== null}
                             aria-label={item.estado === "activo" ? `Inactivar ${item.nombre}` : `Activar ${item.nombre}`}
                             title={item.estado === "activo" ? "Inactivar" : "Activar"}
-                            onClick={() => void changeStatus(item)}
+                            onClick={() => { if (item.estado === "activo") setItemToDeactivate(item); else void changeStatus(item) }}
                           >
                             {changingStatusId === item.id
                               ? <span className="h-4 w-4 animate-pulse rounded-full bg-current/40" />
@@ -584,6 +586,16 @@ export function CatalogSettings({
           </div>
         </DialogContent>
       </Dialog>
+      <ConfirmDestructiveDialog
+        open={Boolean(itemToDeactivate)}
+        onOpenChange={(next) => { if (!next) setItemToDeactivate(null) }}
+        title={`Inactivar ${definition.singular.toLocaleLowerCase()}`}
+        description={`¿Estás seguro de que deseas inactivar “${itemToDeactivate?.nombre ?? ""}”? Dejará de estar disponible para nuevas selecciones.`}
+        confirmLabel="Sí, inactivar"
+        pendingLabel="Inactivando..."
+        errorMessage="No se pudo inactivar el registro."
+        onConfirm={async () => { if (itemToDeactivate) await changeStatus(itemToDeactivate) }}
+      />
     </>
   )
 }

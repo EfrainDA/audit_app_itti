@@ -1,5 +1,6 @@
 // Lectura y marcado de notificaciones del usuario autenticado.
 import type { Notificacion } from "@/lib/data"
+import type { AppRole } from "@/lib/domain/permissions"
 import { supabase } from "@/lib/supabase"
 
 const PAGE_SIZE = 500
@@ -14,7 +15,14 @@ type NotificationRow = {
   created_at: string
 }
 
-export async function fetchNotifications(userId: string, signal: AbortSignal): Promise<Notificacion[]> {
+const TITLES_BY_ROLE: Partial<Record<AppRole, string[]>> = {
+  auditor: ["Lote asignado"],
+  supervisor: ["Auditor terminó su asignación", "Lote completado al 100%"],
+}
+
+export async function fetchNotifications(userId: string, role: AppRole, signal: AbortSignal): Promise<Notificacion[]> {
+  const allowedTitles = TITLES_BY_ROLE[role] ?? []
+  if (!allowedTitles.length) return []
   const rows: NotificationRow[] = []
 
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -22,6 +30,7 @@ export async function fetchNotifications(userId: string, signal: AbortSignal): P
       .from("notifications")
       .select("id,user_id,title,message,type,read,created_at")
       .eq("user_id", userId)
+      .in("title", allowedTitles)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
       .abortSignal(signal)
