@@ -5,9 +5,11 @@ import { SaveStatus } from "@/components/ui/async-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { SafeImage } from "@/components/ui/safe-image"
 import { Textarea } from "@/components/ui/textarea"
 import {
   EVIDENCE_FILE_ACCEPT,
@@ -28,7 +30,10 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Eye,
   FileText,
+  Loader2,
   MinusCircle,
   Paperclip,
   Save,
@@ -47,7 +52,13 @@ import { useEvaluacionDetailController } from "./use-evaluacion-detail-controlle
 export function EvaluacionDetail({ controlId }: EvaluacionDetailProps) {
   const controller = useEvaluacionDetailController({ controlId })
   if (!("data" in controller)) return controller
-  const { appUser, control, unidad, vertical, auditor, respuestas, setActiveParametroIndex, autoSaveStatus, formError, isSubmitting, evaluationBlockedReason, canEditEvaluation, displayEstado, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreActual } = controller
+  const { appUser, control, unidad, vertical, auditor, respuestas, evidencePreview, setActiveParametroIndex, autoSaveStatus, formError, isSubmitting, evaluationBlockedReason, canEditEvaluation, displayEstado, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, handleEvidenceFilesChange, handleRemoveEvidenceFile, handlePreviewEvidence, closeEvidencePreview, handleDownloadEvidence, handleSaveDraft, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreActual } = controller
+  const previewExtension = evidencePreview?.evidence.name.split(".").pop()?.toLowerCase() ?? ""
+  const previewIsImage = evidencePreview?.evidence.type?.startsWith("image/")
+    || ["jpg", "jpeg", "png", "webp", "gif"].includes(previewExtension)
+  const previewCanEmbed = evidencePreview?.evidence.type === "application/pdf"
+    || evidencePreview?.evidence.type?.startsWith("text/")
+    || ["pdf", "txt", "csv"].includes(previewExtension)
 return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -275,9 +286,19 @@ return (
                   {currentRespuesta.evidencias.length > 0 && (
                     <div className="grid gap-1.5">
                       {currentRespuesta.evidencias.map((evidence) => (
-                        <div key={evidence} className="flex min-h-7 items-center gap-2 rounded-md border border-border/40 bg-secondary/10 px-2.5 py-1 text-xs">
-                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="truncate text-foreground">{evidence}</span>
+                        <div key={evidence.path} className="flex min-h-8 items-center justify-between gap-2 rounded-md border border-border/40 bg-secondary/10 px-2.5 py-1 text-xs">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <span className="truncate text-foreground" title={evidence.name}>{evidence.name}</span>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" title="Vista previa" aria-label={`Vista previa de ${evidence.name}`} onClick={() => void handlePreviewEvidence(evidence)}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" title="Descargar" aria-label={`Descargar ${evidence.name}`} onClick={() => void handleDownloadEvidence(evidence)}>
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -422,6 +443,51 @@ return (
           </Link>
         </Button>
       </div>
+
+      <Dialog open={Boolean(evidencePreview)} onOpenChange={(open) => { if (!open) closeEvidencePreview() }}>
+        <DialogContent
+          className="flex h-[85vh] w-[calc(100vw-1rem)] max-w-5xl flex-col gap-3 p-4 sm:p-5"
+          closeButtonClassName="flex size-8 items-center justify-center rounded-sm bg-transparent shadow-none"
+        >
+          <DialogHeader className="min-w-0 pr-8">
+            <DialogTitle className="truncate" title={evidencePreview?.evidence.name}>Vista previa: {evidencePreview?.evidence.name}</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-border bg-secondary/20">
+            {evidencePreview?.loading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando evidencia...
+              </div>
+            )}
+            {evidencePreview?.error && <p className="max-w-md px-4 text-center text-sm text-status-danger-text">{evidencePreview.error}</p>}
+            {evidencePreview?.url && previewIsImage && (
+              <SafeImage src={evidencePreview.url} alt={evidencePreview.evidence.name} className="h-full w-full object-contain p-3" />
+            )}
+            {evidencePreview?.url && !previewIsImage && previewCanEmbed && (
+              <iframe src={evidencePreview.url} title={`Vista previa de ${evidencePreview.evidence.name}`} className="h-full w-full border-0 bg-background" />
+            )}
+            {evidencePreview?.url && !previewIsImage && !previewCanEmbed && (
+              <div className="flex max-w-md flex-col items-center gap-3 px-5 text-center">
+                <FileText className="h-10 w-10 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Este formato no admite vista previa en el navegador.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Puedes descargarlo para abrirlo con la aplicación correspondiente.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {evidencePreview && (
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={() => void handleDownloadEvidence(evidencePreview.evidence)}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

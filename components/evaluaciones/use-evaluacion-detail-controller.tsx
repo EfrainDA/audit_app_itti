@@ -15,6 +15,7 @@ import {
   isAcceptedEvidenceFile,
   MAX_EVIDENCE_FILES,
   toAnswerPayload,
+  type EvidenceAttachment,
   type EditableRespuesta as Respuesta,
   type RespuestaValor
 } from "@/features/evaluations/domain/evaluation-answer"
@@ -35,7 +36,7 @@ import {
   saveEvaluationDraft,
   type EvaluationAnswerInput,
 } from "@/lib/repositories/supabase/evaluations"
-import { saveAnswerEvidenceFiles } from "@/lib/repositories/supabase/evidences"
+import { getEvidenceSignedUrl, saveAnswerEvidenceFiles } from "@/lib/repositories/supabase/evidences"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
@@ -80,25 +81,25 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [areAnswersLoading, setAreAnswersLoading] = useState(true)
+  const [evidencePreview, setEvidencePreview] = useState<{
+    evidence: EvidenceAttachment
+    url: string | null
+    loading: boolean
+    error: string | null
+  } | null>(null)
   const router = useRouter()
-  const nowTime = Date.now()
-  const cycleStartsAt = cicloLote ? new Date(`${cicloLote.fechaInicio}T00:00:00`).getTime() : null
-  const cycleEndsAt = cicloLote ? new Date(`${cicloLote.fechaFin}T23:59:59`).getTime() : null
-  const cycleIsEnabled = (cicloLote?.estado ?? "habilitado") === "habilitado"
-  const cycleIsInForce = cycleIsEnabled && cycleStartsAt !== null && cycleEndsAt !== null && nowTime >= cycleStartsAt && nowTime <= cycleEndsAt
-  const evaluationBlockedReason = !cicloLote
-    ? "No se pudo validar el ciclo del lote."
-    : !cycleIsEnabled
-      ? "El ciclo del lote está deshabilitado."
-      : cycleStartsAt !== null && nowTime < cycleStartsAt
-        ? "La evaluación estará disponible cuando el ciclo del lote entre en vigor."
-        : cycleEndsAt !== null && nowTime > cycleEndsAt
-          ? "El ciclo del lote ya finalizó."
-          : null
+  // La vigencia del ciclo no bloquea respuestas: el estado del lote es la
+  // única fuente de verdad. Un administrador o supervisor puede reabrirlo.
+  const lotIsOpen = lote?.estado === "abierto"
+  const evaluationBlockedReason = lote && !lotIsOpen
+    ? lote.estado === "cerrado"
+      ? "El lote está cerrado. Un administrador o supervisor debe volver a abrirlo para admitir respuestas."
+      : "El lote está dado de baja y no admite respuestas."
+    : null
   const canEditEvaluation = !areAnswersLoading
     && appUser?.role === "auditor"
     && canEditAssignedControl(appUser.role, appUser.id, control?.auditorId)
-    && cycleIsInForce
+    && lotIsOpen
   const answeredControlIds = new Set(data.respuestas.map((answer) => answer.controlId))
   const hasLocalAnswers = Object.values(respuestas).some((respuesta) => respuesta.valor !== null)
   if (control && hasLocalAnswers) answeredControlIds.add(control.id)
@@ -132,7 +133,19 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
           )
         // Si el usuario alcanzó a modificar estado local, sus cambios prevalecen
         // sobre la respuesta remota en vez de ser reemplazados.
-        setRespuestas((current) => ({ ...remoteAnswers, ...current }))
+        setRespuestas((current) => {
+          const merged = { ...remoteAnswers }
+          for (const [parameterId, localAnswer] of Object.entries(current)) {
+            merged[parameterId] = {
+              ...(remoteAnswers[parameterId] ?? localAnswer),
+              ...localAnswer,
+              // La lista remota incluye los archivos recién persistidos; el
+              // resto de los campos locales conserva ediciones aún no guardadas.
+              evidencias: remoteAnswers[parameterId]?.evidencias ?? localAnswer.evidencias,
+            }
+          }
+          return merged
+        })
         if (answers.length) setAutoSaveStatus("saved")
       })
       .catch((loadError) => setFormError(getErrorMessage(loadError, "No se pudieron cargar las respuestas.")))
@@ -499,6 +512,37 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
     }))
   }
 
+  const handlePreviewEvidence = async (evidence: EvidenceAttachment) => {
+    setEvidencePreview({ evidence, url: null, loading: true, error: null })
+    try {
+      const signedUrl = await getEvidenceSignedUrl(evidence.path)
+      setEvidencePreview({ evidence, url: signedUrl, loading: false, error: null })
+    } catch (cause) {
+      setEvidencePreview({
+        evidence,
+        url: null,
+        loading: false,
+        error: getErrorMessage(cause, "No se pudo cargar la vista previa."),
+      })
+    }
+  }
+
+  const closeEvidencePreview = () => setEvidencePreview(null)
+
+  const handleDownloadEvidence = async (evidence: EvidenceAttachment) => {
+    try {
+      const signedUrl = await getEvidenceSignedUrl(evidence.path, evidence.name, true)
+      const link = document.createElement("a")
+      link.href = signedUrl
+      link.download = evidence.name
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (cause) {
+      setFormError(getErrorMessage(cause, "No se pudo descargar la evidencia."))
+    }
+  }
+
   // Guarda respuestas incompletas de forma atómica sin cambiar el estado final.
   const handleSaveDraft = async () => {
     if (!canEditEvaluation) return
@@ -510,6 +554,7 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
       await saveEvaluationDraft(controlId, getAnswersPayload())
       await saveAnswerEvidenceFiles(controlId, evidenceFiles)
       setEvidenceFiles({})
+      await refresh()
       setAutoSaveStatus("saved")
     } catch (submitError) {
       setFormError(getErrorMessage(submitError, "No se pudo guardar el borrador."))
@@ -594,5 +639,5 @@ export function useEvaluacionDetailController({ controlId }: EvaluacionDetailPro
     }
   }
 
-    return { controlId, data, isLoading, dataError, refresh, appUser, loteVertical, control, lote, cicloLote, unidad, modelo, vertical, auditor, selectedLote, selectedUnidad, selectedModelo, selectedLoteVerticales, respuestas, setRespuestas, evidenceFiles, setEvidenceFiles, activeParametroIndex, setActiveParametroIndex, autoSaveStatus, setAutoSaveStatus, formError, setFormError, isSubmitting, setIsSubmitting, areAnswersLoading, setAreAnswersLoading, router, nowTime, cycleStartsAt, cycleEndsAt, cycleIsEnabled, cycleIsInForce, evaluationBlockedReason, canEditEvaluation, answeredControlIds, hasLocalAnswers, displayEstado, currentControl, currentLote, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, getAnswersPayload, getAnsweredParamsWithoutComment, validateRequiredComments, handleEvidenceFilesChange, handleRemoveEvidenceFile, handleSaveDraft, evaluationProgress, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentTieneRespuesta, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreCalculado, scoreActual, handleFinalizeEvaluation }
+    return { controlId, data, isLoading, dataError, refresh, appUser, loteVertical, control, lote, cicloLote, unidad, modelo, vertical, auditor, selectedLote, selectedUnidad, selectedModelo, selectedLoteVerticales, respuestas, setRespuestas, evidenceFiles, setEvidenceFiles, evidencePreview, activeParametroIndex, setActiveParametroIndex, autoSaveStatus, setAutoSaveStatus, formError, setFormError, isSubmitting, setIsSubmitting, areAnswersLoading, setAreAnswersLoading, router, lotIsOpen, evaluationBlockedReason, canEditEvaluation, answeredControlIds, hasLocalAnswers, displayEstado, currentControl, currentLote, handleSetRespuesta, handleSetComentario, handleSetRespuestaListItem, getAnswersPayload, getAnsweredParamsWithoutComment, validateRequiredComments, handleEvidenceFilesChange, handleRemoveEvidenceFile, handlePreviewEvidence, closeEvidencePreview, handleDownloadEvidence, handleSaveDraft, evaluationProgress, totalParametros, respondidos, progreso, isComplete, currentParametroIndex, currentParametro, currentRespuesta, currentParametroEvidenceFiles, currentTieneRespuesta, currentMissingRequiredComment, canGoToPreviousParametro, canGoToNextParametro, goToPreviousParametro, goToNextParametro, handleSaveOrFinalize, scoreCalculado, scoreActual, handleFinalizeEvaluation }
 }

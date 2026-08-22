@@ -232,9 +232,11 @@ export function PlanificacionContent() {
 
   const handleReactivateLote = async (loteId: string) => {
     setStatusError(null)
+    setStatusSuccess(null)
     try {
       await updateLotStatus(loteId, "abierto")
       await refresh()
+      setStatusSuccess("El lote fue abierto nuevamente y ya admite respuestas.")
     } catch (error) {
       setStatusError(error instanceof Error ? error.message : "No se pudo reactivar el lote.")
     }
@@ -415,6 +417,15 @@ export function PlanificacionContent() {
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCloseLote(lote.id); }} className="text-status-warning-text">
                                 <Lock className="h-4 w-4 mr-2" />
                                 Cerrar Lote
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canManageLots && lote.estado === "cerrado" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReactivateLote(lote.id); }} className="text-status-success-text">
+                                <Unlock className="h-4 w-4 mr-2" />
+                                Volver a abrir lote
                               </DropdownMenuItem>
                             </>
                           )}

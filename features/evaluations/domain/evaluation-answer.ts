@@ -2,6 +2,12 @@
 // depende de React ni de Supabase y puede validarse con pruebas unitarias.
 export type RespuestaValor = "cumple" | "intermedio" | "no_cumple" | "na" | null
 
+export interface EvidenceAttachment {
+  name: string
+  path: string
+  type?: string
+}
+
 export interface EditableRespuesta {
   id?: string
   parametroId: string
@@ -11,7 +17,7 @@ export interface EditableRespuesta {
   areas: string[]
   fechaRespuesta?: string
   comentario: string
-  evidencias: string[]
+  evidencias: EvidenceAttachment[]
 }
 
 export type EvaluationAnswerInput = {

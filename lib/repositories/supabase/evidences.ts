@@ -6,6 +6,14 @@ import { requireActiveProfile } from "./access"
 
 const BUCKET = "answer-evidences"
 
+export async function getEvidenceSignedUrl(path: string, fileName?: string, download = false) {
+  await requireActiveProfile()
+  const options = download ? { download: fileName || true } : undefined
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60, options)
+  if (error) throw error
+  return data.signedUrl
+}
+
 function safeFileName(name: string) {
   return name.replace(/[^\w.-]+/g, "-").replace(/-+/g, "-")
 }

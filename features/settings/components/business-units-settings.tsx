@@ -13,8 +13,8 @@ import type { UnidadNegocio } from "@/lib/data"
 import { getErrorMessage } from "@/lib/error-message"
 import { createBusinessUnit, deleteBusinessUnit, updateBusinessUnit } from "@/lib/repositories/supabase/business-units"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Building2, Pencil, Plus, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { Building2, Camera, Pencil, Plus, Trash2, X } from "lucide-react"
+import { useRef, useState, type ChangeEvent } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { SettingsSectionHeader } from "./settings-section-header"
@@ -32,13 +32,43 @@ export function BusinessUnitsSettings({ units, canManage, canDelete, onChanged }
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [unitToDelete, setUnitToDelete] = useState<UnidadNegocio | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { nombre: "", ecosistema: "", logo: "" } })
+  const logo = form.watch("logo")
 
   const showForm = (unit?: UnidadNegocio) => {
     setEditing(unit ?? null)
     setError(null)
     form.reset({ nombre: unit?.nombre ?? "", ecosistema: unit?.ecosistema ?? "", logo: unit?.logo ?? "" })
+    if (logoInputRef.current) logoInputRef.current.value = ""
     setOpen(true)
+  }
+
+  const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"])
+    if (!allowedTypes.has(file.type) || file.size <= 0 || file.size > 2 * 1024 * 1024) {
+      setError("El logo debe ser JPG, PNG o WebP y no superar 2 MB.")
+      event.target.value = ""
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        form.setValue("logo", reader.result, { shouldDirty: true })
+        setError(null)
+      }
+    }
+    reader.onerror = () => setError("No se pudo leer la imagen seleccionada.")
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = () => {
+    form.setValue("logo", "", { shouldDirty: true })
+    if (logoInputRef.current) logoInputRef.current.value = ""
   }
   const submit = form.handleSubmit(async (values) => {
     try {
@@ -64,6 +94,46 @@ export function BusinessUnitsSettings({ units, canManage, canDelete, onChanged }
       </Card>
     </div>
     <ConfirmDestructiveDialog open={Boolean(unitToDelete)} onOpenChange={(next) => { if (!next) setUnitToDelete(null) }} title="Eliminar unidad de negocio" description={`Se eliminará “${unitToDelete?.nombre ?? ""}”. Esta acción no se puede deshacer.`} errorMessage="No se pudo eliminar la unidad." onConfirm={async () => { if (!unitToDelete) return; const name = unitToDelete.nombre; await deleteBusinessUnit(unitToDelete.id); await onChanged(); setSuccess(`La unidad “${name}” fue eliminada.`) }} />
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>{editing ? "Editar unidad" : "Nueva unidad"}</DialogTitle></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label>Nombre</Label><Input {...form.register("nombre")} />{form.formState.errors.nombre && <p className="text-xs text-status-danger-text">{form.formState.errors.nombre.message}</p>}</div><div><Label>Ecosistema</Label><Input {...form.register("ecosistema")} />{form.formState.errors.ecosistema && <p className="text-xs text-status-danger-text">{form.formState.errors.ecosistema.message}</p>}</div><div><Label>URL o imagen del logo</Label><Input {...form.register("logo")} /></div>{error && <p className="text-sm text-status-danger-text">{error}</p>}<div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>Guardar</Button></div></form></DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{editing ? "Editar unidad" : "Nueva unidad"}</DialogTitle></DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="business-unit-name">Nombre</Label>
+            <Input id="business-unit-name" {...form.register("nombre")} />
+            {form.formState.errors.nombre && <p className="text-xs text-status-danger-text">{form.formState.errors.nombre.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="business-unit-ecosystem">Ecosistema</Label>
+            <Input id="business-unit-ecosystem" {...form.register("ecosistema")} />
+            {form.formState.errors.ecosistema && <p className="text-xs text-status-danger-text">{form.formState.errors.ecosistema.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="business-unit-logo">Logo</Label>
+            <div className="flex items-center gap-3">
+              <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-secondary/30">
+                {logo ? <SafeImage src={logo} alt="Vista previa del logo" className="h-full w-full object-contain p-1" /> : <Building2 className="h-5 w-5 text-primary" />}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <label htmlFor="business-unit-logo" className="cursor-pointer">
+                    <Camera className="mr-2 h-4 w-4" />
+                    {logo ? "Cambiar imagen" : "Cargar imagen"}
+                  </label>
+                </Button>
+                {logo && <Button type="button" variant="ghost" size="sm" onClick={removeLogo}><X className="mr-2 h-4 w-4" />Quitar</Button>}
+              </div>
+            </div>
+            <input ref={logoInputRef} id="business-unit-logo" type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleLogoChange} />
+            <p className="text-xs text-muted-foreground">JPG, PNG o WebP. Máximo 2 MB.</p>
+          </div>
+          {error && <p className="text-sm text-status-danger-text">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>Guardar</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   </>
 }

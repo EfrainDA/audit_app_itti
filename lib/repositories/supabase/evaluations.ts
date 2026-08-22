@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export type { EvaluationAnswerInput } from "@/features/evaluations/domain/evaluation-answer";
 
-type EvidenceRow = { file_name: string | null; file_url: string }
+type EvidenceRow = { file_name: string | null; file_url: string; file_type: string | null }
 type AnswerRow = {
   id: string
   parameter_id: string
@@ -21,7 +21,7 @@ type AnswerRow = {
 export async function fetchAnswersForControl(controlId: string) {
   const result = await supabase
     .from("answers")
-    .select("id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url)")
+    .select("id,parameter_id,value,comment,audited_people,audited_roles,audited_areas,answered_at,answer_evidences(file_name,file_url,file_type)")
     .eq("control_id", controlId)
 
   let data = result.data
@@ -33,7 +33,7 @@ export async function fetchAnswersForControl(controlId: string) {
   ) {
     const legacyResult = await supabase
       .from("answers")
-      .select("id,parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url)")
+      .select("id,parameter_id,value,comment,audited_people,audited_roles,answered_at,answer_evidences(file_name,file_url,file_type)")
       .eq("control_id", controlId)
 
     data = legacyResult.data as typeof data
@@ -51,7 +51,11 @@ export async function fetchAnswersForControl(controlId: string) {
     cargos: answer.audited_roles?.length ? answer.audited_roles : [""],
     areas: answer.audited_areas?.length ? answer.audited_areas : [""],
     fechaRespuesta: answer.answered_at,
-    evidencias: (answer.answer_evidences ?? []).map((evidence) => evidence.file_name || evidence.file_url),
+    evidencias: (answer.answer_evidences ?? []).map((evidence) => ({
+      name: evidence.file_name || evidence.file_url,
+      path: evidence.file_url,
+      type: evidence.file_type ?? undefined,
+    })),
   }))
 }
 
